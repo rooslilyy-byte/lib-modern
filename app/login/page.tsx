@@ -48,11 +48,11 @@ export default function LoginPage() {
         {/* Bookstore Branding */}
         <div className="text-center space-y-3">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center">
-            <img src="/logo.png" alt="شعار مكتبة وراقة اهل سوس" className="w-full h-full object-contain" />
+            <img src="/LOGO izourane.jpg" alt="شركة إيزوران" className="object-contain h-16 w-auto" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              مكتبة وراقة اهل سوس
+              شركة إيزوران
             </h1>
             <p className="text-xs text-slate-500 font-medium mt-1">
               نظام متابعة وتوزيع خصاصات الدخول المدرسي POS
@@ -121,7 +121,7 @@ export default function LoginPage() {
 
         {/* Footer Note */}
         <div className="pt-2 border-t border-slate-200 text-[11px] text-slate-500 text-center">
-          حماية خاصة بطاقم عمل مكتبة وراقة اهل سوس • الجلسة ممتدة 30 يوماً
+          حماية خاصة بطاقم عمل شركة إيزوران • الجلسة ممتدة 30 يوماً
         </div>
 
       </div>
