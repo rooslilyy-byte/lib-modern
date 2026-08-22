@@ -212,9 +212,9 @@ export default function SupplierBuyingSheet({
             <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img
-                  src="/LOGO izourane.jpg"
+                  src="/logo-izourane.jpg"
                   alt="شعار شركة إيزوران"
-                  className="h-12 w-auto object-contain shrink-0"
+                  className="h-16 w-auto object-contain shrink-0"
                 />
                 <div>
                   <h1 className="text-2xl font-black text-black">شركة إيزوران</h1>

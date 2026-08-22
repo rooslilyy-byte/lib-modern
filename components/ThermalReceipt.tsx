@@ -42,9 +42,9 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
       {/* Top Center Logo (wide rectangular, 80mm-friendly) */}
       <div className="text-center mb-2">
         <img
-          src="/LOGO izourane.jpg"
+          src="/logo-izourane.jpg"
           alt="شعار شركة إيزوران"
-          className="w-32 h-auto object-contain mx-auto grayscale block"
+          className="h-12 w-auto object-contain grayscale mx-auto block"
         />
         <p className="text-lg font-bold text-center mt-2 text-black leading-tight">
           شركة إيزوران مكتب

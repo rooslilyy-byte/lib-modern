@@ -48,7 +48,7 @@ export default function LoginPage() {
         {/* Bookstore Branding */}
         <div className="text-center space-y-3">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-slate-50 border border-slate-200 p-2 flex items-center justify-center">
-            <img src="/LOGO izourane.jpg" alt="شركة إيزوران" className="object-contain h-16 w-auto" />
+            <img src="/logo-izourane.jpg" alt="شركة إيزوران" className="h-16 w-auto object-contain mx-auto" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">

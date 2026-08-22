@@ -64,9 +64,9 @@ export default function Sidebar({ isSupabaseActive }: SidebarProps) {
       {/* Logo & Branding (wide rectangle logo, stacked) */}
       <div className="flex flex-col items-center justify-center text-center p-4 border-b border-slate-200">
         <img
-          src="/LOGO izourane.jpg"
+          src="/logo-izourane.jpg"
           alt="شعار شركة إيزوران"
-          className="h-10 w-auto object-contain"
+          className="h-12 w-auto object-contain"
         />
         <span className="text-sm font-bold text-slate-900 mt-1.5">شركة إيزوران</span>
       </div>
@@ -170,7 +170,7 @@ export default function Sidebar({ isSupabaseActive }: SidebarProps) {
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center gap-2.5">
-            <img src="/LOGO izourane.jpg" alt="شعار شركة إيزوران" className="h-8 w-auto object-contain shrink-0" />
+            <img src="/logo-izourane.jpg" alt="شعار شركة إيزوران" className="h-8 w-auto object-contain shrink-0" />
             <div>
               <h1 className="font-extrabold text-xs text-slate-900 leading-tight">شركة إيزوران</h1>
               <span className="text-[10px] text-slate-500 font-bold block">{activeItem?.label}</span>

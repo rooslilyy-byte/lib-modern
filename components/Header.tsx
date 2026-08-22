@@ -60,7 +60,7 @@ export default function Header({
             {/* Store Branding */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white p-1 flex items-center justify-center shadow-lg shrink-0 overflow-hidden">
-                <img src="/logo.png" alt="شعار مكتبة وراقة اهل سوس" className="w-full h-full object-contain" />
+                <img src="/logo-izourane.jpg" alt="شعار شركة إيزوران" className="h-12 w-auto object-contain" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
