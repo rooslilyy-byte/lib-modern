@@ -88,7 +88,7 @@ export default function CustomerDetails({
     const readyItems = targetDemand.items?.filter(i => i.is_in_stock && !i.is_delivered) || [];
     const readyText = readyItems.map(i => `- ${i.product_name} (${i.quantity})`).join('\n');
 
-    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${targetDemand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText || 'جميع خصاصاتكم المسجلة جاهزة'}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: +212 661-556418`;
+    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${targetDemand.client.name}،\n\nنخبركم من شركة إيزوران أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText || 'جميع خصاصاتكم المسجلة جاهزة'}\n\nالعنوان: شركة إيزوران\nالهاتف: +212 661-556418`;
 
     return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
   }, [targetDemand]);

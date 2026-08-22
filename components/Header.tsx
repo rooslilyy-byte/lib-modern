@@ -65,7 +65,7 @@ export default function Header({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg sm:text-2xl font-extrabold text-slate-100 tracking-tight">
-                    مكتبة وراقة اهل سوس
+                    شركة إيزوران
                   </h1>
                   <span className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-medium ${
                     isSupabaseActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'

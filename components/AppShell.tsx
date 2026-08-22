@@ -181,7 +181,7 @@ export default function AppShell({ children }: AppShellProps) {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-24 space-y-3">
               <div className="w-10 h-10 border-4 border-slate-800 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-sm font-bold text-slate-600">جاري تحميل بيانات مكتبة وراقة اهل سوس...</p>
+              <p className="text-sm font-bold text-slate-600">جاري تحميل بيانات شركة إيزوران...</p>
             </div>
           ) : (
             children({
@@ -204,7 +204,7 @@ export default function AppShell({ children }: AppShellProps) {
         <footer className="bg-white text-slate-500 text-xs py-4 text-center border-t border-slate-200 mt-auto no-print">
           <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="font-bold text-slate-700">
-              مكتبة وراقة اهل سوس — الهاتف: <span dir="ltr" className="font-mono text-slate-700">+212 661-556418</span>
+              شركة إيزوران — الهاتف: <span dir="ltr" className="font-mono text-slate-700">+212 661-556418</span>
             </p>
             <p>© {new Date().getFullYear()} نظام متابعة وتوزيع خصاصات الدخول المدرسي POS.</p>
           </div>
