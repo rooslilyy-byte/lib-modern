@@ -150,17 +150,17 @@ export default function ProductAutocomplete({
                   key={item.id}
                   onClick={() => handleSelect(item.name)}
                   onMouseEnter={() => setFocusedIndex(index)}
-                  className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between gap-2 text-sky-700 bg-sky-50/80 hover:bg-sky-100/80 ${
-                    isFocused ? 'bg-sky-100 text-sky-900 font-bold' : ''
+                  className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between gap-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 ${
+                    isFocused ? 'bg-emerald-100 text-emerald-900 font-bold' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <PlusCircle className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    <PlusCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     <span className="text-xs font-semibold truncate">
                       إضافة كعنصر مخصص: &quot;{item.name}&quot;
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold bg-sky-200/70 text-sky-800 px-1.5 py-0.5 rounded shrink-0">
+                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0">
                     جديد
                   </span>
                 </div>

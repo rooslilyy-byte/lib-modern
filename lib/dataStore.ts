@@ -367,7 +367,7 @@ export async function autoAllocateStock(
     return Object.values(allocatedMap).map(c => {
       let rawPhone = c.phone.replace(/\D/g, '');
       if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
-      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: +212 661-556418`;
       return {
         clientName: c.clientName,
         phone: c.phone,

@@ -201,10 +201,10 @@ export default function AppShell({ children }: AppShellProps) {
           )}
         </main>
 
-        <footer className="bg-slate-900 text-slate-400 text-xs py-4 text-center border-t border-slate-800 mt-auto no-print">
+        <footer className="bg-white text-slate-500 text-xs py-4 text-center border-t border-slate-200 mt-auto no-print">
           <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="font-bold text-slate-300">
-              مكتبة وراقة اهل سوس — الهاتف: <span className="font-mono text-slate-300 dir-ltr">0675502660</span>
+            <p className="font-bold text-slate-700">
+              مكتبة وراقة اهل سوس — الهاتف: <span dir="ltr" className="font-mono text-slate-700">+212 661-556418</span>
             </p>
             <p>© {new Date().getFullYear()} نظام متابعة وتوزيع خصاصات الدخول المدرسي POS.</p>
           </div>

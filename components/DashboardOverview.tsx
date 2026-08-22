@@ -56,17 +56,17 @@ export default function DashboardOverview({
     <div className="space-y-4">
       
       {/* 1. Header Banner */}
-      <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-sm border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-base font-bold text-white">لوحة تحكّم المكتبة</h2>
-          <span className="bg-slate-800 text-slate-300 text-[11px] font-medium px-2 py-0.5 rounded border border-slate-700">
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900">لوحة تحكّم المكتبة</h2>
+          <span className="bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">
             موسم الدخول المدرسي
           </span>
         </div>
 
         <Link
           href="/customers"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center justify-center gap-1.5 transition-colors"
+          className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors shrink-0"
         >
           <Plus className="w-4 h-4 text-white shrink-0" />
           <span>إضافة طلب جديد</span>
@@ -100,19 +100,19 @@ export default function DashboardOverview({
         {/* Pending Card */}
         <Link 
           href="/customers"
-          className="bg-white border border-rose-200 hover:border-rose-300 transition-all rounded-2xl p-5 shadow-sm block group"
+          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-700">قيد الانتظار</span>
-            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-700">
-              <Clock className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-500">قيد الانتظار</span>
+            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-700">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-rose-700">{stats.pendingDemands}</span>
-            <span className="text-xs text-rose-600 font-medium">طلب معلق</span>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900">{stats.pendingDemands}</span>
+            <span className="text-xs text-slate-500 font-medium">طلب معلق</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-rose-100 flex items-center justify-between text-[11px] text-rose-700">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>تنتظر الشراء للمحل</span>
           </div>
         </Link>
@@ -120,19 +120,19 @@ export default function DashboardOverview({
         {/* Partial Card */}
         <Link 
           href="/customers"
-          className="bg-white border border-amber-200 hover:border-amber-300 transition-all rounded-2xl p-5 shadow-sm block group"
+          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700">تسليم جزئي</span>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-700">
-              <AlertCircle className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-500">تسليم جزئي</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-700">
+              <AlertCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-amber-700">{stats.partialDemands}</span>
-            <span className="text-xs text-amber-600 font-medium">مستلم جزئياً</span>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900">{stats.partialDemands}</span>
+            <span className="text-xs text-slate-500 font-medium">مستلم جزئياً</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-amber-100 flex items-center justify-between text-[11px] text-amber-700">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>بعض العناصر متوفرة</span>
           </div>
         </Link>
@@ -140,19 +140,19 @@ export default function DashboardOverview({
         {/* Completed Card */}
         <Link 
           href="/customers"
-          className="bg-white border border-emerald-200 hover:border-emerald-300 transition-all rounded-2xl p-5 shadow-sm block group"
+          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-700">مكتمل المسلمات</span>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-700">
-              <CheckCircle2 className="w-5 h-5" />
+            <span className="text-xs font-semibold text-slate-500">مكتمل المسلمات</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-emerald-700">{stats.completedDemands}</span>
-            <span className="text-xs text-emerald-600 font-medium">تم التسليم بالكامل</span>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900">{stats.completedDemands}</span>
+            <span className="text-xs text-slate-500 font-medium">تم التسليم بالكامل</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-700">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
             <span>تم تسليم جميع الكتب</span>
           </div>
         </Link>
@@ -165,7 +165,7 @@ export default function DashboardOverview({
         {/* Card 1: Add Client & Demand */}
         <Link
           href="/customers"
-          className="bg-slate-900 hover:bg-slate-800 text-white border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-md transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-slate-900 hover:bg-slate-800 text-white border border-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
         >
           <div className="flex items-center justify-between">
             <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 text-sky-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
@@ -182,7 +182,7 @@ export default function DashboardOverview({
         {/* Card 2: A4 Purchase Report */}
         <Link
           href="/reports"
-          className="bg-white border-2 border-slate-200 hover:border-slate-900 text-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-white border border-slate-200 hover:border-slate-900 text-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
         >
           <div className="flex items-center justify-between">
             <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
@@ -199,7 +199,7 @@ export default function DashboardOverview({
         {/* Card 3: Add & Allocate Stock */}
         <Link
           href="/stock"
-          className="bg-white border-2 border-slate-200 hover:border-slate-900 text-slate-900 rounded-2xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-white border border-slate-200 hover:border-slate-900 text-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
         >
           <div className="flex items-center justify-between">
             <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">

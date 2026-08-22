@@ -1,66 +1,174 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
-import { ClientDemand, MasterProduct, PurchaseBatch } from '@/lib/types';
+import { supabaseAdmin } from '@/lib/db';
+import type { ClientDemand, MasterProduct, PurchaseBatch } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+const DEFAULT_BATCH_NAME =
+  '\u062f\u0641\u0639\u0629 \u0627\u0644\u062f\u062e\u0648\u0644 \u0627\u0644\u0645\u062f\u0631\u0633\u064a \u0627\u0644\u0631\u0626\u064a\u0633\u064a';
+const DEFAULT_PRODUCT_CATEGORY = '\u0643\u062a\u0627\u0628 \u0645\u062f\u0631\u0633\u064a';
+
+type DatabaseRow = Record<string, any>;
+
+function unwrap<T>(
+  result: { data: T; error: { message: string; details?: string; hint?: string } | null },
+  operation: string,
+): T {
+  if (result.error) {
+    const details = [result.error.message, result.error.details, result.error.hint]
+      .filter(Boolean)
+      .join(' ');
+    throw new Error(`${operation}: ${details}`);
+  }
+
+  return result.data;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function normalizeProductName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+async function getActiveBatch(): Promise<PurchaseBatch> {
+  const batches = unwrap(
+    await supabaseAdmin
+      .from('purchase_batches')
+      .select('*')
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false })
+      .limit(1),
+    'Loading active purchase batch',
+  ) as PurchaseBatch[];
+
+  if (batches.length > 0) {
+    return batches[0];
+  }
+
+  return unwrap(
+    await supabaseAdmin
+      .from('purchase_batches')
+      .insert({ batch_name: DEFAULT_BATCH_NAME, is_archived: false })
+      .select()
+      .single(),
+    'Creating default purchase batch',
+  ) as PurchaseBatch;
+}
+
+async function getMasterProductByName(name: string): Promise<MasterProduct | null> {
+  const products = unwrap(
+    await supabaseAdmin
+      .from('master_products')
+      .select('*'),
+    'Loading master products',
+  ) as MasterProduct[];
+
+  const normalizedName = normalizeProductName(name);
+  return products.find((product) => normalizeProductName(product.name) === normalizedName) || null;
+}
+
+async function ensureMasterProduct(name: string, category = DEFAULT_PRODUCT_CATEGORY): Promise<MasterProduct> {
+  const existing = await getMasterProductByName(name);
+  if (existing) {
+    return existing;
+  }
+
+  return unwrap(
+    await supabaseAdmin
+      .from('master_products')
+      .insert({ name, category })
+      .select()
+      .single(),
+    'Creating master product',
+  ) as MasterProduct;
+}
+
+async function updateMasterProductStock(productName: string, delta: number): Promise<void> {
+  const product = await getMasterProductByName(productName);
+  if (!product) {
+    return;
+  }
+
+  const availableStock = Math.max(0, Number(product.available_stock) || 0);
+  unwrap(
+    await supabaseAdmin
+      .from('master_products')
+      .update({ available_stock: Math.max(0, availableStock + delta) })
+      .eq('id', product.id),
+    'Updating master product stock',
+  );
+}
+
+async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
+  const rows = unwrap(
+    await supabaseAdmin
+      .from('client_demands')
+      .select(`
+        id,
+        client_id,
+        batch_id,
+        status,
+        created_at,
+        client:clients!inner (
+          id,
+          name,
+          phone,
+          created_at
+        ),
+        items:demand_items (*)
+      `)
+      .eq('batch_id', batchId)
+      .order('created_at', { ascending: false }),
+    'Loading client demands',
+  ) as DatabaseRow[];
+
+  const demands: ClientDemand[] = [];
+
+  for (const row of rows) {
+    const relatedClient = Array.isArray(row.client) ? row.client[0] : row.client;
+    if (!relatedClient) {
+      continue;
+    }
+
+    const items = [...((row.items || []) as DatabaseRow[])].sort((a, b) => {
+      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    }) as ClientDemand['items'];
+
+    demands.push({
+      id: row.id,
+      client_id: row.client_id,
+      batch_id: row.batch_id,
+      status: row.status,
+      created_at: row.created_at,
+      client: {
+        id: relatedClient.id,
+        name: relatedClient.name,
+        phone: relatedClient.phone,
+        created_at: relatedClient.created_at,
+      },
+      items,
+    });
+  }
+
+  return demands;
+}
+
 export async function GET() {
   try {
-    // 1. Get or create active purchase batch
-    let batchRows = await query<PurchaseBatch>(
-      `SELECT * FROM public.purchase_batches WHERE is_archived = false ORDER BY created_at DESC LIMIT 1;`
-    );
+    const activeBatch = await getActiveBatch();
 
-    if (batchRows.length === 0) {
-      batchRows = await query<PurchaseBatch>(
-        `INSERT INTO public.purchase_batches (batch_name, is_archived) 
-         VALUES ('دفعة الدخول المدرسي الرئيسي', false) 
-         RETURNING *;`
-      );
-    }
-    const activeBatch = batchRows[0];
+    const masterProducts = unwrap(
+      await supabaseAdmin
+        .from('master_products')
+        .select('*')
+        .order('name', { ascending: true }),
+      'Loading master products',
+    ) as MasterProduct[];
 
-    // 2. Fetch master products
-    const masterProducts = await query<MasterProduct>(
-      `SELECT * FROM public.master_products ORDER BY name ASC;`
-    );
-
-    // 3. Fetch client demands with client and items
-    const demandsRows = await query<any>(
-      `SELECT 
-        d.id, d.client_id, d.batch_id, d.status, d.created_at,
-        c.name AS client_name, c.phone AS client_phone, c.created_at AS client_created_at
-       FROM public.client_demands d
-       JOIN public.clients c ON d.client_id = c.id
-       WHERE d.batch_id = $1
-       ORDER BY d.created_at DESC;`,
-      [activeBatch.id]
-    );
-
-    const demandIds = demandsRows.map(d => d.id);
-    let itemsRows: any[] = [];
-    if (demandIds.length > 0) {
-      itemsRows = await query<any>(
-        `SELECT * FROM public.demand_items WHERE demand_id = ANY($1) ORDER BY created_at ASC;`,
-        [demandIds]
-      );
-    }
-
-    const demands: ClientDemand[] = demandsRows.map(d => ({
-      id: d.id,
-      client_id: d.client_id,
-      batch_id: d.batch_id,
-      status: d.status,
-      created_at: d.created_at,
-      client: {
-        id: d.client_id,
-        name: d.client_name,
-        phone: d.client_phone,
-        created_at: d.client_created_at,
-      },
-      items: itemsRows.filter(i => i.demand_id === d.id),
-    }));
+    const demands = await getDemandsForBatch(activeBatch.id);
 
     return NextResponse.json({
       success: true,
@@ -68,11 +176,11 @@ export async function GET() {
       masterProducts,
       demands,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching database store data:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Failed to fetch database data' },
-      { status: 500 }
+      { success: false, message: errorMessage(error) || 'Failed to fetch database data' },
+      { status: 500 },
     );
   }
 }
@@ -82,125 +190,140 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
-    // --- CREATE DEMAND ---
     if (action === 'create_demand') {
       const { clientName, clientPhone, items } = body;
       const cleanPhone = clientPhone.trim();
       const cleanName = clientName.trim();
+      const activeBatch = await getActiveBatch();
 
-      // 1. Get active batch
-      let batchRows = await query<PurchaseBatch>(
-        `SELECT * FROM public.purchase_batches WHERE is_archived = false ORDER BY created_at DESC LIMIT 1;`
-      );
-      if (batchRows.length === 0) {
-        batchRows = await query<PurchaseBatch>(
-          `INSERT INTO public.purchase_batches (batch_name, is_archived) VALUES ('دفعة الدخول المدرسي الرئيسي', false) RETURNING *;`
-        );
-      }
-      const batchId = batchRows[0].id;
+      const client = unwrap(
+        await supabaseAdmin
+          .from('clients')
+          .insert({ name: cleanName, phone: cleanPhone })
+          .select()
+          .single(),
+        'Creating client',
+      ) as DatabaseRow;
 
-      // 2. Force brand new client insertion every time (never merge or lookup by phone)
-      const newClientRows = await query(
-        `INSERT INTO public.clients (name, phone) VALUES ($1, $2) RETURNING *;`,
-        [cleanName, cleanPhone]
-      );
-      const clientId = newClientRows[0].id;
+      const demand = unwrap(
+        await supabaseAdmin
+          .from('client_demands')
+          .insert({ client_id: client.id, batch_id: activeBatch.id, status: 'pending' })
+          .select()
+          .single(),
+        'Creating client demand',
+      ) as DatabaseRow;
 
-      // 3. Create client demand in public.client_demands
-      const demandRows = await query(
-        `INSERT INTO public.client_demands (client_id, batch_id, status) VALUES ($1, $2, 'pending') RETURNING *;`,
-        [clientId, batchId]
-      );
-      const demandId = demandRows[0].id;
+      for (const item of items) {
+        const productName = item.product_name.trim();
+        const quantity = Math.max(1, Math.floor(item.quantity || 1));
+        const product = await ensureMasterProduct(productName);
+        const availableStock = Math.max(0, Number(product.available_stock) || 0);
+        const isInStock = availableStock >= quantity;
 
-      // 4. Insert demand items in public.demand_items with auto-fulfillment if available_stock >= requested_quantity
-      for (const it of items) {
-        const prodName = it.product_name.trim();
-        const qty = Math.max(1, Math.floor(it.quantity || 1));
-
-        // Ensure master product exists
-        await query(
-          `INSERT INTO public.master_products (name, category) VALUES ($1, 'كتاب مدرسي') ON CONFLICT (name) DO NOTHING;`,
-          [prodName]
-        );
-
-        // Pre-check available stock for this product
-        const prodRows = await query<MasterProduct>(
-          `SELECT available_stock FROM public.master_products WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) LIMIT 1;`,
-          [prodName]
-        );
-
-        const currentAvailable = prodRows[0]?.available_stock || 0;
-        let isInStock = false;
-
-        if (currentAvailable >= qty) {
-          isInStock = true;
-          // Deduct allocated stock from master_products
-          await query(
-            `UPDATE public.master_products 
-             SET available_stock = available_stock - $1 
-             WHERE LOWER(TRIM(name)) = LOWER(TRIM($2));`,
-            [qty, prodName]
+        if (isInStock) {
+          unwrap(
+            await supabaseAdmin
+              .from('master_products')
+              .update({ available_stock: availableStock - quantity })
+              .eq('id', product.id),
+            'Allocating available product stock',
           );
         }
 
-        await query(
-          `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-           VALUES ($1, $2, $3, $4, false);`,
-          [demandId, prodName, qty, isInStock]
+        unwrap(
+          await supabaseAdmin
+            .from('demand_items')
+            .insert({
+              demand_id: demand.id,
+              product_name: productName,
+              quantity,
+              is_in_stock: isInStock,
+              is_delivered: false,
+            }),
+          'Creating demand item',
         );
       }
 
-      return NextResponse.json({ success: true, demandId });
+      return NextResponse.json({ success: true, demandId: demand.id });
     }
 
-    // --- UPDATE DEMAND ---
     if (action === 'update_demand') {
       const { demandId, clientName, clientPhone, items } = body;
       const cleanPhone = clientPhone.trim();
       const cleanName = clientName.trim();
 
-      const demandRows = await query(`SELECT * FROM public.client_demands WHERE id = $1;`, [demandId]);
-      if (demandRows.length === 0) {
+      const demand = unwrap(
+        await supabaseAdmin
+          .from('client_demands')
+          .select('*')
+          .eq('id', demandId)
+          .maybeSingle(),
+        'Loading demand to update',
+      ) as DatabaseRow | null;
+
+      if (!demand) {
         return NextResponse.json({ success: false, message: 'Demand not found' }, { status: 404 });
       }
 
-      const clientId = demandRows[0].client_id;
-      await query(`UPDATE public.clients SET name = $1, phone = $2 WHERE id = $3;`, [cleanName, cleanPhone, clientId]);
+      unwrap(
+        await supabaseAdmin
+          .from('clients')
+          .update({ name: cleanName, phone: cleanPhone })
+          .eq('id', demand.client_id),
+        'Updating client',
+      );
 
-      const keepIds = items.map((i: any) => i.id).filter(Boolean);
-      if (keepIds.length > 0) {
-        await query(
-          `DELETE FROM public.demand_items WHERE demand_id = $1 AND id NOT IN (SELECT unnest($2::uuid[]));`,
-          [demandId, keepIds]
+      const existingItems = unwrap(
+        await supabaseAdmin
+          .from('demand_items')
+          .select('id')
+          .eq('demand_id', demandId),
+        'Loading existing demand items',
+      ) as Array<{ id: string }>;
+      const keepIds = new Set(items.map((item: DatabaseRow) => item.id).filter(Boolean));
+      const removedIds = existingItems.map((item) => item.id).filter((id) => !keepIds.has(id));
+
+      if (removedIds.length > 0) {
+        unwrap(
+          await supabaseAdmin.from('demand_items').delete().in('id', removedIds),
+          'Removing deleted demand items',
         );
-      } else {
-        await query(`DELETE FROM public.demand_items WHERE demand_id = $1;`, [demandId]);
       }
 
-      for (const it of items) {
-        const prodName = it.product_name.trim();
-        const qty = Math.max(1, Math.floor(it.quantity || 1));
-        const inStock = Boolean(it.is_in_stock);
-        const delivered = Boolean(it.is_delivered);
+      for (const item of items) {
+        const productName = item.product_name.trim();
+        const quantity = Math.max(1, Math.floor(item.quantity || 1));
+        const isInStock = Boolean(item.is_in_stock);
+        const isDelivered = Boolean(item.is_delivered);
 
-        await query(
-          `INSERT INTO public.master_products (name, category) VALUES ($1, 'كتاب مدرسي') ON CONFLICT (name) DO NOTHING;`,
-          [prodName]
-        );
+        await ensureMasterProduct(productName);
 
-        if (it.id) {
-          await query(
-            `UPDATE public.demand_items 
-             SET product_name = $1, quantity = $2, is_in_stock = $3, is_delivered = $4 
-             WHERE id = $5;`,
-            [prodName, qty, inStock, delivered, it.id]
+        if (item.id) {
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .update({
+                product_name: productName,
+                quantity,
+                is_in_stock: isInStock,
+                is_delivered: isDelivered,
+              })
+              .eq('id', item.id),
+            'Updating demand item',
           );
         } else {
-          await query(
-            `INSERT INTO public.demand_items (demand_id, product_name, quantity, is_in_stock, is_delivered)
-             VALUES ($1, $2, $3, $4, $5);`,
-            [demandId, prodName, qty, inStock, delivered]
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .insert({
+                demand_id: demandId,
+                product_name: productName,
+                quantity,
+                is_in_stock: isInStock,
+                is_delivered: isDelivered,
+              }),
+            'Creating replacement demand item',
           );
         }
       }
@@ -208,112 +331,129 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    // --- UPDATE ITEM STATE (Stock Allocation / Delivery) ---
     if (action === 'update_item_state') {
       const { itemId, updates } = body;
-      const { is_in_stock, is_delivered } = updates;
+      const update: DatabaseRow = {};
 
-      if (is_in_stock !== undefined && is_delivered !== undefined) {
-        await query(
-          `UPDATE public.demand_items SET is_in_stock = $1, is_delivered = $2 WHERE id = $3;`,
-          [Boolean(is_in_stock), Boolean(is_delivered), itemId]
-        );
-      } else if (is_in_stock !== undefined) {
-        await query(
-          `UPDATE public.demand_items SET is_in_stock = $1 WHERE id = $2;`,
-          [Boolean(is_in_stock), itemId]
-        );
-      } else if (is_delivered !== undefined) {
-        await query(
-          `UPDATE public.demand_items SET is_delivered = $1, is_in_stock = CASE WHEN $1 = true THEN true ELSE is_in_stock END WHERE id = $2;`,
-          [Boolean(is_delivered), itemId]
+      if (updates.is_in_stock !== undefined) {
+        update.is_in_stock = Boolean(updates.is_in_stock);
+      }
+      if (updates.is_delivered !== undefined) {
+        update.is_delivered = Boolean(updates.is_delivered);
+        if (updates.is_delivered) {
+          update.is_in_stock = true;
+        }
+      }
+
+      if (Object.keys(update).length > 0) {
+        unwrap(
+          await supabaseAdmin.from('demand_items').update(update).eq('id', itemId),
+          'Updating demand item state',
         );
       }
 
       return NextResponse.json({ success: true });
     }
 
-    // --- AUTO ALLOCATE STOCK (FIFO Multi-Client) ---
     if (action === 'auto_allocate_stock') {
       const { productName, receivedQty } = body;
       const cleanName = productName.trim();
-      let remainingQty = Math.max(1, parseInt(receivedQty) || 1);
+      let remainingQty = Math.max(1, parseInt(receivedQty, 10) || 1);
 
-      // Get active batch ID
-      const batchRows = await query<PurchaseBatch>(
-        `SELECT id FROM public.purchase_batches WHERE is_archived = false ORDER BY created_at DESC LIMIT 1;`
-      );
-      const batchId = batchRows[0]?.id;
+      const activeBatches = unwrap(
+        await supabaseAdmin
+          .from('purchase_batches')
+          .select('id')
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        'Loading active batch for stock allocation',
+      ) as Array<{ id: string }>;
+      const activeBatchId = activeBatches[0]?.id;
 
-      // Select matching pending demand_items in active batch ordered by client_demands.created_at ASC
-      const pendingItems = await query<any>(
-        `SELECT 
-          di.id AS item_id,
-          di.demand_id,
-          di.product_name,
-          di.quantity,
-          di.is_in_stock,
-          di.is_delivered,
-          cd.created_at AS demand_created_at,
-          c.name AS client_name,
-          c.phone AS client_phone
-         FROM public.demand_items di
-         JOIN public.client_demands cd ON di.demand_id = cd.id
-         JOIN public.clients c ON cd.client_id = c.id
-         WHERE LOWER(TRIM(di.product_name)) = LOWER($1)
-           AND di.is_in_stock = false
-           AND di.is_delivered = false
-           ${batchId ? `AND cd.batch_id = '${batchId}'` : ''}
-         ORDER BY cd.created_at ASC;`,
-        [cleanName]
-      );
+      let demandQuery = supabaseAdmin
+        .from('client_demands')
+        .select(`
+          id,
+          created_at,
+          batch_id,
+          client:clients!inner (name, phone),
+          items:demand_items (*)
+        `)
+        .order('created_at', { ascending: true });
 
-      const allocatedClientsMap: Record<string, { clientName: string; phone: string; totalFulfilled: number }> = {};
+      if (activeBatchId) {
+        demandQuery = demandQuery.eq('batch_id', activeBatchId);
+      }
 
-      for (const item of pendingItems) {
+      const pendingDemands = unwrap(
+        await demandQuery,
+        'Loading pending demands for stock allocation',
+      ) as DatabaseRow[];
+
+      const allocatedClientsMap: Record<
+        string,
+        { clientName: string; phone: string; totalFulfilled: number }
+      > = {};
+
+      for (const demand of pendingDemands) {
         if (remainingQty <= 0) break;
 
-        const needed = item.quantity;
-        const fulfilledPortion = Math.min(remainingQty, needed);
+        const client = Array.isArray(demand.client) ? demand.client[0] : demand.client;
+        if (!client?.phone) continue;
 
-        // Strict Requirement: NEVER execute INSERT into demand_items.
-        // Update the is_in_stock boolean column on existing record.
-        await query(
-          `UPDATE public.demand_items SET is_in_stock = true WHERE id = $1;`,
-          [item.item_id]
-        );
+        const items = [...((demand.items || []) as DatabaseRow[])].sort((a, b) => {
+          return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
 
-        remainingQty -= needed;
+        for (const item of items) {
+          if (remainingQty <= 0) break;
+          if (
+            normalizeProductName(item.product_name) !== normalizeProductName(cleanName) ||
+            item.is_in_stock ||
+            item.is_delivered
+          ) {
+            continue;
+          }
 
-        const key = item.client_phone;
-        if (!allocatedClientsMap[key]) {
-          allocatedClientsMap[key] = {
-            clientName: item.client_name,
-            phone: item.client_phone,
-            totalFulfilled: 0,
-          };
+          const needed = Number(item.quantity) || 0;
+          const fulfilledPortion = Math.min(remainingQty, needed);
+
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .update({ is_in_stock: true })
+              .eq('id', item.id),
+            'Allocating received stock to demand item',
+          );
+
+          remainingQty -= fulfilledPortion;
+          const key = client.phone;
+          if (!allocatedClientsMap[key]) {
+            allocatedClientsMap[key] = {
+              clientName: client.name,
+              phone: client.phone,
+              totalFulfilled: 0,
+            };
+          }
+          allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
         }
-        allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
       }
 
       if (remainingQty > 0) {
-        await query(
-          `INSERT INTO public.master_products (name, category, available_stock)
-           VALUES ($1, 'كتاب مدرسي', $2)
-           ON CONFLICT (name) DO UPDATE 
-           SET available_stock = GREATEST(0, COALESCE(master_products.available_stock, 0) + EXCLUDED.available_stock);`,
-          [cleanName, remainingQty]
-        );
+        await ensureMasterProduct(cleanName);
+        await updateMasterProductStock(cleanName, remainingQty);
       }
 
-      const allocatedClients = Object.values(allocatedClientsMap).map(c => {
-        let rawPhone = c.phone.replace(/\D/g, '');
-        if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
-        const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+      const allocatedClients = Object.values(allocatedClientsMap).map((client) => {
+        let rawPhone = client.phone.replace(/\D/g, '');
+        if (rawPhone.startsWith('0')) rawPhone = `212${rawPhone.slice(1)}`;
+        const message = `\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0648\u0631\u062d\u0645\u0629 \u0627\u0644\u0644\u0647 \u0648\u0628\u0631\u0643\u0627\u062a\u0647 \u0627\u0644\u0633\u064a\u062f(\u0629) ${client.clientName}\u060c\n\n\u0646\u062e\u0628\u0631\u0643\u0645 \u0623\u0646 \u0627\u0644\u0645\u0646\u062a\u062c \"${cleanName}\" (\u0639\u062f\u062f: ${client.totalFulfilled}) \u0642\u062f \u0648\u0635\u0644 \u0648\u0647\u0648 \u062c\u0627\u0647\u0632 \u0644\u0644\u062a\u0633\u0644\u064a\u0645!`;
+
         return {
-          clientName: c.clientName,
-          phone: c.phone,
-          fulfilledQty: c.totalFulfilled,
+          clientName: client.clientName,
+          phone: client.phone,
+          fulfilledQty: client.totalFulfilled,
           link: `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`,
         };
       });
@@ -321,78 +461,88 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingQty });
     }
 
-    // --- DELETE DEMAND ---
     if (action === 'delete_demand') {
       const { demandId } = body;
-      await query(`DELETE FROM public.client_demands WHERE id = $1;`, [demandId]);
+      unwrap(
+        await supabaseAdmin.from('client_demands').delete().eq('id', demandId),
+        'Deleting demand',
+      );
       return NextResponse.json({ success: true });
     }
 
-    // --- DELETE BULK CUSTOMERS ---
     if (action === 'delete_bulk_customers') {
       const { clientIds } = body;
       if (Array.isArray(clientIds) && clientIds.length > 0) {
-        await query(`DELETE FROM public.client_demands WHERE client_id = ANY($1);`, [clientIds]);
-        await query(`DELETE FROM public.clients WHERE id = ANY($1);`, [clientIds]);
+        unwrap(
+          await supabaseAdmin.from('client_demands').delete().in('client_id', clientIds),
+          'Deleting customer demands',
+        );
+        unwrap(
+          await supabaseAdmin.from('clients').delete().in('id', clientIds),
+          'Deleting customers',
+        );
       }
       return NextResponse.json({ success: true });
     }
 
-    // --- UPDATE MASTER PRODUCT STOCK ---
     if (action === 'update_stock') {
       const { productName, deltaQty } = body;
       const cleanName = productName.trim();
-      const delta = parseInt(deltaQty) || 0;
-
-      await query(
-        `UPDATE public.master_products 
-         SET available_stock = GREATEST(0, COALESCE(available_stock, 0) + $1) 
-         WHERE name = $2;`,
-        [delta, cleanName]
-      );
+      const delta = parseInt(deltaQty, 10) || 0;
+      await updateMasterProductStock(cleanName, delta);
       return NextResponse.json({ success: true });
     }
 
-    // --- ADD MASTER PRODUCT ---
     if (action === 'add_master_product') {
       const { name, category } = body;
       const cleanName = name.trim();
-      const cat = category || 'كتاب مدرسي';
+      const productCategory = category || DEFAULT_PRODUCT_CATEGORY;
 
-      const rows = await query(
-        `INSERT INTO public.master_products (name, category, available_stock)
-         VALUES ($1, $2, 0)
-         ON CONFLICT (name) DO UPDATE SET category = EXCLUDED.category
-         RETURNING *;`,
-        [cleanName, cat]
-      );
+      const product = unwrap(
+        await supabaseAdmin
+          .from('master_products')
+          .upsert(
+            { name: cleanName, category: productCategory },
+            { onConflict: 'name' },
+          )
+          .select()
+          .single(),
+        'Adding master product',
+      ) as MasterProduct;
 
-      return NextResponse.json({ success: true, product: rows[0] });
+      return NextResponse.json({ success: true, product });
     }
 
-    // --- ARCHIVE BATCH ---
     if (action === 'archive_batch') {
       const { newBatchName } = body;
-      
-      const activeRows = await query(`SELECT id FROM public.purchase_batches WHERE is_archived = false;`);
-      if (activeRows.length > 0) {
-        await query(`UPDATE public.purchase_batches SET is_archived = true, archived_at = NOW() WHERE is_archived = false;`);
-      }
+      const now = new Date().toISOString();
 
-      const created = await query(
-        `INSERT INTO public.purchase_batches (batch_name, is_archived) VALUES ($1, false) RETURNING *;`,
-        [newBatchName]
+      unwrap(
+        await supabaseAdmin
+          .from('purchase_batches')
+          .update({ is_archived: true, archived_at: now })
+          .eq('is_archived', false),
+        'Archiving active batches',
       );
 
-      return NextResponse.json({ success: true, batch: created[0] });
+      const batch = unwrap(
+        await supabaseAdmin
+          .from('purchase_batches')
+          .insert({ batch_name: newBatchName, is_archived: false })
+          .select()
+          .single(),
+        'Creating replacement batch',
+      ) as PurchaseBatch;
+
+      return NextResponse.json({ success: true, batch });
     }
 
     return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error executing database store action:', error);
     return NextResponse.json(
-      { success: false, message: error.message || 'Database action failed' },
-      { status: 500 }
+      { success: false, message: errorMessage(error) || 'Database action failed' },
+      { status: 500 },
     );
   }
 }

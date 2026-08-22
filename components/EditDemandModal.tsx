@@ -191,17 +191,17 @@ export default function EditDemandModal({
       <div className="bg-white border border-slate-200 text-slate-900 rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="bg-slate-900 text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sky-400 shrink-0">
+        <div className="bg-white border-b border-slate-200 p-3.5 sm:p-4 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
               <Edit3 className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-sm sm:text-base">تعديل الطلب</h3>
+            <h3 className="font-bold text-sm sm:text-base text-slate-900 truncate">تعديل الطلب</h3>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -335,7 +335,7 @@ export default function EditDemandModal({
                         type="checkbox"
                         checked={item.is_in_stock}
                         onChange={(e) => handleItemChange(idx, 'is_in_stock', e.target.checked)}
-                        className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 w-5 h-5"
+                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 w-5 h-5"
                       />
                       <span>متوفر بالمتجر</span>
                     </label>

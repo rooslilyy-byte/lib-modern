@@ -172,7 +172,7 @@ export default function CustomersDirectory({
               {onCreateDemand && (
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all shrink-0"
+                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4 text-white" />
                   <span>إضافة زبون وطلب خصاص</span>
@@ -245,7 +245,7 @@ export default function CustomersDirectory({
       </div>
 
       {/* Compact Full-Width Customers Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden space-y-0">
         
         {filteredCustomers.length === 0 ? (
           <div className="text-center py-12 bg-white">
@@ -264,7 +264,7 @@ export default function CustomersDirectory({
                       type="checkbox"
                       checked={isAllSelected}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer accent-slate-900"
                       title="تحديد الكل"
                     />
                   </div>
@@ -283,7 +283,7 @@ export default function CustomersDirectory({
               const isSelected = selectedCustomerIds.includes(cli.clientId);
 
               return (
-                <div key={cli.id} className={`group transition-colors ${isSelected ? 'bg-blue-50/50' : 'bg-white hover:bg-slate-50/80'}`}>
+                <div key={cli.id} className={`group transition-colors ${isSelected ? 'bg-slate-100/70' : 'bg-white hover:bg-slate-50/80'}`}>
                   
                   {/* Main Minimalist Compact Row */}
                   <div 
@@ -303,7 +303,7 @@ export default function CustomersDirectory({
                                 e.stopPropagation();
                                 handleToggleCustomer(cli.clientId);
                               }}
-                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600"
+                              className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer accent-slate-900"
                               title="تحديد هذا الزبون"
                             />
                           </div>
@@ -316,7 +316,7 @@ export default function CustomersDirectory({
                         <Link
                           href={`/customers/${encodeURIComponent(cli.id)}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-sky-700 hover:underline transition-colors truncate dir-rtl text-right"
+                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-slate-600 hover:underline transition-colors truncate dir-rtl text-right"
                           title="انقر لعرض ملف هذه الطلبية بالكامل"
                         >
                           {cli.name}
@@ -347,19 +347,19 @@ export default function CustomersDirectory({
 
                       {/* Mobile Badges */}
                       <div className="md:hidden flex items-center gap-1.5 flex-wrap">
-                        <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded">
+                        <span className="bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                           {cli.totalItems} سلعة
                         </span>
                         {cli.missingCount > 0 ? (
-                          <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             {cli.missingCount} خصاص
                           </span>
                         ) : cli.isReady ? (
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             جاهز
                           </span>
                         ) : (
-                          <span className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          <span className="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             مستلم
                           </span>
                         )}
@@ -368,20 +368,20 @@ export default function CustomersDirectory({
 
                     {/* RTL Section 3: Desktop Badges */}
                     <div className="hidden md:flex flex-1 items-center justify-center gap-2">
-                      <span className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                      <span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                         {cli.totalItems} سلعة
                       </span>
 
                       {cli.missingCount > 0 ? (
-                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-rose-50 text-rose-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                           {cli.missingCount} خصاص
                         </span>
                       ) : cli.isReady ? (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                           جاهز للاستلام
                         </span>
                       ) : (
-                        <span className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                           جميع طلباته مستلمة
                         </span>
                       )}
@@ -413,7 +413,7 @@ export default function CustomersDirectory({
                             <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
                               {item.quantity}
                             </span>
-                            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
+                            <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0">
                               خصاص
                             </span>
                             <span className="font-extrabold text-slate-900 text-xs truncate">

@@ -20,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} overflow-x-hidden`} suppressHydrationWarning>
-      <body className="min-h-screen bg-slate-50 font-cairo antialiased selection:bg-sky-500 selection:text-white overflow-x-hidden" suppressHydrationWarning>
+      <body className="min-h-screen bg-slate-50 font-cairo antialiased selection:bg-slate-900 selection:text-white overflow-x-hidden" suppressHydrationWarning>
         {children}
       </body>
     </html>

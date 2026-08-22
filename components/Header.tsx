@@ -76,9 +76,9 @@ export default function Header({
                 <p className="text-[11px] sm:text-xs text-sky-300 font-medium flex items-center gap-2 mt-0.5">
                   <span className="hidden sm:inline">متابعة خصاصات الدخول المدرسي</span>
                   <span className="hidden sm:inline text-slate-600">•</span>
-                  <a href="tel:0675502660" className="flex items-center gap-1 text-slate-300 hover:text-sky-300 dir-ltr font-mono">
+                  <a dir="ltr" href="tel:+212661556418" className="flex items-center gap-1 text-slate-300 hover:text-sky-300 font-mono">
                     <Phone className="w-3 h-3 text-sky-400" />
-                    <span>0675502660</span>
+                    <span>+212 661-556418</span>
                   </a>
                 </p>
               </div>

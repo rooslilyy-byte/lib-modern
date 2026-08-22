@@ -142,7 +142,7 @@ export default function DemandsList({
     const readyItems = demand.items?.filter(i => i.is_in_stock && !i.is_delivered) || [];
     const readyText = readyItems.map(i => `- ${i.product_name} (${i.quantity})`).join('\n');
     
-    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${demand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${demand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: +212 661-556418`;
     
     return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
   };
@@ -151,7 +151,7 @@ export default function DemandsList({
     <div className="space-y-6">
       
       {/* 1. Demand Entry Form */}
-      <div ref={formRef} className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+      <div ref={formRef} className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4 flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold">
@@ -280,7 +280,7 @@ export default function DemandsList({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-50 min-h-[44px]"
               >
                 <Plus className="w-4 h-4 text-white" />
                 <span>طلب خصاص جديد</span>
@@ -292,7 +292,7 @@ export default function DemandsList({
       </div>
 
       {/* 2. Demands List & Search Compact Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden space-y-0">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden space-y-0">
         
         {/* Filter & Search Top Bar */}
         <div className="p-4 sm:p-5 border-b border-slate-200/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/50">
@@ -382,7 +382,7 @@ export default function DemandsList({
                         <Link
                           href={`/customers/${encodeURIComponent(demand.id)}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-sky-700 hover:underline transition-colors truncate dir-rtl text-right"
+                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-slate-600 hover:underline transition-colors truncate dir-rtl text-right"
                           title="انقر لعرض الملف الشخصي الكامل للزبون"
                         >
                           {demand.client?.name || 'زبون غير معرف'}
@@ -413,15 +413,15 @@ export default function DemandsList({
 
                       {/* Mobile Badges */}
                       <div className="md:hidden flex items-center gap-1.5 flex-wrap">
-                        <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black px-2 py-0.5 rounded">
+                        <span className="bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                           {totalItems} سلعة
                         </span>
                         {missingCount > 0 ? (
-                          <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             {missingCount} خصاص
                           </span>
                         ) : (
-                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-0.5 rounded">
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             جاهز
                           </span>
                         )}
@@ -430,16 +430,16 @@ export default function DemandsList({
 
                     {/* RTL Section 3: Badges (Desktop) */}
                     <div className="hidden md:flex flex-1 items-center justify-center gap-2">
-                      <span className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                      <span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                         {totalItems} سلعة
                       </span>
                       
                       {missingCount > 0 ? (
-                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-rose-50 text-rose-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                           {missingCount} خصاص
                         </span>
                       ) : (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-2.5 py-0.5 rounded-md">
+                        <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
                           جاهز بالكامل
                         </span>
                       )}
@@ -471,7 +471,7 @@ export default function DemandsList({
                             <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
                               {item.quantity}
                             </span>
-                            <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-2 py-0.5 rounded shrink-0 border border-rose-200">
+                            <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0">
                               خصاص
                             </span>
                             <span className="font-extrabold text-slate-900 text-xs truncate">

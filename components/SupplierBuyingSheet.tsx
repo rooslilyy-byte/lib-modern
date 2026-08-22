@@ -211,15 +211,15 @@ export default function SupplierBuyingSheet({
           <div className="printable-supplier font-cairo bg-white text-black">
             <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img 
-                  src="/logo.png" 
-                  alt="شعار مكتبة وراقة اهل سوس" 
-                  className="w-14 h-14 object-contain grayscale contrast-125 shrink-0" 
+                <img
+                  src="/LOGO izourane.jpg"
+                  alt="شعار شركة إيزوران"
+                  className="h-12 w-auto object-contain shrink-0"
                 />
                 <div>
-                  <h1 className="text-2xl font-black text-black">مكتبة وراقة اهل سوس</h1>
+                  <h1 className="text-2xl font-black text-black">شركة إيزوران</h1>
                   <p className="text-xs font-semibold text-slate-700">متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة</p>
-                  <p className="text-xs font-mono text-slate-800 dir-ltr mt-0.5 text-right">الهاتف: 0675502660</p>
+                  <p className="text-xs font-mono text-slate-800 mt-0.5 text-right">الهاتف: <span dir="ltr">+212 661-556418</span></p>
                 </div>
               </div>
               <div className="text-left text-xs text-slate-700 font-medium">
@@ -270,7 +270,7 @@ export default function SupplierBuyingSheet({
                 <div className="h-10"></div>
               </div>
               <div>
-                <p>خاتم مكتبة وراقة اهل سوس:</p>
+                <p>خاتم شركة إيزوران:</p>
                 <div className="h-10"></div>
               </div>
             </div>

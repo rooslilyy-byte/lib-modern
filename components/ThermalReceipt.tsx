@@ -39,21 +39,20 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
 
   const renderSingleReceiptCopy = () => (
     <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1">
-      {/* Top Center Logo */}
+      {/* Top Center Logo (wide rectangular, 80mm-friendly) */}
       <div className="text-center mb-2">
-        <img 
-          src="/logo.png" 
-          alt="شعار مكتبة وراقة اهل سوس" 
-          className="w-auto h-12 max-w-[45mm] max-h-[22mm] mx-auto mb-1 object-contain grayscale contrast-125 block" 
+        <img
+          src="/LOGO izourane.jpg"
+          alt="شعار شركة إيزوران"
+          className="w-32 h-auto object-contain mx-auto grayscale block"
         />
-        <h2 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug text-black">
-          مكتبة وراقة اهل سوس
-        </h2>
-        <p className="text-[10px] font-semibold text-slate-700">متابعة خصاصات الدخول المدرسي</p>
-        <p className="text-[10px] font-extrabold dir-ltr font-mono mt-0.5 text-black">0675502660</p>
-        
+        <p className="text-lg font-bold text-center mt-2 text-black leading-tight">
+          شركة إيزوران مكتب
+        </p>
+        <p dir="ltr" className="text-[10px] font-extrabold font-mono mt-0.5 text-black">+212 661-556418</p>
+
         <div className="receipt-divider border-t border-dashed border-black my-1.5"></div>
-        
+
         <div className="inline-block border border-black px-2.5 py-0.5 text-[10px] font-black bg-slate-100 text-black">
           وصل خصاص
         </div>
@@ -124,7 +123,7 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
       {/* Footer */}
       <div className="text-center pt-2 border-t border-slate-300 text-[8.5px] text-slate-800 mt-2">
         <p>طبع بتاريخ {formattedDate}</p>
-        <p className="font-semibold mt-0.5">شكراً لزيارتكم مكتبة وراقة اهل سوس</p>
+        <p className="font-semibold mt-0.5">شكراً لزيارتكم شركة إيزوران</p>
       </div>
     </div>
   );

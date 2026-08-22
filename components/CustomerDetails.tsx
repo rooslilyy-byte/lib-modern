@@ -88,7 +88,7 @@ export default function CustomerDetails({
     const readyItems = targetDemand.items?.filter(i => i.is_in_stock && !i.is_delivered) || [];
     const readyText = readyItems.map(i => `- ${i.product_name} (${i.quantity})`).join('\n');
 
-    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${targetDemand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText || 'جميع خصاصاتكم المسجلة جاهزة'}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: 0675502660`;
+    const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${targetDemand.client.name}،\n\nنخبركم من مكتبة وراقة اهل سوس أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText || 'جميع خصاصاتكم المسجلة جاهزة'}\n\nالعنوان: مكتبة وراقة اهل سوس\nالهاتف: +212 661-556418`;
 
     return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
   }, [targetDemand]);
@@ -202,7 +202,7 @@ export default function CustomerDetails({
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+            className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
           >
             <Edit className="w-3.5 h-3.5" />
             <span>تعديل الطلب</span>
@@ -312,11 +312,11 @@ export default function CustomerDetails({
                       onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
                       className={`h-8 px-2.5 rounded-lg font-medium text-xs transition-colors flex items-center gap-1 border ${
                         item.is_in_stock 
-                          ? 'bg-sky-50 text-sky-900 border-sky-200' 
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                           : 'bg-white text-slate-700 hover:bg-slate-50 border-slate-200'
                       }`}
                     >
-                      {item.is_in_stock ? <CheckSquare className="w-3.5 h-3.5 text-sky-700" /> : <Square className="w-3.5 h-3.5 text-slate-400" />}
+                      {item.is_in_stock ? <CheckSquare className="w-3.5 h-3.5 text-emerald-600" /> : <Square className="w-3.5 h-3.5 text-slate-400" />}
                       <span>{item.is_in_stock ? 'بالمحل' : 'توفير'}</span>
                     </button>
 

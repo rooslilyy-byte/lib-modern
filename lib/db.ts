@@ -1,25 +1,25 @@
-import { Pool } from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
-let pool: Pool | null = null;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export function getDbPool(): Pool {
-  if (!pool) {
-    const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
-    if (!connectionString) {
-      throw new Error('DATABASE_URL or DIRECT_URL environment variable is missing.');
-    }
-    pool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      max: 10,
-      idleTimeoutMillis: 30000,
-    });
-  }
-  return pool;
+if (!supabaseUrl) {
+  throw new Error('NEXT_PUBLIC_SUPABASE_URL is missing.');
 }
 
-export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
-  const p = getDbPool();
-  const result = await p.query(text, params);
-  return result.rows as T[];
+if (!serviceRoleKey) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY is missing.');
 }
+
+/**
+ * Server-only Supabase client.
+ * The service-role key bypasses RLS and must never be imported by client code.
+ */
+export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
+export default supabaseAdmin;

@@ -39,21 +39,20 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
 
   const renderSingleReceiptCopy = () => (
     <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1">
-      {/* Top Center Logo */}
+      {/* Top Center Logo (wide rectangular, 80mm-friendly) */}
       <div className="text-center mb-2">
-        <img 
-          src="/logo.png" 
-          alt="شعار مكتبة وراقة اهل سوس" 
-          className="w-auto h-12 max-w-[45mm] max-h-[22mm] mx-auto mb-1 object-contain grayscale contrast-125 block" 
+        <img
+          src="/LOGO izourane.jpg"
+          alt="شعار شركة إيزوران"
+          className="w-32 h-auto object-contain mx-auto grayscale block"
         />
-        <h2 className="font-extrabold text-sm sm:text-base tracking-tight leading-snug text-black">
-          مكتبة وراقة اهل سوس
-        </h2>
-        <p className="text-[10px] font-semibold text-slate-700">متابعة خصاصات الدخول المدرسي</p>
-        <p className="text-[10px] font-extrabold dir-ltr font-mono mt-0.5 text-black">0675502660</p>
-        
+        <p className="text-lg font-bold text-center mt-2 text-black leading-tight">
+          شركة إيزوران مكتب
+        </p>
+        <p dir="ltr" className="text-[10px] font-extrabold font-mono mt-0.5 text-black">+212 661-556418</p>
+
         <div className="receipt-divider border-t border-dashed border-black my-1.5"></div>
-        
+
         <div className="inline-block border border-black px-2.5 py-0.5 text-[10px] font-black bg-slate-100 text-black">
           وصل خصاص
         </div>
@@ -124,7 +123,7 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
       {/* Footer */}
       <div className="text-center pt-2 border-t border-slate-300 text-[8.5px] text-slate-800 mt-2">
         <p>طبع بتاريخ {formattedDate}</p>
-        <p className="font-semibold mt-0.5">شكراً لزيارتكم مكتبة وراقة اهل سوس</p>
+        <p className="font-semibold mt-0.5">شكراً لزيارتكم شركة إيزوران</p>
       </div>
     </div>
   );
@@ -138,27 +137,27 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
   return (
     <>
       {/* SCREEN MODAL VIEW (NO-PRINT) */}
-      <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 modal-backdrop no-print">
-        <div className="bg-slate-900 text-slate-100 rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
-          
+      <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 modal-backdrop no-print">
+        <div className="bg-white text-slate-900 rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200">
+
           {/* Modal Header Controls */}
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <div className="flex items-center gap-2 text-slate-200 font-bold text-sm sm:text-base">
-              <Printer className="w-5 h-5 text-slate-400" />
-              <span>طباعة وصل خصاص (80mm Thermal)</span>
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200 gap-2">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm sm:text-base min-w-0">
+              <Printer className="w-5 h-5 text-slate-500 shrink-0" />
+              <span className="truncate">طباعة وصل خصاص (80mm Thermal)</span>
             </div>
-            
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handlePrint}
-                className="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-700 shadow"
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 transition-colors"
               >
-                <Printer className="w-4 h-4 text-slate-300" />
+                <Printer className="w-4 h-4 text-white" />
                 <span>طباعة الوصل</span>
               </button>
               <button
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 text-xs font-bold"
+                className="p-2 text-slate-400 hover:text-slate-900 rounded-lg hover:bg-slate-100 text-xs font-bold"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -166,13 +165,13 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
           </div>
 
           {/* Scrollable Receipt Preview */}
-          <div className="overflow-y-auto p-4 flex-1 my-2 bg-slate-800/50 rounded-xl flex flex-col items-center">
+          <div className="overflow-y-auto p-4 flex-1 my-2 bg-slate-50 border border-slate-200 rounded-xl flex flex-col items-center">
             <div className="receipt-preview-container bg-white p-3 rounded-lg shadow max-w-[72mm] w-full text-black">
               {renderSingleReceiptCopy()}
             </div>
           </div>
 
-          <div className="pt-2 text-xs text-slate-400 text-center">
+          <div className="pt-2 text-xs text-slate-500 text-center">
             المقاس المجهز: 80mm Roll • وصل واحد جاهز للطباعة
           </div>
         </div>
