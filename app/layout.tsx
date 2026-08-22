@@ -9,8 +9,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: 'مكتبة وراقة اهل سوس - نظام متابعة خصاصات الدخول المدرسي',
-  description: 'نظام إدارة وتوزيع كتب ومستلزمات خصاصات الدخول المدرسي لمكتبة وراقة اهل سوس',
+  title: 'شركة إيزوران - نظام إدارة الخصاصات',
+  description: 'نظام إدارة وتوزيع كتب ومستلزمات الدخول المدرسي لشركة إيزوران',
 };
 
 export default function RootLayout({
