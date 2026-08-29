@@ -14,6 +14,7 @@ import {
   LogOut,
   UserCircle,
   Settings,
+  Search as LucideSearch,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -45,6 +46,7 @@ export default function Sidebar({ isSupabaseActive }: SidebarProps) {
     { href: '/', label: 'الرئيسية', icon: BarChart3 },
     { href: '/customers', label: 'دليل الزبائن', icon: Users },
     { href: '/stock', label: 'استقبال وتوزيع السلع', icon: PackageCheck },
+    { href: '/search', label: 'بحث عن منتج', icon: LucideSearch },
     { href: '/reports', label: 'التقارير والمشتريات', icon: FileText },
   ];
 
