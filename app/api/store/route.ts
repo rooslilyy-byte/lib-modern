@@ -358,7 +358,10 @@ export async function POST(request: Request) {
     if (action === 'auto_allocate_stock') {
       const { productName, receivedQty } = body;
       const cleanName = productName.trim();
-      let remainingQty = Math.max(1, parseInt(receivedQty, 10) || 1);
+      let remainingStock = parseInt(receivedQty, 10);
+      if (isNaN(remainingStock) || remainingStock < 0) {
+        remainingStock = 0;
+      }
 
       const activeBatches = unwrap(
         await supabaseAdmin
@@ -371,54 +374,108 @@ export async function POST(request: Request) {
       ) as Array<{ id: string }>;
       const activeBatchId = activeBatches[0]?.id;
 
-      let demandQuery = supabaseAdmin
-        .from('client_demands')
+      // 1. Fetch all pending/unfulfilled items matching the received product name, ORDERED BY creation date ASC (oldest first)
+      let itemsQuery = supabaseAdmin
+        .from('demand_items')
         .select(`
           id,
+          demand_id,
+          product_name,
+          quantity,
+          is_in_stock,
+          is_delivered,
           created_at,
-          batch_id,
-          client:clients!inner (name, phone),
-          items:demand_items (*)
+          demand:client_demands!inner (
+            id,
+            batch_id,
+            created_at,
+            client:clients!inner (
+              id,
+              name,
+              phone
+            )
+          )
         `)
+        .eq('is_in_stock', false)
+        .eq('is_delivered', false)
+        .ilike('product_name', cleanName)
         .order('created_at', { ascending: true });
 
       if (activeBatchId) {
-        demandQuery = demandQuery.eq('batch_id', activeBatchId);
+        itemsQuery = itemsQuery.eq('demand.batch_id', activeBatchId);
       }
 
-      const pendingDemands = unwrap(
-        await demandQuery,
-        'Loading pending demands for stock allocation',
+      let pendingItems = unwrap(
+        await itemsQuery,
+        'Loading pending items for stock allocation',
       ) as DatabaseRow[];
+
+      // Fallback matching using normalizeProductName if direct ilike yielded no items
+      if (pendingItems.length === 0) {
+        let fallbackQuery = supabaseAdmin
+          .from('demand_items')
+          .select(`
+            id,
+            demand_id,
+            product_name,
+            quantity,
+            is_in_stock,
+            is_delivered,
+            created_at,
+            demand:client_demands!inner (
+              id,
+              batch_id,
+              created_at,
+              client:clients!inner (
+                id,
+                name,
+                phone
+              )
+            )
+          `)
+          .eq('is_in_stock', false)
+          .eq('is_delivered', false)
+          .order('created_at', { ascending: true });
+
+        if (activeBatchId) {
+          fallbackQuery = fallbackQuery.eq('demand.batch_id', activeBatchId);
+        }
+
+        const allItems = unwrap(
+          await fallbackQuery,
+          'Loading all pending items fallback for stock allocation',
+        ) as DatabaseRow[];
+
+        pendingItems = allItems.filter(
+          (item) => normalizeProductName(item.product_name) === normalizeProductName(cleanName),
+        );
+      }
+
+      // Ensure strict FIFO ordering by creation date ASC (oldest first)
+      pendingItems.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.demand?.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || b.demand?.created_at || 0).getTime();
+        return timeA - timeB;
+      });
 
       const allocatedClientsMap: Record<
         string,
         { clientName: string; phone: string; totalFulfilled: number }
       > = {};
 
-      for (const demand of pendingDemands) {
-        if (remainingQty <= 0) break;
+      // 2. Iterate over the fetched pending items with strict FIFO math
+      for (const item of pendingItems) {
+        if (remainingStock <= 0) {
+          break;
+        }
 
-        const client = Array.isArray(demand.client) ? demand.client[0] : demand.client;
-        if (!client?.phone) continue;
+        const itemQty = Number(item.quantity) || 0;
+        if (itemQty <= 0) {
+          continue;
+        }
 
-        const items = [...((demand.items || []) as DatabaseRow[])].sort((a, b) => {
-          return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-        });
-
-        for (const item of items) {
-          if (remainingQty <= 0) break;
-          if (
-            normalizeProductName(item.product_name) !== normalizeProductName(cleanName) ||
-            item.is_in_stock ||
-            item.is_delivered
-          ) {
-            continue;
-          }
-
-          const needed = Number(item.quantity) || 0;
-          const fulfilledPortion = Math.min(remainingQty, needed);
-
+        if (remainingStock >= itemQty) {
+          // Mark this individual item as fulfilled
           unwrap(
             await supabaseAdmin
               .from('demand_items')
@@ -427,28 +484,38 @@ export async function POST(request: Request) {
             'Allocating received stock to demand item',
           );
 
-          remainingQty -= fulfilledPortion;
-          const key = client.phone;
-          if (!allocatedClientsMap[key]) {
-            allocatedClientsMap[key] = {
-              clientName: client.name,
-              phone: client.phone,
-              totalFulfilled: 0,
-            };
+          remainingStock -= itemQty;
+
+          const clientRaw = item.demand?.client;
+          const client = Array.isArray(clientRaw) ? clientRaw[0] : clientRaw;
+          if (client && client.phone) {
+            const key = client.phone;
+            if (!allocatedClientsMap[key]) {
+              allocatedClientsMap[key] = {
+                clientName: client.name || '',
+                phone: client.phone,
+                totalFulfilled: 0,
+              };
+            }
+            allocatedClientsMap[key].totalFulfilled += itemQty;
           }
-          allocatedClientsMap[key].totalFulfilled += fulfilledPortion;
+        } else if (remainingStock < itemQty && remainingStock > 0) {
+          // Do NOT mark as fulfilled if the entire row cannot be fulfilled.
+          // Break the loop so it remains pending for the next stock arrival.
+          break;
         }
       }
 
-      if (remainingQty > 0) {
+      // Any surplus stock is added to master product available stock
+      if (remainingStock > 0) {
         await ensureMasterProduct(cleanName);
-        await updateMasterProductStock(cleanName, remainingQty);
+        await updateMasterProductStock(cleanName, remainingStock);
       }
 
       const allocatedClients = Object.values(allocatedClientsMap).map((client) => {
         let rawPhone = client.phone.replace(/\D/g, '');
         if (rawPhone.startsWith('0')) rawPhone = `212${rawPhone.slice(1)}`;
-        const message = `\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0648\u0631\u062d\u0645\u0629 \u0627\u0644\u0644\u0647 \u0648\u0628\u0631\u0643\u0627\u062a\u0647 \u0627\u0644\u0633\u064a\u062f(\u0629) ${client.clientName}\u060c\n\n\u0646\u062e\u0628\u0631\u0643\u0645 \u0623\u0646 \u0627\u0644\u0645\u0646\u062a\u062c \"${cleanName}\" (\u0639\u062f\u062f: ${client.totalFulfilled}) \u0642\u062f \u0648\u0635\u0644 \u0648\u0647\u0648 \u062c\u0627\u0647\u0632 \u0644\u0644\u062a\u0633\u0644\u064a\u0645!`;
+        const message = `\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645 \u0648\u0631\u062d\u0645\u0629 \u0627\u0644\u0644\u0647 \u0648\u0628\u0631\u0643\u0627\u062a\u0647 \u0627\u0644\u0633\u064a\u062f(\u0629) ${client.clientName}\u060c\n\n\u0646\u062e\u0628\u0631\u0643\u0645 \u0623\u0646 \u0627\u0644\u0645\u0646\u062a\u062c "${cleanName}" (\u0639\u062f\u062f: ${client.totalFulfilled}) \u0642\u062f \u0648\u0635\u0644 \u0648\u0647\u0648 \u062c\u0627\u0647\u0632 \u0644\u0644\u062a\u0633\u0644\u064a\u0645!`;
 
         return {
           clientName: client.clientName,
@@ -458,7 +525,7 @@ export async function POST(request: Request) {
         };
       });
 
-      return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingQty });
+      return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingStock });
     }
 
     if (action === 'delete_demand') {

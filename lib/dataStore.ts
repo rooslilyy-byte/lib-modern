@@ -319,47 +319,76 @@ export async function autoAllocateStock(
 
   if (isSupabaseConfigured) {
     const activeBatch = await getActiveBatch();
-    const { data: demands } = await supabase
-      .from('client_demands')
-      .select('id, created_at, client:clients(*), items:demand_items(*)')
-      .eq('batch_id', activeBatch.id)
+
+    let query = supabase
+      .from('demand_items')
+      .select(`
+        id,
+        demand_id,
+        product_name,
+        quantity,
+        is_in_stock,
+        is_delivered,
+        created_at,
+        demand:client_demands!inner (
+          id,
+          batch_id,
+          created_at,
+          client:clients!inner (
+            id,
+            name,
+            phone
+          )
+        )
+      `)
+      .eq('is_in_stock', false)
+      .eq('is_delivered', false)
       .order('created_at', { ascending: true });
 
-    let remaining = qty;
+    if (activeBatch?.id) {
+      query = query.eq('demand.batch_id', activeBatch.id);
+    }
+
+    const { data: rawItems } = await query;
+    const pendingItems = (rawItems || []).filter(
+      (item: any) => item.product_name.trim().toLowerCase() === cleanName.toLowerCase(),
+    );
+
+    pendingItems.sort((a: any, b: any) => {
+      const timeA = new Date(a.created_at || a.demand?.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || b.demand?.created_at || 0).getTime();
+      return timeA - timeB;
+    });
+
+    let remainingStock = qty;
     const allocatedMap: Record<string, { clientName: string; phone: string; totalFulfilled: number }> = {};
 
-    if (demands) {
-      for (const dem of demands) {
-        if (remaining <= 0) break;
-        if (!dem.items || !dem.client) continue;
-        const cli: any = Array.isArray(dem.client) ? dem.client[0] : dem.client;
-        if (!cli || !cli.phone) continue;
+    for (const item of pendingItems) {
+      if (remainingStock <= 0) break;
+      const itemQty = Number(item.quantity) || 0;
+      if (itemQty <= 0) continue;
 
-        for (const item of dem.items) {
-          if (remaining <= 0) break;
-          if (
-            item.product_name.trim().toLowerCase() === cleanName.toLowerCase() &&
-            !item.is_in_stock &&
-            !item.is_delivered
-          ) {
-            const needed = item.quantity;
-            const fulfilled = Math.min(remaining, needed);
+      if (remainingStock >= itemQty) {
+        await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
+        remainingStock -= itemQty;
 
-            await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
-            remaining -= needed;
-
-            const key = cli.phone;
-            if (!allocatedMap[key]) {
-              allocatedMap[key] = { clientName: cli.name, phone: cli.phone, totalFulfilled: 0 };
-            }
-            allocatedMap[key].totalFulfilled += fulfilled;
+        const demandObj: any = (item as any).demand;
+        const cliRaw = Array.isArray(demandObj) ? demandObj[0]?.client : demandObj?.client;
+        const cli: any = Array.isArray(cliRaw) ? cliRaw[0] : cliRaw;
+        if (cli && cli.phone) {
+          const key = cli.phone;
+          if (!allocatedMap[key]) {
+            allocatedMap[key] = { clientName: cli.name || '', phone: cli.phone, totalFulfilled: 0 };
           }
+          allocatedMap[key].totalFulfilled += itemQty;
         }
+      } else if (remainingStock < itemQty && remainingStock > 0) {
+        break;
       }
     }
 
-    if (remaining > 0) {
-      await updateMasterProductStock(cleanName, remaining);
+    if (remainingStock > 0) {
+      await updateMasterProductStock(cleanName, remainingStock);
     }
 
     invalidateStoreCache();
