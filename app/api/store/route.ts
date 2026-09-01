@@ -133,9 +133,14 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
       continue;
     }
 
-    const items = [...((row.items || []) as DatabaseRow[])].sort((a, b) => {
-      return String(a.created_at || '').localeCompare(String(b.created_at || ''));
-    }) as ClientDemand['items'];
+    const items = [...((row.items || []) as DatabaseRow[])]
+      .sort((a, b) => {
+        return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+      })
+      .map((it) => ({
+        ...it,
+        status: it.status || 'pending',
+      })) as ClientDemand['items'];
 
     demands.push({
       id: row.id,
@@ -526,6 +531,71 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingStock });
+    }
+
+    // --- MARK EN RUPTURE (Out of Stock) ---
+    if (action === 'mark_en_rupture') {
+      const { productName } = body;
+      const cleanName = productName.trim();
+
+      // 1. Fetch pending items matching product name
+      const { data: items } = await supabaseAdmin
+        .from('demand_items')
+        .select('id, product_name')
+        .eq('is_in_stock', false)
+        .eq('is_delivered', false);
+
+      const targetIds = (items || [])
+        .filter((item) => normalizeProductName(item.product_name) === normalizeProductName(cleanName))
+        .map((item) => item.id);
+
+      if (targetIds.length > 0) {
+        try {
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .update({ status: 'en_rupture' })
+              .in('id', targetIds),
+            'Marking items en rupture',
+          );
+        } catch (err) {
+          console.warn('Warning: Could not persist en_rupture status to DB column:', err);
+        }
+      }
+
+      return NextResponse.json({ success: true, updatedCount: targetIds.length });
+    }
+
+    // --- RESTORE FROM RUPTURE ---
+    if (action === 'restore_en_rupture') {
+      const { productName } = body;
+      const cleanName = productName.trim();
+
+      const { data: items } = await supabaseAdmin
+        .from('demand_items')
+        .select('id, product_name')
+        .eq('is_in_stock', false)
+        .eq('is_delivered', false);
+
+      const targetIds = (items || [])
+        .filter((item) => normalizeProductName(item.product_name) === normalizeProductName(cleanName))
+        .map((item) => item.id);
+
+      if (targetIds.length > 0) {
+        try {
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .update({ status: 'pending' })
+              .in('id', targetIds),
+            'Restoring items from en rupture',
+          );
+        } catch (err) {
+          console.warn('Warning: Could not restore status in DB column:', err);
+        }
+      }
+
+      return NextResponse.json({ success: true, updatedCount: targetIds.length });
     }
 
     if (action === 'delete_demand') {

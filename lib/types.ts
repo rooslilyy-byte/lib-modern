@@ -30,6 +30,7 @@ export interface DemandItem {
   quantity: number;
   is_in_stock: boolean;
   is_delivered: boolean;
+  status?: string;
   created_at?: string;
 }
 

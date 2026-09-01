@@ -13,7 +13,9 @@ import {
   updateDemandItemState, 
   deleteClientDemand,
   deleteBulkCustomers,
-  autoAllocateStock
+  autoAllocateStock,
+  markProductEnRupture,
+  restoreProductEnRupture
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
@@ -41,6 +43,8 @@ export interface AppShellData {
   handleUpdateDemand: (id: string, name: string, phone: string, items: any[]) => Promise<void>;
   handleUpdateItemState: (id: string, updates: any) => Promise<void>;
   handleAutoAllocateStock: (productName: string, receivedQty: number) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
+  handleMarkEnRupture: (productName: string) => Promise<void>;
+  handleRestoreEnRupture: (productName: string) => Promise<void>;
   handleDeleteDemand: (id: string) => Promise<void>;
   handleDeleteBulkCustomers: (clientIds: string[]) => Promise<void>;
   handleArchiveBatch: (name: string) => Promise<void>;
@@ -143,6 +147,50 @@ export default function AppShell({ children }: AppShellProps) {
     return res;
   };
 
+  const handleMarkEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
+    // Optimistic item update to en_rupture
+    setDemands(prev => {
+      const updated = prev.map(dem => {
+        if (!dem.items) return dem;
+        const newItems = dem.items.map(it => {
+          if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
+            return { ...it, status: 'en_rupture' };
+          }
+          return it;
+        });
+        return { ...dem, items: newItems };
+      });
+      globalAppCache.demands = updated;
+      return updated;
+    });
+
+    await markProductEnRupture(productName);
+    await loadData(true);
+  };
+
+  const handleRestoreEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
+    // Optimistic item update back to pending
+    setDemands(prev => {
+      const updated = prev.map(dem => {
+        if (!dem.items) return dem;
+        const newItems = dem.items.map(it => {
+          if (it.product_name.trim().toLowerCase() === cleanName && it.status === 'en_rupture') {
+            return { ...it, status: 'pending' };
+          }
+          return it;
+        });
+        return { ...dem, items: newItems };
+      });
+      globalAppCache.demands = updated;
+      return updated;
+    });
+
+    await restoreProductEnRupture(productName);
+    await loadData(true);
+  };
+
   const handleDeleteDemand = async (id: string) => {
     // Optimistically filter out deleted demand
     setDemands(prev => {
@@ -194,6 +242,8 @@ export default function AppShell({ children }: AppShellProps) {
               handleUpdateDemand,
               handleUpdateItemState,
               handleAutoAllocateStock,
+              handleMarkEnRupture,
+              handleRestoreEnRupture,
               handleDeleteDemand,
               handleDeleteBulkCustomers,
               handleArchiveBatch,

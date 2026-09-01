@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, FileText, ShoppingCart, Users, CheckCircle2 } from 'lucide-react';
+import { Printer, FileText, ShoppingCart, CheckCircle2, AlertCircle } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
+
+type ReportTab = 'normal' | 'rupture';
 
 interface SupplierBuyingSheetProps {
   activeBatch: PurchaseBatch | null;
@@ -16,6 +18,7 @@ export default function SupplierBuyingSheet({
   activeBatch,
   demands,
 }: SupplierBuyingSheetProps) {
+  const [activeTab, setActiveTab] = useState<ReportTab>('normal');
   const [fetchedReport, setFetchedReport] = useState<SupplierAggregatedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -24,10 +27,10 @@ export default function SupplierBuyingSheet({
     setMounted(true);
   }, []);
 
-  const fetchReport = async () => {
+  const fetchReport = async (tab: ReportTab) => {
     setIsLoading(true);
     try {
-      const data = await getSupplierAggregatedReport(activeBatch?.id);
+      const data = await getSupplierAggregatedReport(activeBatch?.id, tab);
       setFetchedReport(data);
     } finally {
       setIsLoading(false);
@@ -36,15 +39,16 @@ export default function SupplierBuyingSheet({
 
   useEffect(() => {
     if (!demands) {
-      fetchReport();
+      fetchReport(activeTab);
     } else {
       setIsLoading(false);
     }
-  }, [activeBatch, demands]);
+  }, [activeBatch, demands, activeTab]);
 
-  const computedReport = useMemo(() => {
-    if (!demands) return null;
-    const itemMap: Record<string, SupplierAggregatedItem> = {};
+  const { normalReport, ruptureReport } = useMemo(() => {
+    if (!demands) return { normalReport: [], ruptureReport: [] };
+    const normalMap: Record<string, SupplierAggregatedItem> = {};
+    const ruptureMap: Record<string, SupplierAggregatedItem> = {};
 
     for (const dem of demands) {
       if (!dem.items || !dem.client) continue;
@@ -52,17 +56,20 @@ export default function SupplierBuyingSheet({
       for (const item of dem.items) {
         if (item.is_delivered || item.is_in_stock) continue;
 
+        const isRupture = item.status === 'en_rupture';
+        const targetMap = isRupture ? ruptureMap : normalMap;
+
         const pName = item.product_name.trim();
-        if (!itemMap[pName]) {
-          itemMap[pName] = {
+        if (!targetMap[pName]) {
+          targetMap[pName] = {
             productName: pName,
             totalQuantity: 0,
             clients: [],
           };
         }
 
-        itemMap[pName].totalQuantity += item.quantity;
-        itemMap[pName].clients.push({
+        targetMap[pName].totalQuantity += item.quantity;
+        targetMap[pName].clients.push({
           clientName: dem.client.name,
           phone: dem.client.phone,
           quantity: item.quantity,
@@ -71,10 +78,17 @@ export default function SupplierBuyingSheet({
       }
     }
 
-    return Object.values(itemMap).sort((a, b) => b.totalQuantity - a.totalQuantity);
+    const sortFn = (a: SupplierAggregatedItem, b: SupplierAggregatedItem) => b.totalQuantity - a.totalQuantity;
+
+    return {
+      normalReport: Object.values(normalMap).sort(sortFn),
+      ruptureReport: Object.values(ruptureMap).sort(sortFn),
+    };
   }, [demands]);
 
-  const report = computedReport !== null ? computedReport : fetchedReport;
+  const report = demands 
+    ? (activeTab === 'normal' ? normalReport : ruptureReport) 
+    : fetchedReport;
 
   const handlePrint = () => {
     window.print();
@@ -95,46 +109,102 @@ export default function SupplierBuyingSheet({
     <div className="space-y-4">
       
       {/* 1. Screen Header Controls (NO-PRINT) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 no-print">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
-            <FileText className="w-4.5 h-4.5" />
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-3 no-print">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
+              <FileText className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {activeTab === 'normal' ? 'تقرير مشتريات الموردين' : 'تقرير السلع غير المتوفرة'}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                {activeTab === 'normal' 
+                  ? 'قائمة السلع والكتب المعلقة للشراء من الموردين'
+                  : 'قائمة السلع الموسومة كغير متوفرة (En Rupture)'}
+              </p>
+            </div>
           </div>
-          <h2 className="text-base font-bold text-slate-900">تقرير مشتريات الموردين</h2>
+
+          {/* Page-level action buttons & counters */}
+          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 h-9 rounded-lg">
+              <span className="text-slate-500">العناوين:</span>
+              <strong className="text-slate-900">{totalItemTypes}</strong>
+              <span className="text-slate-300">|</span>
+              <span className="text-slate-500">مجموع القطع:</span>
+              <strong className="text-slate-900">{totalPiecesCount}</strong>
+            </div>
+
+            <button
+              onClick={handlePrint}
+              disabled={report.length === 0}
+              className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
+            >
+              <Printer className="w-4 h-4 text-white" />
+              <span>طباعة A4</span>
+            </button>
+          </div>
         </div>
 
-        {/* Page-level action buttons: ONLY A4 Print button */}
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 h-9 rounded-lg">
-            <span className="text-slate-500">العناوين:</span>
-            <strong className="text-slate-900">{totalItemTypes}</strong>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-500">مجموع القطع:</span>
-            <strong className="text-slate-900">{totalPiecesCount}</strong>
-          </div>
+        {/* View Switcher: Normal vs Rupture */}
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-bold border border-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab('normal')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+              activeTab === 'normal'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShoppingCart className="w-3.5 h-3.5 text-blue-600" />
+            <span>المشتريات العادية</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'normal' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {demands ? normalReport.length : (activeTab === 'normal' ? report.length : '-')}
+            </span>
+          </button>
 
           <button
-            onClick={handlePrint}
-            disabled={report.length === 0}
-            className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
+            type="button"
+            onClick={() => setActiveTab('rupture')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+              activeTab === 'rupture'
+                ? 'bg-white text-emerald-800 shadow-2xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
           >
-            <Printer className="w-4 h-4 text-white" />
-            <span>طباعة A4</span>
+            <AlertCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <span>السلع غير المتوفرة</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'rupture' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {demands ? ruptureReport.length : (activeTab === 'rupture' ? report.length : '-')}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* 3. Screen UI Web View (NO-PRINT) */}
+      {/* 2. Screen UI Web View (NO-PRINT) */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs no-print">
         {isLoading ? (
-          <div className="text-center py-8 text-slate-500 font-medium text-xs">جاري تحميل تقرير المشتريات...</div>
+          <div className="text-center py-8 text-slate-500 font-medium text-xs">جاري تحميل التقرير...</div>
         ) : report.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-emerald-200 bg-emerald-50/50 rounded-lg space-y-1.5">
             <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-            <p className="text-emerald-800 font-bold text-sm">جميع الكتب متوفرة في المخزون</p>
-            <p className="text-xs text-emerald-600">لا توجد خصاصات معلقة للموردين في الوقت الحالي</p>
+            <p className="text-emerald-800 font-bold text-sm">
+              {activeTab === 'normal' ? 'جميع الكتب متوفرة في المخزون' : 'لا توجد سلع مسجلة كغير متوفرة حالياً'}
+            </p>
+            <p className="text-xs text-emerald-600">
+              {activeTab === 'normal' 
+                ? 'لا توجد خصاصات معلقة للموردين في الوقت الحالي'
+                : 'جميع السلع المطلوبة متوفرة أو مسجلة في قائمة المشتريات العادية'}
+            </p>
           </div>
         ) : (
           <>
@@ -149,7 +219,9 @@ export default function SupplierBuyingSheet({
                       </span>
                       <h3 className="font-semibold text-slate-900 text-xs truncate">{item.productName}</h3>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-bold text-xs shrink-0">
+                    <span className={`px-2 py-0.5 rounded font-bold text-xs shrink-0 ${
+                      activeTab === 'normal' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
+                    }`}>
                       {item.totalQuantity} قطعة
                     </span>
                   </div>
@@ -205,7 +277,7 @@ export default function SupplierBuyingSheet({
         )}
       </div>
 
-      {/* DEDICATED PRINTABLE PORTAL DIRECTLY AT DOCUMENT BODY */}
+      {/* 3. DEDICATED PRINTABLE PORTAL DIRECTLY AT DOCUMENT BODY */}
       {mounted && createPortal(
         <div id="printable-a4-report" className="print-only">
           <div className="printable-supplier font-cairo bg-white text-black">
@@ -217,8 +289,14 @@ export default function SupplierBuyingSheet({
                   className="h-16 w-auto object-contain shrink-0"
                 />
                 <div>
-                  <h1 className="text-2xl font-black text-black">شركة إيزوران</h1>
-                  <p className="text-xs font-semibold text-slate-700">متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة</p>
+                  <h1 className="text-2xl font-black text-black">
+                    {activeTab === 'normal' ? 'تقرير مشتريات الموردين' : 'تقرير السلع غير المتوفرة'}
+                  </h1>
+                  <p className="text-xs font-semibold text-slate-700">
+                    {activeTab === 'normal'
+                      ? 'متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة'
+                      : 'متابعة خصاصات الدخول المدرسي — قائمة السلع المقطوعة (En Rupture)'}
+                  </p>
                   <p className="text-xs font-mono text-slate-800 mt-0.5 text-right">الهاتف: <span dir="ltr">+212 661-556418</span></p>
                 </div>
               </div>
@@ -232,7 +310,9 @@ export default function SupplierBuyingSheet({
               <thead>
                 <tr className="bg-slate-100 text-slate-900 font-black border-y-2 border-slate-900">
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3">السلعة / الكتاب المطلوب</th>
+                  <th className="py-2.5 px-3">
+                    {activeTab === 'normal' ? 'السلعة / الكتاب المطلوب' : 'السلعة / الكتاب غير المتوفر'}
+                  </th>
                   <th className="py-2.5 px-3 text-center w-28">العدد المطلوب</th>
                   <th className="py-2.5 px-3">تفاصيل طلبات الزبناء</th>
                 </tr>
@@ -257,7 +337,11 @@ export default function SupplierBuyingSheet({
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-900 font-black bg-slate-50">
-                  <td colSpan={2} className="py-3 px-3 text-left">المجموع الإجمالي للقطع المطلوب شراؤها:</td>
+                  <td colSpan={2} className="py-3 px-3 text-left">
+                    {activeTab === 'normal' 
+                      ? 'المجموع الإجمالي للقطع المطلوب شراؤها:' 
+                      : 'المجموع الإجمالي للقطع غير المتوفرة:'}
+                  </td>
                   <td className="py-3 px-3 text-center text-lg font-black text-slate-900">{totalPiecesCount}</td>
                   <td></td>
                 </tr>

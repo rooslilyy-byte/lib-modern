@@ -52,7 +52,10 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
           const fullData: FullStoreData = {
             activeBatch: data.activeBatch || { id: 'batch-001', batch_name: 'دفعة الدخول المدرسي الرئيسي', is_archived: false },
             masterProducts: data.masterProducts || [],
-            demands: data.demands || [],
+            demands: (data.demands || []).map((d: any) => ({
+              ...d,
+              items: (d.items || []).map((it: any) => ({ ...it, status: it.status || 'pending' })),
+            })),
           };
           storeCache = { data: fullData, timestamp: Date.now() };
           return fullData;
@@ -115,7 +118,7 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             },
             status: d.status,
             created_at: d.created_at,
-            items: d.items || [],
+            items: (d.items || []).map((it: any) => ({ ...it, status: it.status || 'pending' })),
           }));
         }
       }
@@ -409,6 +412,50 @@ export async function autoAllocateStock(
   return [];
 }
 
+export async function markProductEnRupture(productName: string): Promise<void> {
+  const cleanName = productName.trim();
+  if (isBrowser) {
+    await fetchStoreApi('mark_en_rupture', { productName: cleanName });
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase
+        .from('demand_items')
+        .update({ status: 'en_rupture' })
+        .ilike('product_name', cleanName)
+        .eq('is_in_stock', false)
+        .eq('is_delivered', false);
+    } catch (e) {
+      console.warn('Direct mark_en_rupture error:', e);
+    }
+    invalidateStoreCache();
+  }
+}
+
+export async function restoreProductEnRupture(productName: string): Promise<void> {
+  const cleanName = productName.trim();
+  if (isBrowser) {
+    await fetchStoreApi('restore_en_rupture', { productName: cleanName });
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase
+        .from('demand_items')
+        .update({ status: 'pending' })
+        .ilike('product_name', cleanName)
+        .eq('is_in_stock', false)
+        .eq('is_delivered', false);
+    } catch (e) {
+      console.warn('Direct restore_en_rupture error:', e);
+    }
+    invalidateStoreCache();
+  }
+}
+
 export async function deleteClientDemand(demandId: string): Promise<void> {
   if (isBrowser) {
     await fetchStoreApi('delete_demand', { demandId });
@@ -487,7 +534,10 @@ export async function updateClientDemand(
 }
 
 // --- AGGREGATED REPORT FOR SUPPLIERS (A4 PRINT) ---
-export async function getSupplierAggregatedReport(batchId?: string): Promise<SupplierAggregatedItem[]> {
+export async function getSupplierAggregatedReport(
+  batchId?: string,
+  statusFilter: 'normal' | 'rupture' = 'normal'
+): Promise<SupplierAggregatedItem[]> {
   const demands = await getClientDemands(batchId);
   const itemMap: Record<string, {
     productName: string;
@@ -505,6 +555,10 @@ export async function getSupplierAggregatedReport(batchId?: string): Promise<Sup
 
     for (const item of dem.items) {
       if (item.is_delivered || item.is_in_stock) continue;
+
+      const isRupture = item.status === 'en_rupture';
+      if (statusFilter === 'rupture' && !isRupture) continue;
+      if (statusFilter === 'normal' && isRupture) continue;
 
       const pName = item.product_name.trim();
       if (!itemMap[pName]) {

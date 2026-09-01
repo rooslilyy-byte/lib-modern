@@ -5,10 +5,29 @@ import {
   PackageCheck, 
   CheckCircle2, 
   Search, 
-  X
+  X,
+  Ban,
+  ArrowUpDown,
+  RotateCcw,
+  AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { updateMasterProductStock } from '@/lib/dataStore';
+
+type ViewTab = 'normal' | 'rupture';
+type SortOption = 'alphabetical' | 'oldest' | 'newest';
+
+interface AggregatedProduct {
+  productName: string;
+  category: string;
+  totalDemanded: number;
+  totalFulfilled: number;
+  totalMissingQty: number;
+  availableStock: number;
+  clients: { clientName: string; phone: string; quantity: number; demandCreatedAt: string }[];
+  initialDemandCreatedAt: string;
+  latestDemandCreatedAt: string;
+}
 
 interface StockAllocationProps {
   demands: ClientDemand[];
@@ -21,6 +40,8 @@ interface StockAllocationProps {
     productName: string, 
     receivedQty: number
   ) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
+  onMarkEnRupture?: (productName: string) => Promise<void>;
+  onRestoreEnRupture?: (productName: string) => Promise<void>;
 }
 
 export default function StockAllocation({
@@ -28,10 +49,14 @@ export default function StockAllocation({
   masterProducts,
   onUpdateItemState,
   onAutoAllocateStock,
+  onMarkEnRupture,
+  onRestoreEnRupture,
 }: StockAllocationProps) {
+  const [activeTab, setActiveTab] = useState<ViewTab>('normal');
+  const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
   const [searchQuery, setSearchQuery] = useState('');
   const [processingProduct, setProcessingProduct] = useState<string | null>(null);
-  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Modal State
   const [modalProduct, setModalProduct] = useState<{ productName: string; totalMissingQty: number } | null>(null);
@@ -47,69 +72,173 @@ export default function StockAllocation({
     }
   }, [modalProduct]);
 
-  // 1. Calculate Active Missing Products Aggregation
-  const missingProductsList = useMemo(() => {
-    const map: Record<string, {
-      productName: string;
-      category: string;
-      totalMissingQty: number;
-      availableStock: number;
-      clients: { clientName: string; phone: string; quantity: number; demandCreatedAt: string }[];
-    }> = {};
+  // 1. Calculate Active Missing Products Aggregation (Partition Normal vs En Rupture)
+  const { normalProductsList, ruptureProductsList } = useMemo(() => {
+    const normalMap: Record<string, AggregatedProduct> = {};
+    const ruptureMap: Record<string, AggregatedProduct> = {};
 
     for (const dem of demands) {
       if (!dem.items || !dem.client) continue;
       for (const item of dem.items) {
-        if (!item.is_in_stock && !item.is_delivered) {
+        if (!item.is_delivered && !item.is_in_stock) {
           const pName = item.product_name.trim();
-          if (!map[pName]) {
+          const key = pName.toLowerCase();
+          const isRupture = item.status === 'en_rupture';
+          const targetMap = isRupture ? ruptureMap : normalMap;
+
+          if (!targetMap[key]) {
             const masterProd = masterProducts.find(
-              mp => mp.name.trim().toLowerCase() === pName.toLowerCase()
+              mp => mp.name.trim().toLowerCase() === key
             );
-            map[pName] = {
+            targetMap[key] = {
               productName: pName,
               category: masterProd?.category || 'كتاب مدرسي',
+              totalDemanded: 0,
+              totalFulfilled: 0,
               totalMissingQty: 0,
               availableStock: masterProd?.available_stock || 0,
               clients: [],
+              initialDemandCreatedAt: dem.created_at || new Date().toISOString(),
+              latestDemandCreatedAt: dem.created_at || new Date().toISOString(),
             };
           }
-          map[pName].totalMissingQty += item.quantity;
-          map[pName].clients.push({
+
+          const qty = item.quantity || 0;
+          targetMap[key].totalDemanded += qty;
+          targetMap[key].totalMissingQty += qty;
+
+          const createdAt = dem.created_at || new Date().toISOString();
+          targetMap[key].clients.push({
             clientName: dem.client.name,
             phone: dem.client.phone,
-            quantity: item.quantity,
-            demandCreatedAt: dem.created_at || new Date().toISOString(),
+            quantity: qty,
+            demandCreatedAt: createdAt,
           });
+
+          if (new Date(createdAt).getTime() < new Date(targetMap[key].initialDemandCreatedAt).getTime()) {
+            targetMap[key].initialDemandCreatedAt = createdAt;
+          }
+          if (new Date(createdAt).getTime() > new Date(targetMap[key].latestDemandCreatedAt).getTime()) {
+            targetMap[key].latestDemandCreatedAt = createdAt;
+          }
         }
       }
     }
 
-    const list = Object.values(map).map(item => ({
-      ...item,
-      clients: item.clients.sort((a, b) => new Date(a.demandCreatedAt).getTime() - new Date(b.demandCreatedAt).getTime())
-    }));
+    const processList = (map: Record<string, AggregatedProduct>) => {
+      return Object.values(map)
+        .map(item => ({
+          ...item,
+          clients: item.clients.sort((a, b) => new Date(a.demandCreatedAt).getTime() - new Date(b.demandCreatedAt).getTime())
+        }))
+        .filter(item => item.totalMissingQty > 0);
+    };
 
-    return list.sort((a, b) => b.totalMissingQty - a.totalMissingQty);
+    return {
+      normalProductsList: processList(normalMap),
+      ruptureProductsList: processList(ruptureMap),
+    };
   }, [demands, masterProducts]);
 
-  // Filter missing products by search query
-  const filteredMissingProducts = useMemo(() => {
-    if (!searchQuery.trim()) return missingProductsList;
-    const q = searchQuery.trim().toLowerCase();
-    return missingProductsList.filter(
-      p => p.productName.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
-    );
-  }, [missingProductsList, searchQuery]);
+  // Helper to detect Arabic text
+  const isArabic = (str: string) => /[\u0600-\u06FF]/.test(str);
 
-  // Total summary metrics
-  const totalMissingItemsCount = missingProductsList.length;
-  const totalMissingPiecesCount = missingProductsList.reduce((acc, p) => acc + p.totalMissingQty, 0);
+  // Sorting Function
+  const sortAggregatedProducts = (list: AggregatedProduct[], sort: SortOption) => {
+    return [...list].sort((a, b) => {
+      if (sort === 'alphabetical') {
+        const aArabic = isArabic(a.productName);
+        const bArabic = isArabic(b.productName);
+
+        // Arabic product names first (أ to ي), followed by Latin names (A to Z)
+        if (aArabic && !bArabic) return -1;
+        if (!aArabic && bArabic) return 1;
+
+        if (aArabic && bArabic) {
+          return a.productName.localeCompare(b.productName, 'ar', { sensitivity: 'base' });
+        }
+        return a.productName.localeCompare(b.productName, 'fr', { sensitivity: 'base' });
+      }
+
+      if (sort === 'oldest') {
+        // Ascending order based on initial demand creation time
+        const timeA = new Date(a.initialDemandCreatedAt).getTime() || 0;
+        const timeB = new Date(b.initialDemandCreatedAt).getTime() || 0;
+        return timeA - timeB;
+      }
+
+      if (sort === 'newest') {
+        // Descending order based on latest demand creation time
+        const timeA = new Date(a.latestDemandCreatedAt).getTime() || 0;
+        const timeB = new Date(b.latestDemandCreatedAt).getTime() || 0;
+        return timeB - timeA;
+      }
+
+      return 0;
+    });
+  };
+
+  // Filter and sort products based on active tab, search query, and selected sort
+  const displayedProducts = useMemo(() => {
+    const baseList = activeTab === 'normal' ? normalProductsList : ruptureProductsList;
+
+    let filtered = baseList;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = baseList.filter(
+        p => p.productName.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
+      );
+    }
+
+    return sortAggregatedProducts(filtered, sortBy);
+  }, [activeTab, normalProductsList, ruptureProductsList, searchQuery, sortBy]);
+
+  // Metrics for active view
+  const currentTotalItems = displayedProducts.length;
+  const currentTotalPieces = displayedProducts.reduce((acc, p) => acc + p.totalMissingQty, 0);
+
+  // Summary counts for badges
+  const totalNormalItems = normalProductsList.length;
+  const totalRuptureItems = ruptureProductsList.length;
 
   // Handle Modal Open
   const handleOpenModal = (productName: string, totalMissingQty: number) => {
     setModalProduct({ productName, totalMissingQty });
     setModalQty('');
+  };
+
+  // Handle Mark Product En Rupture
+  const handleMarkEnRupture = async (productName: string) => {
+    setProcessingProduct(productName);
+    try {
+      if (onMarkEnRupture) {
+        await onMarkEnRupture(productName);
+      }
+      setToastMessage(`تم وسم "${productName}" كغير متوفر ونقلها إلى قائمة السلع غير المتوفرة`);
+      setTimeout(() => setToastMessage(null), 2500);
+    } catch (err) {
+      console.error('Error marking product en rupture:', err);
+      alert('حدث خطأ أثناء تغيير حالة السلعة، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setProcessingProduct(null);
+    }
+  };
+
+  // Handle Restore Product from Rupture
+  const handleRestoreEnRupture = async (productName: string) => {
+    setProcessingProduct(productName);
+    try {
+      if (onRestoreEnRupture) {
+        await onRestoreEnRupture(productName);
+      }
+      setToastMessage(`تمت إعادة "${productName}" إلى قائمة الخصاصات العادية`);
+      setTimeout(() => setToastMessage(null), 2500);
+    } catch (err) {
+      console.error('Error restoring product:', err);
+      alert('حدث خطأ أثناء استرجاع السلعة، يرجى المحاولة مرة أخرى.');
+    } finally {
+      setProcessingProduct(null);
+    }
   };
 
   // Handle Allocation Submit from Modal
@@ -133,7 +262,8 @@ export default function StockAllocation({
       } else {
         // Fallback manually if onAutoAllocateStock is not provided
         let remaining = parsedQty;
-        const targetProd = missingProductsList.find(p => p.productName === productName);
+        const allPending = [...normalProductsList, ...ruptureProductsList];
+        const targetProd = allPending.find(p => p.productName === productName);
 
         if (targetProd) {
           for (const cli of targetProd.clients) {
@@ -144,8 +274,13 @@ export default function StockAllocation({
                 for (const it of dem.items) {
                   if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
                     const needed = it.quantity;
-                    await onUpdateItemState(it.id, { is_in_stock: true });
-                    remaining -= needed;
+                    if (remaining >= needed) {
+                      await onUpdateItemState(it.id, { is_in_stock: true });
+                      remaining -= needed;
+                    } else {
+                      remaining = 0;
+                      break;
+                    }
                   }
                 }
               }
@@ -160,10 +295,10 @@ export default function StockAllocation({
       setModalProduct(null);
       setModalQty('');
 
-      // Show lightweight 2.5s Toast notification
-      setShowToast(true);
+      // Show Toast notification
+      setToastMessage('تمت إضافة وتوزيع السلعة بنجاح');
       setTimeout(() => {
-        setShowToast(false);
+        setToastMessage(null);
       }, 2500);
 
     } catch (err) {
@@ -178,8 +313,8 @@ export default function StockAllocation({
   return (
     <div className="space-y-3 relative">
       
-      {/* 1. Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
+      {/* 1. Header Banner & Section Switcher */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
@@ -194,71 +329,171 @@ export default function StockAllocation({
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
               <span className="text-slate-500">العناوين:</span>
-              <strong className="text-slate-900">{totalMissingItemsCount}</strong>
+              <strong className="text-slate-900">{currentTotalItems}</strong>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
               <span className="text-slate-500">القطع المطلوبة:</span>
-              <strong className="text-slate-900">{totalMissingPiecesCount}</strong>
+              <strong className="text-slate-900">{currentTotalPieces}</strong>
             </div>
           </div>
         </div>
+
+        {/* Section Switcher: Normal Pending vs Out of Stock */}
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-bold border border-slate-200/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab('normal')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+              activeTab === 'normal'
+                ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <PackageCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span>قائمة الخصاصات العادية</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'normal' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {totalNormalItems}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('rupture')}
+            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+              activeTab === 'rupture'
+                ? 'bg-white text-emerald-800 shadow-2xs font-bold'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <AlertCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <span>سلع غير متوفرة</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'rupture' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {totalRuptureItems}
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* 2. MAIN VIEW: Active Missing Products List Table */}
+      {/* 2. MAIN VIEW: Products List Table with Sort & Search */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-2.5">
         
-        {/* Search Filter Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
-          <span className="text-sm sm:text-base font-bold text-slate-900">قائمة الخصاصات المطلوب توفيرها</span>
+        {/* Search & Sort Filter Header */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+          <span className="text-base font-bold text-slate-800">
+            {activeTab === 'normal' ? 'قائمة الخصاصات المطلوب توفيرها' : 'سلع غير متوفرة (Out of stock)'}
+          </span>
 
-          <div className="relative w-full sm:w-60">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="البحث بالاسم..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* Minimalist Sorting Dropdown */}
+            <div className="relative flex items-center">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-slate-800 transition-colors cursor-pointer appearance-none"
+              >
+                <option value="alphabetical">أبجدياً (أ - ي ثم A - Z)</option>
+                <option value="oldest">الطلب الأقدم أولاً</option>
+                <option value="newest">الطلب الأحدث أولاً</option>
+              </select>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-60">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="البحث بالاسم..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
+              />
+            </div>
           </div>
         </div>
 
         {/* Missing Products List / Table */}
-        {filteredMissingProducts.length === 0 ? (
+        {displayedProducts.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg bg-slate-50/50 space-y-1.5">
             <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
-            <p className="font-bold text-slate-800 text-xs">جميع كتب هذه الدفعة متوفرة بالكامل</p>
+            <p className="font-bold text-slate-800 text-xs">
+              {activeTab === 'normal' 
+                ? 'جميع كتب هذه الدفعة متوفرة بالكامل' 
+                : 'لا توجد سلع مسجلة كغير متوفرة حالياً'}
+            </p>
           </div>
         ) : (
           <div className="space-y-1.5">
-            {filteredMissingProducts.map((item) => {
+            {displayedProducts.map((item) => {
               const isProcessing = processingProduct === item.productName;
 
               return (
                 <div 
                   key={item.productName}
-                  className="border border-slate-200 bg-white hover:border-slate-300 rounded-lg py-2 px-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors"
+                  className="border border-slate-200 bg-white hover:border-slate-300 rounded-lg py-2.5 px-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors"
                 >
                   {/* Left: Product Name & Required Quantity */}
                   <div className="space-y-0.5 flex-1 min-w-0">
-                    <h4 className="text-base font-bold text-slate-900 leading-tight truncate">
-                      {item.productName}
-                    </h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-base font-bold text-slate-900 leading-tight truncate">
+                        {item.productName}
+                      </h4>
+                      {activeTab === 'rupture' && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          غير متوفر
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-slate-500">
                       الكمية المطلوبة: <strong className="text-slate-800 font-semibold">{item.totalMissingQty} قطعة</strong>
+                      <span className="mx-1.5 text-slate-300">|</span>
+                      <span className="text-xs text-slate-400">
+                        {item.clients.length} {item.clients.length === 1 ? 'زبون' : 'زبناء'}
+                      </span>
                     </p>
                   </div>
 
-                  {/* Right: Compact Standard Button */}
-                  <div className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 border-slate-100 pt-2 md:pt-0 justify-end">
+                  {/* Right: Action Buttons (Mobile-Responsive 50/50 Grid, Desktop Flex) */}
+                  <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center mt-3 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 justify-end">
+                    
+                    {/* Blue Ready (جاهز) Button */}
                     <button
                       onClick={() => handleOpenModal(item.productName, item.totalMissingQty)}
                       disabled={isProcessing}
-                      className="h-8 px-3.5 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 w-full md:w-auto shrink-0"
+                      className="h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                      <span>{isProcessing ? 'جاري التوزيع...' : 'جاهز'}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+                      <span className="truncate">{isProcessing ? 'جاري...' : 'جاهز'}</span>
                     </button>
+
+                    {/* In Normal Tab: Green 'غير متوفر' Button */}
+                    {activeTab === 'normal' ? (
+                      <button
+                        onClick={() => handleMarkEnRupture(item.productName)}
+                        disabled={isProcessing}
+                        title="وسم السلعة كغير متوفرة ونقلها لقسم سلع غير متوفرة"
+                        className="h-8 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
+                      >
+                        <Ban className="w-3.5 h-3.5 text-white shrink-0" />
+                        <span className="truncate">غير متوفر</span>
+                      </button>
+                    ) : (
+                      /* In Rupture Tab: Restore Button */
+                      <button
+                        onClick={() => handleRestoreEnRupture(item.productName)}
+                        disabled={isProcessing}
+                        title="إلغاء الانقطاع وإعادة السلعة لقائمة الخصاصات العادية"
+                        className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                        <span className="truncate">إلغاء الانقطاع</span>
+                      </button>
+                    )}
+
                   </div>
 
                 </div>
@@ -285,7 +520,7 @@ export default function StockAllocation({
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-2.5 border-b border-slate-100 pb-2.5">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
                   <PackageCheck className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
@@ -293,7 +528,7 @@ export default function StockAllocation({
                     استلام: {modalProduct.productName}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    الكمية المطلوبة: <span className="text-slate-900 font-semibold">{modalProduct.totalMissingQty} قطعة</span>
+                    الكمية المطلوبة: <span className="text-blue-700 font-semibold">{modalProduct.totalMissingQty} قطعة</span>
                   </p>
                 </div>
               </div>
@@ -337,7 +572,7 @@ export default function StockAllocation({
                 <button
                   type="submit"
                   disabled={isProcessingModal}
-                  className="flex-1 h-8 px-3 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="flex-1 h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{isProcessingModal ? 'جاري...' : 'تأكيد'}</span>
@@ -360,11 +595,11 @@ export default function StockAllocation({
       )}
 
       {/* 4. Sleek Floating Toast Notification */}
-      {showToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur-xs shadow-lg border border-slate-700 rounded-xl px-3.5 py-2 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur-xs shadow-lg border border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150 max-w-md text-center">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="font-semibold text-xs tracking-wide">
-            تمت إضافة وتوزيع السلعة بنجاح
+            {toastMessage}
           </span>
         </div>
       )}
