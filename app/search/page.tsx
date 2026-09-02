@@ -118,7 +118,16 @@ export default function SearchPage() {
                           </a>
                         </td>
                         <td className="px-6 py-3.5 text-center font-black text-slate-900 text-sm">
-                          {result.quantity} قطع
+                          {result.fulfilledQuantity && result.fulfilledQuantity > 0 && !result.isInStock ? (
+                            <div className="flex flex-col items-center">
+                              <span>{result.quantity} قطع</span>
+                              <span className="text-[10px] text-rose-600 font-bold">
+                                المتبقي: {Math.max(0, result.quantity - result.fulfilledQuantity)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span>{result.quantity} قطع</span>
+                          )}
                         </td>
                         <td className="px-6 py-3.5 text-center">
                           {result.isDelivered ? (
@@ -128,6 +137,10 @@ export default function SearchPage() {
                           ) : result.isInStock ? (
                             <span className="bg-blue-50 text-blue-700 text-[11px] font-medium px-2 py-0.5 rounded inline-flex items-center gap-1">
                               جاهز للتسليم
+                            </span>
+                          ) : result.fulfilledQuantity && result.fulfilledQuantity > 0 ? (
+                            <span className="bg-amber-50 text-amber-800 text-[11px] font-medium px-2 py-0.5 rounded inline-flex items-center gap-1 border border-amber-200">
+                              توفير جزئي ({result.fulfilledQuantity}/{result.quantity})
                             </span>
                           ) : (
                             <span className="bg-rose-50 text-rose-700 text-[11px] font-medium px-2 py-0.5 rounded inline-flex items-center gap-1">
@@ -161,6 +174,11 @@ export default function SearchPage() {
                         </h4>
                         <p className="text-xs text-slate-500 mt-1">
                           الكمية: <span className="font-bold text-slate-800">{result.quantity} قطعة</span>
+                          {result.fulfilledQuantity && result.fulfilledQuantity > 0 && !result.isInStock && (
+                            <span className="text-rose-600 font-bold mr-2">
+                              (المتبقي: {Math.max(0, result.quantity - result.fulfilledQuantity)})
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div>
@@ -171,6 +189,10 @@ export default function SearchPage() {
                         ) : result.isInStock ? (
                           <span className="bg-blue-50 text-blue-700 text-[10px] font-semibold px-2 py-0.5 rounded">
                             جاهز للتسليم
+                          </span>
+                        ) : result.fulfilledQuantity && result.fulfilledQuantity > 0 ? (
+                          <span className="bg-amber-50 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-200">
+                            توفير جزئي ({result.fulfilledQuantity}/{result.quantity})
                           </span>
                         ) : (
                           <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded">

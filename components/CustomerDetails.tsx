@@ -266,6 +266,10 @@ export default function CustomerDetails({
           {targetDemand.items?.map((item, idx) => {
             const isInStock = item.is_in_stock;
             const isDelivered = item.is_delivered;
+            const totalQty = Number(item.quantity) || 0;
+            const fulfilledQty = Number(item.fulfilled_quantity || 0);
+            const stillNeeded = Math.max(0, totalQty - fulfilledQty);
+            const isPartiallyFulfilled = !isInStock && !isDelivered && fulfilledQty > 0;
 
             return (
               <div
@@ -283,9 +287,23 @@ export default function CustomerDetails({
                     <h4 className="font-semibold text-slate-900 text-sm leading-tight truncate">
                       {item.product_name}
                     </h4>
-                    <p className="text-xs text-slate-500 font-normal mt-0.5">
-                      الكمية: <span className="font-semibold text-slate-800">{item.quantity} قطعة</span>
-                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 font-normal mt-0.5 flex-wrap">
+                      <span>
+                        الكمية المطلوبة: <span className="font-semibold text-slate-800">{totalQty} قطعة</span>
+                      </span>
+                      {isPartiallyFulfilled && (
+                        <>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-amber-700 bg-amber-50 font-bold px-1.5 py-0.5 rounded border border-amber-200">
+                            تم توفير: {fulfilledQty}
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span className="text-rose-700 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                            الكمية المتبقية: {stillNeeded}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -297,6 +315,11 @@ export default function CustomerDetails({
                     <span className="bg-emerald-50 text-emerald-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>متوفر / جاهز</span>
+                    </span>
+                  ) : isPartiallyFulfilled ? (
+                    <span className="bg-amber-50 text-amber-800 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0 border border-amber-200">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                      <span>توفير جزئي ({fulfilledQty}/{totalQty})</span>
                     </span>
                   ) : (
                     <span className="bg-rose-50 text-rose-700 text-[11px] font-medium px-2 py-0.5 rounded flex items-center gap-1 shrink-0">

@@ -34,7 +34,7 @@ interface StockAllocationProps {
   masterProducts: MasterProduct[];
   onUpdateItemState: (
     itemId: string, 
-    updates: { is_in_stock?: boolean; is_delivered?: boolean }
+    updates: { is_in_stock?: boolean; is_delivered?: boolean; fulfilled_quantity?: number }
   ) => Promise<void>;
   onAutoAllocateStock?: (
     productName: string, 
@@ -64,6 +64,13 @@ export default function StockAllocation({
   const [isProcessingModal, setIsProcessingModal] = useState(false);
   const modalInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Local demands state for instantaneous UI updates without snapping back
+  const [localDemands, setLocalDemands] = useState<ClientDemand[]>(demands);
+
+  useEffect(() => {
+    setLocalDemands(demands);
+  }, [demands]);
+
   useEffect(() => {
     if (modalProduct) {
       setTimeout(() => {
@@ -77,7 +84,7 @@ export default function StockAllocation({
     const normalMap: Record<string, AggregatedProduct> = {};
     const ruptureMap: Record<string, AggregatedProduct> = {};
 
-    for (const dem of demands) {
+    for (const dem of localDemands) {
       if (!dem.items || !dem.client) continue;
       for (const item of dem.items) {
         if (!item.is_delivered && !item.is_in_stock) {
@@ -103,15 +110,23 @@ export default function StockAllocation({
             };
           }
 
-          const qty = item.quantity || 0;
-          targetMap[key].totalDemanded += qty;
-          targetMap[key].totalMissingQty += qty;
+          const totalQty = item.quantity || 0;
+          const fulfilledQty = item.fulfilled_quantity || 0;
+          const stillNeeded = Math.max(0, totalQty - fulfilledQty);
+
+          if (stillNeeded <= 0) {
+            continue; // Fully fulfilled row, no longer missing
+          }
+
+          targetMap[key].totalDemanded += totalQty;
+          targetMap[key].totalFulfilled += fulfilledQty;
+          targetMap[key].totalMissingQty += stillNeeded;
 
           const createdAt = dem.created_at || new Date().toISOString();
           targetMap[key].clients.push({
             clientName: dem.client.name,
             phone: dem.client.phone,
-            quantity: qty,
+            quantity: stillNeeded,
             demandCreatedAt: createdAt,
           });
 
@@ -138,7 +153,7 @@ export default function StockAllocation({
       normalProductsList: processList(normalMap),
       ruptureProductsList: processList(ruptureMap),
     };
-  }, [demands, masterProducts]);
+  }, [localDemands, masterProducts]);
 
   // Helper to detect Arabic text
   const isArabic = (str: string) => /[\u0600-\u06FF]/.test(str);
@@ -209,7 +224,25 @@ export default function StockAllocation({
 
   // Handle Mark Product En Rupture
   const handleMarkEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
     setProcessingProduct(productName);
+
+    // 1. Immediately & synchronously update local React state
+    setLocalDemands(prev =>
+      prev.map(dem => {
+        if (!dem.items) return dem;
+        return {
+          ...dem,
+          items: dem.items.map(it => {
+            if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
+              return { ...it, status: 'en_rupture' as const };
+            }
+            return it;
+          })
+        };
+      })
+    );
+
     try {
       if (onMarkEnRupture) {
         await onMarkEnRupture(productName);
@@ -219,6 +252,8 @@ export default function StockAllocation({
     } catch (err) {
       console.error('Error marking product en rupture:', err);
       alert('حدث خطأ أثناء تغيير حالة السلعة، يرجى المحاولة مرة أخرى.');
+      // Revert if error occurs
+      setLocalDemands(demands);
     } finally {
       setProcessingProduct(null);
     }
@@ -226,7 +261,25 @@ export default function StockAllocation({
 
   // Handle Restore Product from Rupture
   const handleRestoreEnRupture = async (productName: string) => {
+    const cleanName = productName.trim().toLowerCase();
     setProcessingProduct(productName);
+
+    // 1. Immediately & synchronously update local React state
+    setLocalDemands(prev =>
+      prev.map(dem => {
+        if (!dem.items) return dem;
+        return {
+          ...dem,
+          items: dem.items.map(it => {
+            if (it.product_name.trim().toLowerCase() === cleanName && it.status === 'en_rupture') {
+              return { ...it, status: 'pending' as const };
+            }
+            return it;
+          })
+        };
+      })
+    );
+
     try {
       if (onRestoreEnRupture) {
         await onRestoreEnRupture(productName);
@@ -236,6 +289,7 @@ export default function StockAllocation({
     } catch (err) {
       console.error('Error restoring product:', err);
       alert('حدث خطأ أثناء استرجاع السلعة، يرجى المحاولة مرة أخرى.');
+      setLocalDemands(demands);
     } finally {
       setProcessingProduct(null);
     }
@@ -268,16 +322,22 @@ export default function StockAllocation({
         if (targetProd) {
           for (const cli of targetProd.clients) {
             if (remaining <= 0) break;
-            for (const dem of demands) {
+            for (const dem of localDemands) {
               if (remaining <= 0) break;
               if (dem.client?.phone === cli.phone && dem.items) {
                 for (const it of dem.items) {
                   if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
-                    const needed = it.quantity;
+                    const currentFulfilled = Number(it.fulfilled_quantity || 0);
+                    const totalQty = Number(it.quantity) || 0;
+                    const needed = Math.max(0, totalQty - currentFulfilled);
+                    if (needed <= 0) continue;
+
                     if (remaining >= needed) {
-                      await onUpdateItemState(it.id, { is_in_stock: true });
+                      await onUpdateItemState(it.id, { is_in_stock: true, fulfilled_quantity: totalQty });
                       remaining -= needed;
                     } else {
+                      const newFulfilled = currentFulfilled + remaining;
+                      await onUpdateItemState(it.id, { is_in_stock: false, fulfilled_quantity: newFulfilled });
                       remaining = 0;
                       break;
                     }

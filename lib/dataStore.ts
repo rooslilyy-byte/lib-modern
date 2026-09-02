@@ -31,8 +31,11 @@ export function invalidateStoreCache(): void {
 }
 
 export async function getFullStoreData(forceRefresh = false): Promise<FullStoreData> {
+  if (forceRefresh) {
+    invalidateStoreCache();
+  }
   // Always fetch live data without caching
-  if (pendingStorePromise) {
+  if (pendingStorePromise && !forceRefresh) {
     return pendingStorePromise;
   }
 
@@ -54,7 +57,11 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             masterProducts: data.masterProducts || [],
             demands: (data.demands || []).map((d: any) => ({
               ...d,
-              items: (d.items || []).map((it: any) => ({ ...it, status: it.status || 'pending' })),
+              items: (d.items || []).map((it: any) => ({ 
+                ...it, 
+                fulfilled_quantity: it.fulfilled_quantity !== undefined ? Number(it.fulfilled_quantity) : (it.is_in_stock ? Number(it.quantity) : 0),
+                status: it.status || 'pending' 
+              })),
             })),
           };
           storeCache = { data: fullData, timestamp: Date.now() };
@@ -368,25 +375,42 @@ export async function autoAllocateStock(
 
     for (const item of pendingItems) {
       if (remainingStock <= 0) break;
-      const itemQty = Number(item.quantity) || 0;
-      if (itemQty <= 0) continue;
+      const totalQty = Number(item.quantity) || 0;
+      if (totalQty <= 0) continue;
 
-      if (remainingStock >= itemQty) {
-        await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
-        remainingStock -= itemQty;
+      const currentFulfilled = Number((item as any).fulfilled_quantity || 0);
+      const stillNeeded = Math.max(0, totalQty - currentFulfilled);
+      if (stillNeeded <= 0) continue;
 
-        const demandObj: any = (item as any).demand;
-        const cliRaw = Array.isArray(demandObj) ? demandObj[0]?.client : demandObj?.client;
-        const cli: any = Array.isArray(cliRaw) ? cliRaw[0] : cliRaw;
-        if (cli && cli.phone) {
+      const demandObj: any = (item as any).demand;
+      const cliRaw = Array.isArray(demandObj) ? demandObj[0]?.client : demandObj?.client;
+      const cli: any = Array.isArray(cliRaw) ? cliRaw[0] : cliRaw;
+      const recordCli = (fulfilledPortion: number) => {
+        if (cli && cli.phone && fulfilledPortion > 0) {
           const key = cli.phone;
           if (!allocatedMap[key]) {
             allocatedMap[key] = { clientName: cli.name || '', phone: cli.phone, totalFulfilled: 0 };
           }
-          allocatedMap[key].totalFulfilled += itemQty;
+          allocatedMap[key].totalFulfilled += fulfilledPortion;
         }
-      } else if (remainingStock < itemQty && remainingStock > 0) {
+      };
+
+      if (remainingStock < stillNeeded && remainingStock > 0) {
+        const newFulfilled = currentFulfilled + remainingStock;
+        try {
+          await supabase.from('demand_items').update({ fulfilled_quantity: newFulfilled }).eq('id', item.id);
+        } catch {}
+        recordCli(remainingStock);
+        remainingStock = 0;
         break;
+      } else if (remainingStock >= stillNeeded) {
+        try {
+          await supabase.from('demand_items').update({ is_in_stock: true, fulfilled_quantity: totalQty }).eq('id', item.id);
+        } catch {
+          await supabase.from('demand_items').update({ is_in_stock: true }).eq('id', item.id);
+        }
+        remainingStock -= stillNeeded;
+        recordCli(stillNeeded);
       }
     }
 
@@ -414,8 +438,10 @@ export async function autoAllocateStock(
 
 export async function markProductEnRupture(productName: string): Promise<void> {
   const cleanName = productName.trim();
+  invalidateStoreCache();
   if (isBrowser) {
     await fetchStoreApi('mark_en_rupture', { productName: cleanName });
+    invalidateStoreCache();
     return;
   }
 
@@ -436,8 +462,10 @@ export async function markProductEnRupture(productName: string): Promise<void> {
 
 export async function restoreProductEnRupture(productName: string): Promise<void> {
   const cleanName = productName.trim();
+  invalidateStoreCache();
   if (isBrowser) {
     await fetchStoreApi('restore_en_rupture', { productName: cleanName });
+    invalidateStoreCache();
     return;
   }
 

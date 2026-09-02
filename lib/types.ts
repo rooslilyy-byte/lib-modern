@@ -28,6 +28,7 @@ export interface DemandItem {
   demand_id: string;
   product_name: string;
   quantity: number;
+  fulfilled_quantity?: number;
   is_in_stock: boolean;
   is_delivered: boolean;
   status?: string;

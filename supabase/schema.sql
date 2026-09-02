@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.demand_items (
     demand_id UUID NOT NULL REFERENCES public.client_demands(id) ON DELETE CASCADE,
     product_name TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    fulfilled_quantity INTEGER DEFAULT 0,
     is_in_stock BOOLEAN DEFAULT FALSE,
     is_delivered BOOLEAN DEFAULT FALSE,
     status TEXT DEFAULT 'pending',

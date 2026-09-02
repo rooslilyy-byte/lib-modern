@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { 
   getFullStoreData,
+  invalidateStoreCache,
   getActiveBatch, 
   archiveActiveBatch, 
   getMasterProducts, 
@@ -55,6 +57,7 @@ interface AppShellProps {
 }
 
 export default function AppShell({ children }: AppShellProps) {
+  const router = useRouter();
   const [activeBatch, setActiveBatch] = useState<PurchaseBatch | null>(globalAppCache.activeBatch);
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>(globalAppCache.masterProducts);
   const [demands, setDemands] = useState<ClientDemand[]>(globalAppCache.demands);
@@ -115,7 +118,7 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleAutoAllocateStock = async (productName: string, receivedQty: number) => {
-    // OPTIMISTIC LOCAL ALLOCATION UPDATE
+    // OPTIMISTIC LOCAL ALLOCATION UPDATE WITH PROGRESSIVE FULFILLMENT
     const cleanName = productName.trim().toLowerCase();
     let remaining = Math.max(1, Math.floor(receivedQty));
 
@@ -129,9 +132,20 @@ export default function AppShell({ children }: AppShellProps) {
         const newItems = dem.items.map(it => {
           if (remaining <= 0) return it;
           if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
-            const needed = it.quantity;
-            remaining -= needed;
-            return { ...it, is_in_stock: true };
+            const currentFulfilled = Number(it.fulfilled_quantity || 0);
+            const totalQty = Number(it.quantity) || 0;
+            const stillNeeded = Math.max(0, totalQty - currentFulfilled);
+
+            if (stillNeeded <= 0) return it;
+
+            if (remaining < stillNeeded) {
+              const newFulfilled = currentFulfilled + remaining;
+              remaining = 0;
+              return { ...it, fulfilled_quantity: newFulfilled, is_in_stock: false };
+            } else {
+              remaining -= stillNeeded;
+              return { ...it, fulfilled_quantity: totalQty, is_in_stock: true };
+            }
           }
           return it;
         });
@@ -144,6 +158,7 @@ export default function AppShell({ children }: AppShellProps) {
 
     const res = await autoAllocateStock(productName, receivedQty);
     await loadData(true);
+    router.refresh();
     return res;
   };
 
@@ -155,7 +170,7 @@ export default function AppShell({ children }: AppShellProps) {
         if (!dem.items) return dem;
         const newItems = dem.items.map(it => {
           if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
-            return { ...it, status: 'en_rupture' };
+            return { ...it, status: 'en_rupture' as const };
           }
           return it;
         });
@@ -165,8 +180,11 @@ export default function AppShell({ children }: AppShellProps) {
       return updated;
     });
 
+    invalidateStoreCache();
     await markProductEnRupture(productName);
+    invalidateStoreCache();
     await loadData(true);
+    router.refresh();
   };
 
   const handleRestoreEnRupture = async (productName: string) => {
@@ -177,7 +195,7 @@ export default function AppShell({ children }: AppShellProps) {
         if (!dem.items) return dem;
         const newItems = dem.items.map(it => {
           if (it.product_name.trim().toLowerCase() === cleanName && it.status === 'en_rupture') {
-            return { ...it, status: 'pending' };
+            return { ...it, status: 'pending' as const };
           }
           return it;
         });
@@ -187,8 +205,11 @@ export default function AppShell({ children }: AppShellProps) {
       return updated;
     });
 
+    invalidateStoreCache();
     await restoreProductEnRupture(productName);
+    invalidateStoreCache();
     await loadData(true);
+    router.refresh();
   };
 
   const handleDeleteDemand = async (id: string) => {

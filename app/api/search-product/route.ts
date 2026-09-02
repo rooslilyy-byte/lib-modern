@@ -39,14 +39,38 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, message: error.message }, { status: 500 });
     }
 
+    // Fetch progressive fulfillment metadata
+    let progressiveMap: Record<string, number> = {};
+    try {
+      const { data: pbData } = await supabaseAdmin
+        .from('purchase_batches')
+        .select('batch_name')
+        .like('batch_name', '__METADATA_PROGRESSIVE_FULFILLMENT__::%')
+        .limit(1);
+
+      if (pbData && pbData.length > 0) {
+        const rawJson = pbData[0].batch_name.slice('__METADATA_PROGRESSIVE_FULFILLMENT__::'.length);
+        const parsed = JSON.parse(rawJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          progressiveMap = parsed;
+        }
+      }
+    } catch {}
+
     // Map database results to a clean client response format
     const results = (items || []).map((item: any) => {
       const demand = item.demand;
       const client = demand?.client;
+      const totalQty = Number(item.quantity) || 0;
+      const fulfilledQty = item.fulfilled_quantity !== undefined && item.fulfilled_quantity !== null
+        ? Number(item.fulfilled_quantity)
+        : (progressiveMap[item.id] !== undefined ? Number(progressiveMap[item.id]) : (item.is_in_stock ? totalQty : 0));
+
       return {
         id: item.id,
         productName: item.product_name,
-        quantity: item.quantity,
+        quantity: totalQty,
+        fulfilledQuantity: fulfilledQty,
         isInStock: item.is_in_stock,
         isDelivered: item.is_delivered,
         demandId: demand?.id || '',

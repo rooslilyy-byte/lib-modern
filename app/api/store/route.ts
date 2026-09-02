@@ -102,7 +102,118 @@ async function updateMasterProductStock(productName: string, delta: number): Pro
   );
 }
 
+const RUPTURE_METADATA_PREFIX = '__METADATA_EN_RUPTURE__::';
+
+async function getRuptureProductsFromDb(): Promise<{ id?: string; products: Set<string> }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('purchase_batches')
+      .select('id, batch_name')
+      .like('batch_name', `${RUPTURE_METADATA_PREFIX}%`)
+      .limit(1);
+
+    if (data && data.length > 0) {
+      const rawJson = data[0].batch_name.slice(RUPTURE_METADATA_PREFIX.length);
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (Array.isArray(parsed)) {
+          return { id: data[0].id, products: new Set(parsed.map((p) => normalizeProductName(String(p)))) };
+        }
+      } catch (e) {
+        console.warn('Error parsing rupture metadata json:', e);
+      }
+      return { id: data[0].id, products: new Set() };
+    }
+  } catch (err) {
+    console.warn('Error fetching rupture metadata row:', err);
+  }
+  return { products: new Set() };
+}
+
+async function saveRuptureProductsToDb(products: Set<string>, existingId?: string): Promise<void> {
+  const serialized = `${RUPTURE_METADATA_PREFIX}${JSON.stringify(Array.from(products))}`;
+  try {
+    if (existingId) {
+      await supabaseAdmin
+        .from('purchase_batches')
+        .update({ batch_name: serialized, is_archived: true })
+        .eq('id', existingId);
+    } else {
+      const current = await getRuptureProductsFromDb();
+      if (current.id) {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .update({ batch_name: serialized, is_archived: true })
+          .eq('id', current.id);
+      } else {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .insert({ batch_name: serialized, is_archived: true });
+      }
+    }
+  } catch (err) {
+    console.error('Error saving rupture products metadata:', err);
+  }
+}
+
+const PROGRESSIVE_METADATA_PREFIX = '__METADATA_PROGRESSIVE_FULFILLMENT__::';
+
+async function getProgressiveFulfillmentFromDb(): Promise<{ id?: string; map: Record<string, number> }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('purchase_batches')
+      .select('id, batch_name')
+      .like('batch_name', `${PROGRESSIVE_METADATA_PREFIX}%`)
+      .limit(1);
+
+    if (data && data.length > 0) {
+      const rawJson = data[0].batch_name.slice(PROGRESSIVE_METADATA_PREFIX.length);
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return { id: data[0].id, map: parsed };
+        }
+      } catch (e) {
+        console.warn('Error parsing progressive metadata json:', e);
+      }
+      return { id: data[0].id, map: {} };
+    }
+  } catch (err) {
+    console.warn('Error fetching progressive metadata row:', err);
+  }
+  return { map: {} };
+}
+
+async function saveProgressiveFulfillmentToDb(map: Record<string, number>, existingId?: string): Promise<void> {
+  const serialized = `${PROGRESSIVE_METADATA_PREFIX}${JSON.stringify(map)}`;
+  try {
+    if (existingId) {
+      await supabaseAdmin
+        .from('purchase_batches')
+        .update({ batch_name: serialized, is_archived: true })
+        .eq('id', existingId);
+    } else {
+      const current = await getProgressiveFulfillmentFromDb();
+      if (current.id) {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .update({ batch_name: serialized, is_archived: true })
+          .eq('id', current.id);
+      } else {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .insert({ batch_name: serialized, is_archived: true });
+      }
+    }
+  } catch (err) {
+    console.error('Error saving progressive metadata:', err);
+  }
+}
+
 async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
+  const { products: ruptureProducts } = await getRuptureProductsFromDb();
+  const { map: progressiveMap } = await getProgressiveFulfillmentFromDb();
+
   const rows = unwrap(
     await supabaseAdmin
       .from('client_demands')
@@ -137,10 +248,22 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
       .sort((a, b) => {
         return String(a.created_at || '').localeCompare(String(b.created_at || ''));
       })
-      .map((it) => ({
-        ...it,
-        status: it.status || 'pending',
-      })) as ClientDemand['items'];
+      .map((it) => {
+        const isEnRupture =
+          it.status === 'en_rupture' ||
+          ruptureProducts.has(normalizeProductName(it.product_name || ''));
+
+        const totalQty = Number(it.quantity) || 0;
+        const fulfilledQty = it.fulfilled_quantity !== undefined && it.fulfilled_quantity !== null
+          ? Number(it.fulfilled_quantity)
+          : (progressiveMap[it.id] !== undefined ? Number(progressiveMap[it.id]) : (it.is_in_stock ? totalQty : 0));
+
+        return {
+          ...it,
+          fulfilled_quantity: fulfilledQty,
+          status: isEnRupture ? ('en_rupture' as const) : ('pending' as const),
+        };
+      }) as ClientDemand['items'];
 
     demands.push({
       id: row.id,
@@ -175,12 +298,18 @@ export async function GET() {
 
     const demands = await getDemandsForBatch(activeBatch.id);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       activeBatch,
       masterProducts,
       demands,
     });
+
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
+    return response;
   } catch (error) {
     console.error('Error fetching database store data:', error);
     return NextResponse.json(
@@ -342,6 +471,25 @@ export async function POST(request: Request) {
 
       if (updates.is_in_stock !== undefined) {
         update.is_in_stock = Boolean(updates.is_in_stock);
+        try {
+          const { id: progId, map: progMap } = await getProgressiveFulfillmentFromDb();
+          const { data: itData } = await supabaseAdmin
+            .from('demand_items')
+            .select('quantity')
+            .eq('id', itemId)
+            .single();
+          const totalQty = itData ? Number(itData.quantity) : 0;
+          if (update.is_in_stock) {
+            progMap[itemId] = totalQty;
+            update.fulfilled_quantity = totalQty;
+          } else {
+            delete progMap[itemId];
+            update.fulfilled_quantity = 0;
+          }
+          await saveProgressiveFulfillmentToDb(progMap, progId);
+        } catch {
+          // Handled gracefully
+        }
       }
       if (updates.is_delivered !== undefined) {
         update.is_delivered = Boolean(updates.is_delivered);
@@ -351,10 +499,19 @@ export async function POST(request: Request) {
       }
 
       if (Object.keys(update).length > 0) {
-        unwrap(
-          await supabaseAdmin.from('demand_items').update(update).eq('id', itemId),
-          'Updating demand item state',
-        );
+        try {
+          await supabaseAdmin.from('demand_items').update(update).eq('id', itemId);
+        } catch {
+          // Column fulfilled_quantity might not exist yet; remove it and retry
+          const safeUpdate = { ...update };
+          delete safeUpdate.fulfilled_quantity;
+          if (Object.keys(safeUpdate).length > 0) {
+            unwrap(
+              await supabaseAdmin.from('demand_items').update(safeUpdate).eq('id', itemId),
+              'Updating demand item state fallback',
+            );
+          }
+        }
       }
 
       return NextResponse.json({ success: true });
@@ -468,47 +625,97 @@ export async function POST(request: Request) {
         { clientName: string; phone: string; totalFulfilled: number }
       > = {};
 
-      // 2. Iterate over the fetched pending items with strict FIFO math
+      // 2. Load progressive fulfillment map
+      const { id: progId, map: progMap } = await getProgressiveFulfillmentFromDb();
+      let hasProgChanges = false;
+
+      // 3. Iterate over the fetched pending items with Progressive Fulfillment math on SINGLE row
       for (const item of pendingItems) {
         if (remainingStock <= 0) {
           break;
         }
 
-        const itemQty = Number(item.quantity) || 0;
-        if (itemQty <= 0) {
+        const totalQty = Number(item.quantity) || 0;
+        if (totalQty <= 0) {
           continue;
         }
 
-        if (remainingStock >= itemQty) {
-          // Mark this individual item as fulfilled
-          unwrap(
-            await supabaseAdmin
-              .from('demand_items')
-              .update({ is_in_stock: true })
-              .eq('id', item.id),
-            'Allocating received stock to demand item',
-          );
+        const currentFulfilled = item.fulfilled_quantity !== undefined && item.fulfilled_quantity !== null
+          ? Number(item.fulfilled_quantity)
+          : (progMap[item.id] !== undefined ? Number(progMap[item.id]) : 0);
 
-          remainingStock -= itemQty;
+        const stillNeeded = Math.max(0, totalQty - currentFulfilled);
+        if (stillNeeded <= 0) {
+          continue; // Already fulfilled row, skip
+        }
 
-          const clientRaw = item.demand?.client;
-          const client = Array.isArray(clientRaw) ? clientRaw[0] : clientRaw;
-          if (client && client.phone) {
-            const key = client.phone;
-            if (!allocatedClientsMap[key]) {
-              allocatedClientsMap[key] = {
+        const clientRaw = item.demand?.client;
+        const client = Array.isArray(clientRaw) ? clientRaw[0] : clientRaw;
+        const clientKey = client && client.phone ? client.phone : item.id;
+
+        const recordAllocation = (allocatedQty: number) => {
+          if (client && client.phone && allocatedQty > 0) {
+            if (!allocatedClientsMap[clientKey]) {
+              allocatedClientsMap[clientKey] = {
                 clientName: client.name || '',
                 phone: client.phone,
                 totalFulfilled: 0,
               };
             }
-            allocatedClientsMap[key].totalFulfilled += itemQty;
+            allocatedClientsMap[clientKey].totalFulfilled += allocatedQty;
           }
-        } else if (remainingStock < itemQty && remainingStock > 0) {
-          // Do NOT mark as fulfilled if the entire row cannot be fulfilled.
-          // Break the loop so it remains pending for the next stock arrival.
+        };
+
+        if (remainingStock < stillNeeded && remainingStock > 0) {
+          // PARTIAL FULFILLMENT: Add incomingStock to fulfilled_quantity.
+          // The row status MUST REMAIN 'pending' (is_in_stock: false).
+          const newFulfilled = currentFulfilled + remainingStock;
+          progMap[item.id] = newFulfilled;
+          hasProgChanges = true;
+
+          try {
+            await supabaseAdmin
+              .from('demand_items')
+              .update({ fulfilled_quantity: newFulfilled })
+              .eq('id', item.id);
+          } catch {
+            // Handled via metadata
+          }
+
+          recordAllocation(remainingStock);
+          remainingStock = 0;
           break;
+        } else if (remainingStock >= stillNeeded) {
+          // FULL FULFILLMENT: Set fulfilled_quantity = totalQty, status = 'ready' (is_in_stock: true)
+          progMap[item.id] = totalQty;
+          hasProgChanges = true;
+
+          try {
+            unwrap(
+              await supabaseAdmin
+                .from('demand_items')
+                .update({ is_in_stock: true, fulfilled_quantity: totalQty })
+                .eq('id', item.id),
+              'Allocating received stock to demand item',
+            );
+          } catch {
+            // If fulfilled_quantity column does not exist yet
+            unwrap(
+              await supabaseAdmin
+                .from('demand_items')
+                .update({ is_in_stock: true })
+                .eq('id', item.id),
+              'Allocating received stock to demand item fallback',
+            );
+          }
+
+          remainingStock -= stillNeeded;
+          recordAllocation(stillNeeded);
         }
+      }
+
+      if (hasProgChanges) {
+        await saveProgressiveFulfillmentToDb(progMap, progId);
       }
 
       // Any surplus stock is added to master product available stock
@@ -530,6 +737,18 @@ export async function POST(request: Request) {
         };
       });
 
+      // If product was in rupture, remove it from rupture metadata since stock has arrived and was allocated
+      try {
+        const { id: rId, products: rProducts } = await getRuptureProductsFromDb();
+        const normAllocated = normalizeProductName(cleanName);
+        if (rProducts.has(normAllocated)) {
+          rProducts.delete(normAllocated);
+          await saveRuptureProductsToDb(rProducts, rId);
+        }
+      } catch (rErr) {
+        console.warn('Warning: Could not update rupture status after auto-allocation:', rErr);
+      }
+
       return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingStock });
     }
 
@@ -537,8 +756,14 @@ export async function POST(request: Request) {
     if (action === 'mark_en_rupture') {
       const { productName } = body;
       const cleanName = productName.trim();
+      const normalizedName = normalizeProductName(cleanName);
 
-      // 1. Fetch pending items matching product name
+      // 1. Persist to DB rupture metadata row
+      const { id, products } = await getRuptureProductsFromDb();
+      products.add(normalizedName);
+      await saveRuptureProductsToDb(products, id);
+
+      // 2. Also attempt updating DB column on demand_items if it exists
       const { data: items } = await supabaseAdmin
         .from('demand_items')
         .select('id, product_name')
@@ -546,20 +771,17 @@ export async function POST(request: Request) {
         .eq('is_delivered', false);
 
       const targetIds = (items || [])
-        .filter((item) => normalizeProductName(item.product_name) === normalizeProductName(cleanName))
+        .filter((item) => normalizeProductName(item.product_name) === normalizedName)
         .map((item) => item.id);
 
       if (targetIds.length > 0) {
         try {
-          unwrap(
-            await supabaseAdmin
-              .from('demand_items')
-              .update({ status: 'en_rupture' })
-              .in('id', targetIds),
-            'Marking items en rupture',
-          );
-        } catch (err) {
-          console.warn('Warning: Could not persist en_rupture status to DB column:', err);
+          await supabaseAdmin
+            .from('demand_items')
+            .update({ status: 'en_rupture' })
+            .in('id', targetIds);
+        } catch {
+          // Column status might not exist yet in schema cache
         }
       }
 
@@ -570,7 +792,14 @@ export async function POST(request: Request) {
     if (action === 'restore_en_rupture') {
       const { productName } = body;
       const cleanName = productName.trim();
+      const normalizedName = normalizeProductName(cleanName);
 
+      // 1. Remove from DB rupture metadata row
+      const { id, products } = await getRuptureProductsFromDb();
+      products.delete(normalizedName);
+      await saveRuptureProductsToDb(products, id);
+
+      // 2. Also attempt updating DB column on demand_items if it exists
       const { data: items } = await supabaseAdmin
         .from('demand_items')
         .select('id, product_name')
@@ -578,20 +807,17 @@ export async function POST(request: Request) {
         .eq('is_delivered', false);
 
       const targetIds = (items || [])
-        .filter((item) => normalizeProductName(item.product_name) === normalizeProductName(cleanName))
+        .filter((item) => normalizeProductName(item.product_name) === normalizedName)
         .map((item) => item.id);
 
       if (targetIds.length > 0) {
         try {
-          unwrap(
-            await supabaseAdmin
-              .from('demand_items')
-              .update({ status: 'pending' })
-              .in('id', targetIds),
-            'Restoring items from en rupture',
-          );
-        } catch (err) {
-          console.warn('Warning: Could not restore status in DB column:', err);
+          await supabaseAdmin
+            .from('demand_items')
+            .update({ status: 'pending' })
+            .in('id', targetIds);
+        } catch {
+          // Column status might not exist yet in schema cache
         }
       }
 
