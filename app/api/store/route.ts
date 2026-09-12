@@ -351,32 +351,36 @@ export async function POST(request: Request) {
       for (const item of items) {
         const productName = item.product_name.trim();
         const quantity = Math.max(1, Math.floor(item.quantity || 1));
-        const product = await ensureMasterProduct(productName);
-        const availableStock = Math.max(0, Number(product.available_stock) || 0);
-        const isInStock = availableStock >= quantity;
+        await ensureMasterProduct(productName);
 
-        if (isInStock) {
+        try {
           unwrap(
             await supabaseAdmin
-              .from('master_products')
-              .update({ available_stock: availableStock - quantity })
-              .eq('id', product.id),
-            'Allocating available product stock',
+              .from('demand_items')
+              .insert({
+                demand_id: demand.id,
+                product_name: productName,
+                quantity,
+                fulfilled_quantity: 0,
+                is_in_stock: false,
+                is_delivered: false,
+              }),
+            'Creating demand item',
+          );
+        } catch {
+          unwrap(
+            await supabaseAdmin
+              .from('demand_items')
+              .insert({
+                demand_id: demand.id,
+                product_name: productName,
+                quantity,
+                is_in_stock: false,
+                is_delivered: false,
+              }),
+            'Creating demand item fallback',
           );
         }
-
-        unwrap(
-          await supabaseAdmin
-            .from('demand_items')
-            .insert({
-              demand_id: demand.id,
-              product_name: productName,
-              quantity,
-              is_in_stock: isInStock,
-              is_delivered: false,
-            }),
-          'Creating demand item',
-        );
       }
 
       return NextResponse.json({ success: true, demandId: demand.id });
@@ -718,11 +722,7 @@ export async function POST(request: Request) {
         await saveProgressiveFulfillmentToDb(progMap, progId);
       }
 
-      // Any surplus stock is added to master product available stock
-      if (remainingStock > 0) {
-        await ensureMasterProduct(cleanName);
-        await updateMasterProductStock(cleanName, remainingStock);
-      }
+      // Surplus stock is strictly discarded (zero global inventory tracking)
 
       const allocatedClients = Object.values(allocatedClientsMap).map((client) => {
         let rawPhone = client.phone.replace(/\D/g, '');

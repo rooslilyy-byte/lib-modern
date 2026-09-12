@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Printer, FileText, ShoppingCart, CheckCircle2, AlertCircle } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
+import { compareProductNames } from '@/lib/sortUtils';
 
 type ReportTab = 'normal' | 'rupture';
 
@@ -59,6 +60,11 @@ export default function SupplierBuyingSheet({
         const isRupture = item.status === 'en_rupture';
         const targetMap = isRupture ? ruptureMap : normalMap;
 
+        const totalQty = Number(item.quantity) || 0;
+        const fulfilledQty = Number(item.fulfilled_quantity) || 0;
+        const stillNeeded = Math.max(0, totalQty - fulfilledQty);
+        if (stillNeeded <= 0) continue;
+
         const pName = item.product_name.trim();
         if (!targetMap[pName]) {
           targetMap[pName] = {
@@ -68,27 +74,30 @@ export default function SupplierBuyingSheet({
           };
         }
 
-        targetMap[pName].totalQuantity += item.quantity;
+        targetMap[pName].totalQuantity += stillNeeded;
         targetMap[pName].clients.push({
           clientName: dem.client.name,
           phone: dem.client.phone,
-          quantity: item.quantity,
+          quantity: stillNeeded,
           demandId: dem.id,
         });
       }
     }
 
-    const sortFn = (a: SupplierAggregatedItem, b: SupplierAggregatedItem) => b.totalQuantity - a.totalQuantity;
-
     return {
-      normalReport: Object.values(normalMap).sort(sortFn),
-      ruptureReport: Object.values(ruptureMap).sort(sortFn),
+      normalReport: Object.values(normalMap),
+      ruptureReport: Object.values(ruptureMap),
     };
   }, [demands]);
 
-  const report = demands 
+  const rawReport = demands 
     ? (activeTab === 'normal' ? normalReport : ruptureReport) 
     : fetchedReport;
+
+  // Alphabetical sorting (Arabic first أ-ي, followed by French/Latin A-Z)
+  const report = useMemo(() => {
+    return [...rawReport].sort((a, b) => compareProductNames(a.productName, b.productName));
+  }, [rawReport]);
 
   const handlePrint = () => {
     window.print();

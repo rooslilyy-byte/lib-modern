@@ -12,7 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
-import { updateMasterProductStock } from '@/lib/dataStore';
+import { compareProductNames } from '@/lib/sortUtils';
 
 type ViewTab = 'normal' | 'rupture';
 type SortOption = 'alphabetical' | 'oldest' | 'newest';
@@ -155,24 +155,11 @@ export default function StockAllocation({
     };
   }, [localDemands, masterProducts]);
 
-  // Helper to detect Arabic text
-  const isArabic = (str: string) => /[\u0600-\u06FF]/.test(str);
-
   // Sorting Function
   const sortAggregatedProducts = (list: AggregatedProduct[], sort: SortOption) => {
     return [...list].sort((a, b) => {
       if (sort === 'alphabetical') {
-        const aArabic = isArabic(a.productName);
-        const bArabic = isArabic(b.productName);
-
-        // Arabic product names first (أ to ي), followed by Latin names (A to Z)
-        if (aArabic && !bArabic) return -1;
-        if (!aArabic && bArabic) return 1;
-
-        if (aArabic && bArabic) {
-          return a.productName.localeCompare(b.productName, 'ar', { sensitivity: 'base' });
-        }
-        return a.productName.localeCompare(b.productName, 'fr', { sensitivity: 'base' });
+        return compareProductNames(a.productName, b.productName);
       }
 
       if (sort === 'oldest') {
@@ -346,9 +333,7 @@ export default function StockAllocation({
               }
             }
           }
-          if (remaining > 0) {
-            await updateMasterProductStock(productName, remaining);
-          }
+          // Surplus stock is strictly discarded (zero global inventory tracking)
         }
       }
 

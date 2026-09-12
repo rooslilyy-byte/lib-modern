@@ -265,34 +265,24 @@ export async function createClientDemand(
           const prodName = it.product_name.trim();
           const qty = Math.max(1, Math.floor(it.quantity || 1));
 
-          // Check stock
-          const { data: masterProd } = await supabase
-            .from('master_products')
-            .select('*')
-            .ilike('name', prodName)
-            .maybeSingle();
-
-          const available = masterProd?.available_stock || 0;
-          let isInStock = false;
-
-          if (available >= qty) {
-            isInStock = true;
-            // Decrement available stock
-            if (masterProd?.id) {
-              await supabase
-                .from('master_products')
-                .update({ available_stock: available - qty })
-                .eq('id', masterProd.id);
-            }
+          try {
+            await supabase.from('demand_items').insert({
+              demand_id: demand.id,
+              product_name: prodName,
+              quantity: qty,
+              fulfilled_quantity: 0,
+              is_in_stock: false,
+              is_delivered: false,
+            });
+          } catch {
+            await supabase.from('demand_items').insert({
+              demand_id: demand.id,
+              product_name: prodName,
+              quantity: qty,
+              is_in_stock: false,
+              is_delivered: false,
+            });
           }
-
-          await supabase.from('demand_items').insert({
-            demand_id: demand.id,
-            product_name: prodName,
-            quantity: qty,
-            is_in_stock: isInStock,
-            is_delivered: false,
-          });
         }
       }
     }
@@ -414,16 +404,13 @@ export async function autoAllocateStock(
       }
     }
 
-    if (remainingStock > 0) {
-      await updateMasterProductStock(cleanName, remainingStock);
-    }
-
+    // Surplus stock is strictly discarded (zero global inventory tracking)
     invalidateStoreCache();
 
     return Object.values(allocatedMap).map(c => {
       let rawPhone = c.phone.replace(/\D/g, '');
       if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
-      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من مكتبة وراقة اهل سوس أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: مكتبة وراقة اهل سوس\nالهاتف: +212 661-556418`;
+      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من شركة إيزوران أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: شركة إيزوران\nالهاتف: +212 661-556418`;
       return {
         clientName: c.clientName,
         phone: c.phone,
@@ -588,6 +575,11 @@ export async function getSupplierAggregatedReport(
       if (statusFilter === 'rupture' && !isRupture) continue;
       if (statusFilter === 'normal' && isRupture) continue;
 
+      const totalQty = Number(item.quantity) || 0;
+      const fulfilledQty = Number(item.fulfilled_quantity) || 0;
+      const stillNeeded = Math.max(0, totalQty - fulfilledQty);
+      if (stillNeeded <= 0) continue;
+
       const pName = item.product_name.trim();
       if (!itemMap[pName]) {
         itemMap[pName] = {
@@ -597,11 +589,11 @@ export async function getSupplierAggregatedReport(
         };
       }
 
-      itemMap[pName].totalQuantity += item.quantity;
+      itemMap[pName].totalQuantity += stillNeeded;
       itemMap[pName].clients.push({
         clientName: dem.client.name,
         phone: dem.client.phone,
-        quantity: item.quantity,
+        quantity: stillNeeded,
         demandId: dem.id,
       });
     }
