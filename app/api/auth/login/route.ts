@@ -16,12 +16,14 @@ export async function POST(request: Request) {
     if (passcode && passcode.trim() === adminSecret.trim()) {
       const response = NextResponse.json({ success: true });
 
-      // Set HTTP-only authentication session cookie valid for 30 days
+      // Set HTTP-only authentication session cookie strictly valid for 24 hours (86400 seconds)
+      const SESSION_EXPIRATION_SECONDS = 24 * 60 * 60; // 86,400 seconds = 24 hours
+
       response.cookies.set('session_auth', 'authenticated', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+        maxAge: SESSION_EXPIRATION_SECONDS,
         path: '/',
       });
 

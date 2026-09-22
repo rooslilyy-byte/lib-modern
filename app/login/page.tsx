@@ -127,7 +127,7 @@ export default function LoginPage() {
 
         {/* Footer Note */}
         <div className="pt-2 border-t border-neutral-100 text-[11px] text-neutral-400 text-center font-medium">
-          حماية خاصة بطاقم عمل المكتبة العصرية (Lib Moderne) • الجلسة ممتدة 30 يوماً
+          حماية خاصة بطاقم عمل المكتبة العصرية (Lib Moderne) • الجلسة ممتدة 24 ساعة
         </div>
 
       </div>
