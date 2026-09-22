@@ -61,19 +61,17 @@ export default function DashboardOverview({
       {/* 1. Header Banner Floating Glass Card with Custom White Logo */}
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-            <img
-              src="/logo-lib-modern-alt.jpg"
-              alt="Lib Moderne - المكتبة العصرية"
-              className="h-full w-auto object-contain"
-            />
-          </div>
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne - المكتبة العصرية"
+            className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h2 className="text-base sm:text-xl font-black text-neutral-900 tracking-tight">
                 {t('dash.title')}
               </h2>
-              <span className="bg-orange-50 text-orange-600 border border-orange-200/80 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 rounded-full">
+              <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 rounded-full">
                 {t('dash.season')}
               </span>
             </div>
@@ -83,12 +81,12 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <Link
             href="/customers"
-            className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold h-11 px-6 rounded-full flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+            className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold h-9 sm:h-11 px-4 sm:px-6 rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
           >
-            <Plus className="w-4 h-4 text-orange-500 shrink-0" />
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700 shrink-0" />
             <span>{t('dash.new_demand')}</span>
           </Link>
         </div>
@@ -197,8 +195,8 @@ export default function DashboardOverview({
           className="bg-neutral-900 text-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl flex flex-col justify-between space-y-4 group min-h-[150px] w-full"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-2xl bg-neutral-800 border border-neutral-700 text-orange-500 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
-              <UserPlus className="w-6 h-6 text-orange-500" />
+            <div className="w-12 h-12 rounded-2xl bg-neutral-800 border border-neutral-700 text-orange-700 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <UserPlus className="w-6 h-6 text-orange-700" />
             </div>
             <div className="w-9 h-9 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 group-hover:text-white group-hover:bg-neutral-700 transition-all">
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -216,8 +214,8 @@ export default function DashboardOverview({
           className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 hover:border-neutral-300 text-neutral-900 rounded-3xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl flex flex-col justify-between space-y-4 group min-h-[150px] w-full"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
-              <FileSpreadsheet className="w-6 h-6 text-orange-600" />
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-700 border border-orange-200/80 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <FileSpreadsheet className="w-6 h-6 text-orange-700" />
             </div>
             <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 group-hover:bg-neutral-200 transition-all">
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

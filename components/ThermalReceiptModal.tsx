@@ -46,13 +46,11 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
     <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1">
       {/* Top Center Logo */}
       <div className="text-center mb-2">
-        <div className="inline-block bg-black p-1 rounded-md mb-1">
-          <img
-            src="/logo-lib-modern-alt.jpg"
-            alt="Lib Moderne - المكتبة العصرية"
-            className="h-10 w-auto object-contain mx-auto block"
-          />
-        </div>
+        <img
+          src="/logo-lib-modern.jpg"
+          alt="Lib Moderne - المكتبة العصرية"
+          className="h-10 w-auto object-contain mx-auto block mb-1"
+        />
         <p className="text-base font-black text-center mt-1 text-black leading-tight">
           المكتبة العصرية — Lib Moderne
         </p>
@@ -174,25 +172,27 @@ export default function ThermalReceiptModal({ demand, onClose }: ThermalReceiptM
         <div className="bg-white/95 backdrop-blur-md text-neutral-900 rounded-t-3xl sm:rounded-3xl p-4 sm:p-6 max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-200 border border-neutral-200/80">
 
           {/* Modal Header Controls */}
-          <div className="flex items-center justify-between pb-4 border-b border-neutral-100 gap-2">
-            <div className="flex items-center gap-2.5 text-neutral-900 font-extrabold text-sm sm:text-base min-w-0">
-              <Printer className="w-5 h-5 text-orange-500 shrink-0" />
+          <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-neutral-100 gap-2">
+            <div className="flex items-center gap-2 sm:gap-2.5 text-neutral-900 font-extrabold text-xs sm:text-base min-w-0">
+              <Printer className="w-4 h-4 sm:w-5 sm:h-5 text-orange-700 shrink-0" />
               <span className="truncate">طباعة وصل خصاص (80mm Thermal)</span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
+                type="button"
                 onClick={handlePrint}
-                className="bg-neutral-900 hover:bg-black text-white font-bold text-xs px-5 py-2.5 rounded-full flex items-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-neutral-900 hover:bg-black text-white font-bold text-xs px-3.5 py-1.5 sm:px-5 sm:py-2.5 rounded-full flex items-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
               >
-                <Printer className="w-4 h-4 text-orange-500" />
+                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
                 <span>طباعة الوصل</span>
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 text-neutral-400 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
+                className="p-1.5 sm:p-2 text-neutral-400 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>

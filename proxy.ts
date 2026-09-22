@@ -10,6 +10,13 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname === '/logo no background.png' ||
+    pathname === '/logo%20no%20background.png' ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.ico') ||
+    pathname.endsWith('.svg') ||
     pathname === '/logo.png' ||
     pathname === '/logo.jpg' ||
     pathname === '/logo-lib-moderne.jpg' ||

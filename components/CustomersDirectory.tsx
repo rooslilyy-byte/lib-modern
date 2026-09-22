@@ -148,13 +148,11 @@ function CustomersDirectoryContent({
       {/* 1. Header Floating Glass Card with Custom Logo */}
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-            <img
-              src="/logo-lib-modern-alt.jpg"
-              alt="Lib Moderne - المكتبة العصرية"
-              className="h-full w-auto object-contain"
-            />
-          </div>
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne - المكتبة العصرية"
+            className="w-12 h-12 object-contain shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('cust.title')}</h2>
@@ -166,16 +164,16 @@ function CustomersDirectoryContent({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-col sm:flex-row w-full md:w-auto">
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-col sm:flex-row w-full md:w-auto">
           {/* Search Bar */}
           <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-neutral-400 absolute right-3.5 top-3.5" />
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 absolute right-3 top-3 sm:right-3.5 sm:top-3.5" />
             <input
               type="text"
               placeholder={t('cust.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 pl-4 h-11 text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-9 sm:pr-10 pl-3.5 sm:pl-4 h-9 sm:h-11 text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs"
             />
           </div>
 
@@ -184,21 +182,23 @@ function CustomersDirectoryContent({
             <div className="flex items-center gap-2 w-full sm:w-auto">
               {onDeleteBulkCustomers && (
                 <button
+                  type="button"
                   onClick={() => setIsSelectMode(true)}
-                  className="w-full sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-bold text-xs sm:text-sm px-4 h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                  className="w-full sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
                   title="تحديد زبناء لحذفهم"
                 >
-                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600" />
                   <span>{t('cust.bulk_delete')}</span>
                 </button>
               )}
 
               {onCreateDemand && (
                 <button
+                  type="button"
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-5 h-11 rounded-full shadow-md flex items-center justify-center gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 shrink-0"
+                  className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-4 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 shrink-0"
                 >
-                  <Plus className="w-4 h-4 text-orange-500" />
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
                   <span>{t('dash.new_demand')}</span>
                 </button>
               )}
@@ -206,11 +206,12 @@ function CustomersDirectoryContent({
           ) : (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
+                type="button"
                 onClick={handleBulkDelete}
                 disabled={selectedCustomerIds.length === 0 || isDeletingBulk}
-                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-5 h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 shrink-0"
+                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-4 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 shrink-0"
               >
-                <Trash2 className="w-4 h-4 text-white" />
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                 <span>
                   {isDeletingBulk 
                     ? 'جاري الحذف...' 
@@ -221,10 +222,11 @@ function CustomersDirectoryContent({
               </button>
 
               <button
+                type="button"
                 onClick={handleCancelSelectMode}
-                className="w-full sm:w-auto bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs sm:text-sm px-4 h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 shrink-0"
+                className="w-full sm:w-auto bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 shrink-0"
               >
-                <X className="w-4 h-4 text-neutral-500" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500" />
                 <span>{t('common.cancel')}</span>
               </button>
             </div>
@@ -243,7 +245,7 @@ function CustomersDirectoryContent({
       )}
 
       {/* 2. Status Filter Pill Buttons */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         {[
           { key: 'all', label: t('cust.filter_all') },
           { key: 'ready', label: t('cust.filter_ready') },
@@ -254,7 +256,7 @@ function CustomersDirectoryContent({
             key={btn.key}
             type="button"
             onClick={() => setFilter(btn.key)}
-            className={`h-10 px-4 sm:px-5 text-xs sm:text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap shadow-xs ${
+            className={`h-8 sm:h-10 px-3 sm:px-5 text-xs sm:text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap shadow-xs ${
               filter === btn.key
                 ? 'bg-neutral-900 text-white shadow-md hover:bg-black'
                 : 'bg-white/80 backdrop-blur-sm text-neutral-700 border border-neutral-200/80 hover:bg-white hover:text-neutral-900 hover:-translate-y-0.5'
@@ -338,7 +340,7 @@ function CustomersDirectoryContent({
                         <Link
                           href={`/customers/${encodeURIComponent(cli.id)}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-extrabold text-neutral-900 text-sm hover:text-orange-600 hover:underline transition-colors truncate dir-rtl text-right"
+                          className="font-extrabold text-neutral-900 text-sm hover:text-orange-700 hover:underline transition-colors truncate dir-rtl text-right"
                           title="انقر لعرض ملف هذه الطلبية بالكامل"
                         >
                           {cli.name}
@@ -361,7 +363,7 @@ function CustomersDirectoryContent({
                       <a 
                         href={`tel:${cli.phone}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-neutral-800 hover:text-orange-600 bg-neutral-100/90 hover:bg-neutral-200/90 px-3 py-1 rounded-full border border-neutral-200/60 transition-colors dir-ltr"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-neutral-800 hover:text-orange-700 bg-neutral-100/90 hover:bg-neutral-200/90 px-3 py-1 rounded-full border border-neutral-200/60 transition-colors dir-ltr"
                       >
                         <Phone className="w-3 h-3 text-neutral-500" />
                         <span>{cli.phone}</span>

@@ -51,16 +51,18 @@ export default function Header({
   return (
     <>
       {/* Top Header Navbar */}
-      <header className="bg-orange-500 text-white shadow-xl border-b border-orange-600 sticky top-0 z-40">
+      <header className="bg-orange-700 text-white shadow-xl border-b border-orange-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           
           <div className="flex items-center justify-between gap-3">
             
             {/* Store Branding */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white p-1 flex items-center justify-center shadow-lg shrink-0 overflow-hidden">
-                <img src="/logo-lib-modern-alt.jpg" alt="Lib Moderne - المكتبة العصرية" className="h-full w-auto object-contain" />
-              </div>
+              <img
+                src="/logo no background.png"
+                alt="Lib Moderne - المكتبة العصرية"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain shrink-0"
+              />
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">
@@ -86,7 +88,7 @@ export default function Header({
 
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-3">
-              <div className="bg-orange-600/70 border border-orange-400/40 rounded-full px-3.5 py-1.5 flex items-center gap-2 text-xs text-white">
+              <div className="bg-orange-800/70 border border-orange-600/40 rounded-full px-3.5 py-1.5 flex items-center gap-2 text-xs text-white">
                 <Layers className="w-5 h-5 text-white" />
                 <span className="text-orange-100">الدفعة الحالية:</span>
                 <span className="font-bold text-white">{activeBatch?.batch_name || 'الدفعة الرئيسية'}</span>
@@ -94,45 +96,48 @@ export default function Header({
 
               <button
                 onClick={() => setShowArchiveModal(true)}
-                className="bg-white hover:bg-orange-50 text-orange-600 text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5 transition-all shadow-md hover:-translate-y-0.5 active:translate-y-0"
+                className="bg-white hover:bg-orange-50 text-orange-700 text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5 transition-all shadow-md hover:-translate-y-0.5 active:translate-y-0"
               >
-                <Archive className="w-4 h-4 text-orange-600" />
+                <Archive className="w-4 h-4 text-orange-700" />
                 <span>أرشفة الدفعة</span>
               </button>
             </div>
 
             {/* Mobile Hamburger Menu Button */}
-            <div className="flex md:hidden items-center gap-2">
+            <div className="flex md:hidden items-center gap-1.5 sm:gap-2">
               <button
+                type="button"
                 onClick={() => setShowArchiveModal(true)}
-                className="bg-white text-orange-600 text-xs p-2 rounded-full shadow-sm"
+                className="bg-white text-orange-700 text-xs p-1.5 sm:p-2 rounded-full shadow-sm"
                 title="أرشفة الدفعة"
               >
-                <Archive className="w-5 h-5" />
+                <Archive className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 text-white hover:bg-orange-600 rounded-full bg-orange-600/50"
+                className="p-1.5 sm:p-2 text-white hover:bg-orange-800 rounded-full bg-orange-800/50"
               >
-                {mobileMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
+                {mobileMenuOpen ? <X className="w-5 h-5 sm:w-7 sm:h-7" /> : <Menu className="w-5 h-5 sm:w-7 sm:h-7" />}
               </button>
             </div>
 
           </div>
 
           {/* Desktop Nav Tabs */}
-          <nav className="hidden md:flex items-center gap-2 mt-4 pt-3 border-t border-orange-600/80 overflow-x-auto pb-1">
+          <nav className="hidden md:flex items-center gap-2 mt-4 pt-3 border-t border-orange-800/80 overflow-x-auto pb-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${
                     isActive
-                      ? 'bg-white text-orange-600 shadow-md font-black'
-                      : 'text-white hover:bg-orange-600/80'
+                      ? 'bg-white text-orange-700 shadow-md font-black'
+                      : 'text-white hover:bg-orange-800/80'
                   }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -146,29 +151,30 @@ export default function Header({
 
         {/* Mobile Dropdown Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-orange-600 bg-orange-600/95 backdrop-blur p-4 space-y-3 animate-in slide-in-from-top-2 text-white">
-            <div className="bg-orange-700/60 p-3 rounded-2xl flex items-center justify-between text-xs border border-orange-500/40">
+          <div className="md:hidden border-t border-orange-800 bg-orange-800/95 backdrop-blur p-3 space-y-2.5 animate-in slide-in-from-top-2 text-white">
+            <div className="bg-orange-900/60 p-2.5 rounded-xl flex items-center justify-between text-xs border border-orange-700/40">
               <span className="text-orange-100">الدفعة الحالية:</span>
               <span className="font-bold text-white">{activeBatch?.batch_name}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => {
                       setActiveTab(item.id);
                       setMobileMenuOpen(false);
                     }}
-                    className={`flex items-center gap-2 p-3 rounded-2xl text-xs font-bold transition-all ${
+                    className={`flex items-center gap-1.5 p-2 rounded-xl text-xs font-bold transition-all ${
                       isActive
-                        ? 'bg-white text-orange-600 shadow-md font-black'
-                        : 'bg-orange-700/50 text-white hover:bg-orange-700'
+                        ? 'bg-white text-orange-700 shadow-md font-black'
+                        : 'bg-orange-900/50 text-white hover:bg-orange-900'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4" />
                     <span>{item.label}</span>
                   </button>
                 );
@@ -200,20 +206,20 @@ export default function Header({
                   placeholder="مثال: دفعة شتنبر / الأسبوع 2"
                   value={newBatchName}
                   onChange={(e) => setNewBatchName(e.target.value)}
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-700"
                 />
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowArchiveModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-lg shadow-orange-500/20"
+                  className="px-4 py-1.5 sm:px-5 sm:py-2 text-xs font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full shadow-lg shadow-orange-700/20"
                 >
                   تأكيد الأرشفة والبدء
                 </button>

@@ -54,13 +54,11 @@ export default function MasterProductsManager({
       {/* 1. Header & Add Form Floating Glass Card with Custom White Logo */}
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6">
         <div className="flex items-center gap-3.5 mb-6 border-b border-neutral-100 pb-4 flex-wrap">
-          <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-            <img
-              src="/logo-lib-modern-alt.jpg"
-              alt="Lib Moderne"
-              className="h-full w-auto object-contain"
-            />
-          </div>
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne"
+            className="w-12 h-12 object-contain shrink-0"
+          />
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-black text-neutral-900">كتالوج السلع والمواد الرئيسية</h2>
             <p className="text-xs text-neutral-500 font-medium">إدارة دليل الكتب والمستلزمات لتزويد خاصية التكميل التلقائي السريع أثناء الإدخال</p>
@@ -69,8 +67,8 @@ export default function MasterProductsManager({
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+            <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-orange-700" />
               <span>اسم الكتاب أو السلعة:</span>
             </label>
             <input
@@ -79,19 +77,19 @@ export default function MasterProductsManager({
               placeholder="مثال: الممتاز في التربية الإسلامية - 1 بكالوريا"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-11 transition-all shadow-xs"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-9 sm:h-11 transition-all shadow-xs"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-orange-500" />
+            <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-orange-700" />
               <span>الفئة / الصنف:</span>
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-11 transition-all shadow-xs"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-9 sm:h-11 transition-all shadow-xs"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -102,9 +100,9 @@ export default function MasterProductsManager({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-6 h-11 rounded-full flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
+            className="bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-4 sm:px-6 h-9 sm:h-11 rounded-full flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
           >
-            <Plus className="w-4 h-4 text-orange-500" />
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
             <span>{isSubmitting ? 'جاري الإضافة...' : 'إضافة سلع للكتالوج'}</span>
           </button>
         </form>

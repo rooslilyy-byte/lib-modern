@@ -44,20 +44,22 @@ export default function LoginPage() {
     <div className="min-h-[100dvh] bg-[#F8F9FA] flex flex-col items-center justify-center p-4 font-cairo dir-rtl selection:bg-neutral-900 selection:text-white relative overflow-hidden">
 
       {/* Subtle Background Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-orange-700/5 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-md bg-white/90 backdrop-blur-md border border-white/80 rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative z-10 space-y-6">
 
         {/* Bookstore Branding */}
         <div className="text-center space-y-3">
-          <div className="w-20 h-20 mx-auto rounded-3xl bg-neutral-900 border border-neutral-800 p-2 flex items-center justify-center shadow-xs">
-            <img src="/logo-lib-modern-alt.jpg" alt="Lib Moderne - المكتبة العصرية" className="h-full w-auto object-contain mx-auto" />
-          </div>
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne - المكتبة العصرية"
+            className="w-20 h-20 object-contain mx-auto"
+          />
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
               المكتبة العصرية
             </h1>
-            <p className="text-xs font-bold text-orange-600 uppercase tracking-wide mt-0.5">
+            <p className="text-xs font-bold text-orange-700 uppercase tracking-wide mt-0.5">
               Lib Moderne POS
             </p>
             <p className="text-xs text-neutral-500 font-medium mt-1">
@@ -78,7 +80,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-neutral-700 mb-2 flex items-center gap-1.5">
-              <KeyRound className="w-4 h-4 text-orange-500" />
+              <KeyRound className="w-4 h-4 text-orange-700" />
               <span>رمز الدخول السري (Passcode):</span>
             </label>
 
@@ -113,13 +115,13 @@ export default function LoginPage() {
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                <Loader2 className="w-5 h-5 animate-spin text-orange-700" />
                 <span>جاري التحقق من الرمز...</span>
               </>
             ) : (
               <>
                 <span>تسجيل الدخول للنظام</span>
-                <ArrowLeft className="w-4 h-4 text-orange-500" />
+                <ArrowLeft className="w-4 h-4 text-orange-700" />
               </>
             )}
           </button>

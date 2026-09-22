@@ -135,16 +135,16 @@ export default function CustomerDetails({
     <div className="space-y-5">
       
       {/* Top Breadcrumb Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <Link
           href="/customers"
-          className="inline-flex items-center gap-2 text-xs font-bold text-neutral-700 hover:text-neutral-900 bg-white/80 backdrop-blur-sm hover:bg-white border border-neutral-200/80 px-4 h-9 rounded-full transition-all duration-300 shadow-xs hover:-translate-y-0.5"
+          className="inline-flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-neutral-700 hover:text-neutral-900 bg-white/80 backdrop-blur-sm hover:bg-white border border-neutral-200/80 px-3 sm:px-4 h-8 sm:h-9 rounded-full transition-all duration-300 shadow-xs hover:-translate-y-0.5"
         >
-          <ArrowRight className="w-4 h-4" />
+          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <span>العودة إلى دليل الزبناء</span>
         </Link>
 
-        <span className="text-xs font-mono font-bold text-neutral-400 bg-neutral-100 px-3 py-1 rounded-full">
+        <span className="text-[10px] sm:text-xs font-mono font-bold text-neutral-400 bg-neutral-100 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full">
           #ID: {targetDemand.id.substring(0, 8)}
         </span>
       </div>
@@ -155,13 +155,11 @@ export default function CustomerDetails({
         {/* Customer Main Metadata */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-              <img
-                src="/logo-lib-modern-alt.jpg"
-                alt="Lib Moderne"
-                className="h-full w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/logo-lib-modern.jpg"
+              alt="Lib Moderne"
+              className="w-12 h-12 object-contain shrink-0"
+            />
 
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2.5 flex-wrap">
@@ -192,14 +190,14 @@ export default function CustomerDetails({
               <div className="flex items-center gap-3 text-xs text-neutral-500 flex-wrap">
                 <a 
                   href={`tel:${targetDemand.client?.phone}`}
-                  className="inline-flex items-center gap-1.5 text-neutral-800 hover:text-orange-600 font-mono font-bold bg-neutral-100 px-2.5 py-0.5 rounded-full dir-ltr transition-colors"
+                  className="inline-flex items-center gap-1.5 text-neutral-800 hover:text-orange-700 font-mono font-bold bg-neutral-100 px-2.5 py-0.5 rounded-full dir-ltr transition-colors text-[11px] sm:text-xs"
                 >
-                  <Phone className="w-3 h-3 text-orange-500" />
+                  <Phone className="w-3 h-3 text-orange-700" />
                   <span>{targetDemand.client?.phone}</span>
                 </a>
 
-                <span className="flex items-center gap-1.5 text-neutral-400 font-medium">
-                  <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                <span className="flex items-center gap-1.5 text-neutral-400 font-medium text-[11px] sm:text-xs">
+                  <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-neutral-400" />
                   <span>تاريخ التسجيل: {new Date(targetDemand.created_at || Date.now()).toLocaleDateString('ar-MA')}</span>
                 </span>
               </div>
@@ -208,14 +206,14 @@ export default function CustomerDetails({
         </div>
 
         {/* 2. Pill-shaped Action Toolbar */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           {/* Edit Demand */}
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
+            className="h-8 sm:h-10 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
           >
-            <Edit className="w-4 h-4 text-orange-500" />
+            <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
             <span>{t('common.edit')}</span>
           </button>
 
@@ -223,9 +221,9 @@ export default function CustomerDetails({
           <button
             type="button"
             onClick={() => setIsPrinting(true)}
-            className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
+            className="h-8 sm:h-10 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
           >
-            <Printer className="w-4 h-4 text-white" />
+            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             <span>{t('common.print')}</span>
           </button>
 
@@ -234,9 +232,9 @@ export default function CustomerDetails({
             href={whatsAppUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
+            className="h-8 sm:h-10 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 active:translate-y-0"
           >
-            <MessageSquare className="w-4 h-4 text-white" />
+            <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             <span>{t('common.whatsapp')}</span>
           </a>
 
@@ -244,9 +242,9 @@ export default function CustomerDetails({
           <button
             type="button"
             onClick={handleDelete}
-            className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 flex items-center justify-center gap-2 transition-all duration-300 border border-rose-200 hover:-translate-y-0.5"
+            className="h-8 sm:h-10 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-rose-50 hover:bg-rose-100 text-rose-700 flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 border border-rose-200 hover:-translate-y-0.5"
           >
-            <Trash2 className="w-4 h-4 text-rose-600" />
+            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600" />
             <span>{t('common.delete')}</span>
           </button>
         </div>
@@ -285,7 +283,7 @@ export default function CustomerDetails({
         <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 flex items-center gap-3.5">
           <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${
             Math.max(0, (targetDemand.total_amount || 0) - (targetDemand.avance_amount || 0)) > 0
-              ? 'bg-orange-50 border-orange-200/80 text-orange-600'
+              ? 'bg-orange-50 border-orange-200/80 text-orange-700'
               : 'bg-neutral-100 border-neutral-200 text-neutral-500'
           }`}>
             <Wallet className="w-5 h-5" />
@@ -294,7 +292,7 @@ export default function CustomerDetails({
             <p className="text-xs text-neutral-500 font-bold">المبلغ المتبقي (Le Reste):</p>
             <p className={`text-base sm:text-lg font-black font-mono mt-0.5 ${
               Math.max(0, (targetDemand.total_amount || 0) - (targetDemand.avance_amount || 0)) > 0
-                ? 'text-orange-600'
+                ? 'text-orange-700'
                 : 'text-neutral-900'
             }`}>
               {(targetDemand.total_amount || 0) > 0
@@ -350,30 +348,30 @@ export default function CustomerDetails({
                 </div>
 
                 {/* State Toggles (In Stock & Delivered) */}
-                <div className="flex items-center gap-2 self-end sm:self-center">
+                <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-center">
                   <button
                     type="button"
                     onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-all ${
+                    className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
                       item.is_in_stock
                         ? 'bg-blue-500 text-white border-blue-500 shadow-xs'
                         : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    {item.is_in_stock ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                    {item.is_in_stock ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                     <span>متوفر بالمتجر</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => onUpdateItemState(item.id, { is_delivered: !item.is_delivered, is_in_stock: true })}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-all ${
+                    className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
                       item.is_delivered
                         ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                         : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
-                    {item.is_delivered ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
+                    {item.is_delivered ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
                     <span>تم التسليم للزبون</span>
                   </button>
                 </div>

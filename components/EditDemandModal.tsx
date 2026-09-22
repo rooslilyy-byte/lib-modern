@@ -203,13 +203,11 @@ export default function EditDemandModal({
         {/* Header with Custom White Logo */}
         <div className="bg-white border-b border-neutral-100 p-4 sm:p-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-              <img
-                src="/logo-lib-modern-alt.jpg"
-                alt="Lib Moderne"
-                className="h-full w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/logo-lib-modern.jpg"
+              alt="Lib Moderne"
+              className="w-11 h-11 object-contain shrink-0"
+            />
             <div>
               <h3 className="font-extrabold text-sm sm:text-base text-neutral-900 truncate">تعديل الطلب والخصاص</h3>
               <p className="text-xs text-neutral-400 font-medium">تعديل معلومات الزبون وحالة المستلزمات</p>
@@ -219,9 +217,9 @@ export default function EditDemandModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-700 p-2 rounded-full hover:bg-neutral-100 transition-colors"
+            className="text-neutral-400 hover:text-neutral-700 p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
@@ -236,10 +234,10 @@ export default function EditDemandModal({
           )}
 
           {/* Customer info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-orange-500" />
+                <User className="w-3.5 h-3.5 text-orange-700" />
                 <span>اسم الزبون:</span>
               </label>
               <input
@@ -247,13 +245,13 @@ export default function EditDemandModal({
                 required
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-orange-500" />
+                <Phone className="w-3.5 h-3.5 text-orange-700" />
                 <span>رقم الهاتف:</span>
               </label>
               <input
@@ -261,13 +259,13 @@ export default function EditDemandModal({
                 required
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
               />
             </div>
           </div>
 
           {/* Items list */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2.5 pt-1">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-neutral-700">
                 قائمة الكتب والمستلزمات:
@@ -275,17 +273,17 @@ export default function EditDemandModal({
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="inline-flex items-center gap-1 text-xs font-bold text-neutral-800 hover:text-orange-600 bg-neutral-100 hover:bg-neutral-200 px-3 py-1 rounded-full transition-colors"
+                className="inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-bold text-neutral-800 hover:text-orange-700 bg-neutral-100 hover:bg-neutral-200 px-2.5 sm:px-3 py-1 rounded-full transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>إضافة مادة</span>
               </button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2 sm:space-y-2.5">
               {items.map((item, idx) => (
-                <div key={idx} className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-3 space-y-2">
-                  <div className="flex items-center gap-2">
+                <div key={idx} className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-2.5 sm:p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <div className="flex-1">
                       <ProductAutocomplete
                         value={item.product_name}
@@ -296,7 +294,7 @@ export default function EditDemandModal({
                       />
                     </div>
 
-                    <div className="w-20">
+                    <div className="w-16 sm:w-20">
                       <input
                         type="number"
                         min="1"
@@ -308,7 +306,7 @@ export default function EditDemandModal({
                           const val = e.target.value;
                           handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
                         }}
-                        className="w-full bg-white border border-neutral-200 rounded-xl px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-9"
+                        className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-8 sm:h-9"
                       />
                     </div>
 
@@ -316,31 +314,31 @@ export default function EditDemandModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
+                        className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     )}
                   </div>
 
                   {/* Status checks */}
-                  <div className="flex items-center gap-4 text-xs font-bold text-neutral-700 pt-1 border-t border-neutral-200/50">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                  <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs font-bold text-neutral-700 pt-1 border-t border-neutral-200/50">
+                    <label className="flex items-center gap-1 sm:gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={item.is_in_stock}
                         onChange={(e) => handleItemChange(idx, 'is_in_stock', e.target.checked)}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
                       />
                       <span>متوفر بالمتجر</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer">
+                    <label className="flex items-center gap-1 sm:gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={item.is_delivered}
                         onChange={(e) => handleItemChange(idx, 'is_delivered', e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                        className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
                       />
                       <span>تم التسليم للزبون</span>
                     </label>
@@ -351,7 +349,7 @@ export default function EditDemandModal({
           </div>
 
           {/* Financials / Avance Section */}
-          <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center justify-between">
                 <span>التسبيق (Avance):</span>
@@ -365,7 +363,7 @@ export default function EditDemandModal({
                 value={avanceAmount}
                 onKeyDown={handlePreventNegativeKey}
                 onChange={(e) => setAvanceAmount(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
 
@@ -382,26 +380,26 @@ export default function EditDemandModal({
                 value={totalAmount}
                 onKeyDown={handlePreventNegativeKey}
                 onChange={(e) => setTotalAmount(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-neutral-100">
+          <div className="flex items-center justify-end gap-2 sm:gap-2.5 pt-3 sm:pt-4 border-t border-neutral-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
+              className="px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-6 py-2.5 text-xs sm:text-sm font-bold bg-neutral-900 hover:bg-black text-white rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-neutral-900 hover:bg-black text-white rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 flex items-center gap-1.5 sm:gap-2"
             >
-              <Save className="w-4 h-4 text-orange-500" />
+              <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
               <span>{isSaving ? 'جاري الحفظ...' : t('common.save')}</span>
             </button>
           </div>

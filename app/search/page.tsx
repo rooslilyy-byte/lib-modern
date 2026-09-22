@@ -63,17 +63,15 @@ function SearchPageContent({
       {/* Header Banner Floating Glass Card with Custom White Logo */}
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-            <img
-              src="/logo-lib-modern-alt.jpg"
-              alt="Lib Moderne"
-              className="h-full w-auto object-contain"
-            />
-          </div>
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne"
+            className="w-12 h-12 object-contain shrink-0"
+          />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('search.title')}</h2>
-              <span className="bg-orange-50 text-orange-600 border border-orange-200/60 text-xs font-bold px-2.5 py-0.5 rounded-full">
+              <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-xs font-bold px-2.5 py-0.5 rounded-full">
                 بحث فوري
               </span>
             </div>
@@ -83,18 +81,18 @@ function SearchPageContent({
       </div>
 
       {/* Search Box Floating Glass Card */}
-      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-3">
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-2.5 sm:space-y-3">
         <label className="block text-xs font-bold text-neutral-700">
           {t('search.input_placeholder')}
         </label>
         <div className="relative max-w-xl">
-          <Search className="w-5 h-5 text-neutral-400 absolute right-4 top-3.5" />
+          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-400 absolute right-3.5 top-3 sm:right-4 sm:top-3.5" />
           <input
             type="text"
             placeholder={t('search.input_placeholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-12 pl-5 py-3 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium min-h-[48px] shadow-xs transition-all"
+            className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 sm:pr-12 pl-4 sm:pl-5 py-2.5 sm:py-3 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium min-h-[40px] sm:min-h-[48px] shadow-xs transition-all"
           />
         </div>
       </div>
@@ -102,7 +100,7 @@ function SearchPageContent({
       {/* Results List */}
       {isLoadingResults ? (
         <div className="flex flex-col items-center justify-center py-16 space-y-3 bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl">
-          <div className="w-10 h-10 border-4 border-neutral-900 border-t-orange-500 rounded-full animate-spin"></div>
+          <div className="w-10 h-10 border-4 border-neutral-900 border-t-orange-700 rounded-full animate-spin"></div>
           <p className="text-xs font-bold text-neutral-700">جاري البحث عن السلعة والطلبات...</p>
         </div>
       ) : searchQuery.trim() && results.length === 0 ? (
@@ -138,7 +136,7 @@ function SearchPageContent({
                     <td className="px-6 py-4">
                       <a
                         href={`tel:${result.clientPhone}`}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-neutral-800 hover:text-orange-600 bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200/60 transition-colors dir-ltr"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-neutral-800 hover:text-orange-700 bg-neutral-100 px-3 py-1 rounded-full border border-neutral-200/60 transition-colors dir-ltr"
                       >
                         <Phone className="w-3 h-3 text-neutral-500" />
                         <span>{result.clientPhone}</span>
@@ -178,7 +176,7 @@ function SearchPageContent({
                     <td className="px-6 py-4 text-left">
                       <Link
                         href={`/customers/${encodeURIComponent(result.demandId)}`}
-                        className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white font-bold text-xs px-4 h-9 rounded-full shadow-xs transition-all duration-300 hover:-translate-y-0.5"
+                        className="inline-flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white font-bold text-xs px-3.5 sm:px-4 h-8 sm:h-9 rounded-full shadow-xs transition-all duration-300 hover:-translate-y-0.5"
                       >
                         <span>عرض الملف</span>
                         <ArrowRight className="w-3.5 h-3.5 rotate-180" />
@@ -193,27 +191,27 @@ function SearchPageContent({
           {/* Mobile Cards */}
           <div className="md:hidden divide-y divide-neutral-100">
             {results.map((result) => (
-              <div key={result.id} className="p-4 space-y-3 text-right">
-                <div className="flex items-start justify-between gap-2 border-b border-neutral-100 pb-2.5">
+              <div key={result.id} className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3 text-right">
+                <div className="flex items-start justify-between gap-2 border-b border-neutral-100 pb-2">
                   <div>
-                    <h4 className="font-extrabold text-neutral-900 text-sm leading-snug">
+                    <h4 className="font-extrabold text-neutral-900 text-xs sm:text-sm leading-snug">
                       {result.productName}
                     </h4>
-                    <p className="text-xs text-neutral-500 mt-1">
+                    <p className="text-[11px] sm:text-xs text-neutral-500 mt-0.5">
                       الكمية: <span className="font-bold text-neutral-800">{result.quantity} قطعة</span>
                     </p>
                   </div>
                   <div>
                     {result.isDelivered ? (
-                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
                         تم التسليم
                       </span>
                     ) : result.isInStock ? (
-                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200">
                         جاهز للتسليم
                       </span>
                     ) : (
-                      <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-rose-200">
+                      <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-200">
                         خصاص
                       </span>
                     )}
@@ -221,17 +219,17 @@ function SearchPageContent({
                 </div>
 
                 <div className="flex items-center justify-between text-xs">
-                  <div className="space-y-1">
-                    <p className="font-bold text-neutral-800">{result.clientName}</p>
-                    <p className="font-mono text-neutral-500 dir-ltr text-right">{result.clientPhone}</p>
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-neutral-800 text-xs">{result.clientName}</p>
+                    <p className="font-mono text-neutral-500 dir-ltr text-right text-[11px]">{result.clientPhone}</p>
                   </div>
 
                   <Link
                     href={`/customers/${encodeURIComponent(result.demandId)}`}
-                    className="inline-flex items-center gap-1.5 bg-neutral-900 text-white font-bold text-xs px-4 h-9 rounded-full shadow-xs"
+                    className="inline-flex items-center gap-1 bg-neutral-900 text-white font-bold text-[11px] sm:text-xs px-3 sm:px-4 h-7 sm:h-9 rounded-full shadow-xs"
                   >
                     <span>عرض</span>
-                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                    <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 rotate-180" />
                   </Link>
                 </div>
               </div>

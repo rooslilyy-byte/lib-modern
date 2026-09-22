@@ -248,7 +248,7 @@ export default function StockAllocation({
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border border-neutral-700">
-          <CheckCircle2 className="w-5 h-5 text-orange-500" />
+          <CheckCircle2 className="w-5 h-5 text-orange-700" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -257,17 +257,15 @@ export default function StockAllocation({
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-              <img
-                src="/logo-lib-modern-alt.jpg"
-                alt="Lib Moderne"
-                className="h-full w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/logo-lib-modern.jpg"
+              alt="Lib Moderne"
+              className="w-12 h-12 object-contain shrink-0"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('stock.title')}</h2>
-                <span className="bg-orange-50 text-orange-600 border border-orange-200/60 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-xs font-bold px-2.5 py-0.5 rounded-full">
                   توزيع فوري
                 </span>
               </div>
@@ -283,26 +281,26 @@ export default function StockAllocation({
               <strong className="text-neutral-900">{currentTotalItems}</strong>
               <span className="text-neutral-300">|</span>
               <span className="text-neutral-400">مجموع القطع:</span>
-              <strong className="text-orange-600">{currentTotalPieces}</strong>
+              <strong className="text-orange-700">{currentTotalPieces}</strong>
             </div>
           </div>
         </div>
 
         {/* Tab Switcher: Normal vs Rupture */}
-        <div className="flex items-center gap-2 bg-neutral-100/80 p-1.5 rounded-full border border-neutral-200/60 text-xs font-bold">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-100/80 p-1 sm:p-1.5 rounded-full border border-neutral-200/60 text-[11px] sm:text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('normal')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
               activeTab === 'normal'
                 ? 'bg-neutral-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <Package className="w-3.5 h-3.5" />
+            <Package className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>{t('stock.tab_normal')}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'normal' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
+              activeTab === 'normal' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
               {normalProductsList.length}
             </span>
@@ -311,16 +309,16 @@ export default function StockAllocation({
           <button
             type="button"
             onClick={() => setActiveTab('rupture')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
               activeTab === 'rupture'
                 ? 'bg-neutral-900 text-white shadow-sm'
                 : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <Ban className="w-3.5 h-3.5" />
+            <Ban className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>{t('stock.tab_rupture')}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'rupture' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
+              activeTab === 'rupture' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
               {ruptureProductsList.length}
             </span>
@@ -328,20 +326,20 @@ export default function StockAllocation({
         </div>
 
         {/* Search & Sort Filters */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-1">
           <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-neutral-400 absolute right-3.5 top-3.5" />
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 absolute right-3 top-2.5 sm:right-3.5 sm:top-3" />
             <input
               type="text"
               placeholder="ابحث باسم الكتاب أو الصنف..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 pl-4 h-10 text-xs font-medium text-neutral-900 focus:outline-none focus:border-neutral-900 shadow-xs"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-9 sm:pr-10 pl-3.5 sm:pl-4 h-9 sm:h-10 text-xs font-medium text-neutral-900 focus:outline-none focus:border-neutral-900 shadow-xs"
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-400 font-bold hidden sm:inline">الترتيب:</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <span className="text-[11px] sm:text-xs text-neutral-400 font-bold hidden sm:inline">الترتيب:</span>
             {[
               { key: 'alphabetical', label: t('stock.sort_alpha') },
               { key: 'oldest', label: t('stock.sort_oldest') },
@@ -351,7 +349,7 @@ export default function StockAllocation({
                 key={opt.key}
                 type="button"
                 onClick={() => setSortBy(opt.key as SortOption)}
-                className={`h-9 px-3.5 text-xs font-bold rounded-full transition-all ${
+                className={`h-7 sm:h-9 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-full transition-all ${
                   sortBy === opt.key
                     ? 'bg-neutral-900 text-white shadow-xs'
                     : 'bg-white border border-neutral-200/80 text-neutral-600 hover:bg-neutral-50'
@@ -405,25 +403,25 @@ export default function StockAllocation({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2.5 self-end md:self-center flex-wrap">
+                  <div className="flex items-center gap-1.5 sm:gap-2.5 self-end md:self-center flex-wrap">
                     {activeTab === 'normal' ? (
                       <>
                         <button
                           type="button"
                           onClick={() => handleOpenAllocationModal(prod)}
-                          className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md shadow-orange-500/20 hover:-translate-y-0.5 active:translate-y-0"
+                          className="h-8 sm:h-10 px-3 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-orange-700 hover:bg-orange-800 text-white flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md shadow-orange-700/20 hover:-translate-y-0.5 active:translate-y-0"
                         >
-                          <PackageCheck className="w-4 h-4" />
+                          <PackageCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           <span>{t('stock.allocate_btn')} ({prod.totalMissingQty})</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleToggleRupture(prod.productName, false)}
-                          className="h-10 px-4 text-xs font-bold rounded-full bg-neutral-100 hover:bg-rose-50 hover:text-rose-700 text-neutral-600 flex items-center justify-center gap-1.5 transition-colors border border-neutral-200/60"
+                          className="h-8 sm:h-10 px-2.5 sm:px-4 text-xs font-bold rounded-full bg-neutral-100 hover:bg-rose-50 hover:text-rose-700 text-neutral-600 flex items-center justify-center gap-1 sm:gap-1.5 transition-colors border border-neutral-200/60"
                           title="وسم كغير متوفر (En Rupture)"
                         >
-                          <Ban className="w-3.5 h-3.5" />
+                          <Ban className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           <span className="hidden sm:inline">{t('stock.mark_rupture')}</span>
                         </button>
                       </>
@@ -431,9 +429,9 @@ export default function StockAllocation({
                       <button
                         type="button"
                         onClick={() => handleToggleRupture(prod.productName, true)}
-                        className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5"
+                        className="h-8 sm:h-10 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5"
                       >
-                        <RotateCcw className="w-4 h-4 text-orange-500" />
+                        <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
                         <span>{t('stock.restore_normal')}</span>
                       </button>
                     )}
@@ -463,7 +461,7 @@ export default function StockAllocation({
             <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-neutral-900 text-white flex items-center justify-center font-bold">
-                  <PackageCheck className="w-5 h-5 text-orange-500" />
+                  <PackageCheck className="w-5 h-5 text-orange-700" />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">توزيع السلعة الواصلة</h3>
@@ -515,14 +513,14 @@ export default function StockAllocation({
                 <button
                   type="button"
                   onClick={() => setModalProduct(null)}
-                  className="px-5 py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100"
+                  className="px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isProcessingModal}
-                  className="px-6 py-2.5 text-xs sm:text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-lg shadow-orange-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50"
+                  className="px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full shadow-lg shadow-orange-700/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50"
                 >
                   {isProcessingModal ? 'جاري التوزيع...' : 'تأكيد التوزيع الفوري'}
                 </button>

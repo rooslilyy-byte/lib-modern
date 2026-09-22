@@ -138,7 +138,7 @@ export default function CreateDemandModal({
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white font-bold text-sm px-6 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border border-neutral-700">
-          <CheckCircle2 className="w-5 h-5 text-orange-500" />
+          <CheckCircle2 className="w-5 h-5 text-orange-700" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -148,13 +148,11 @@ export default function CreateDemandModal({
         {/* Header with Custom White Logo */}
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
-              <img
-                src="/logo-lib-modern-alt.jpg"
-                alt="Lib Moderne"
-                className="h-full w-auto object-contain"
-              />
-            </div>
+            <img
+              src="/logo-lib-modern.jpg"
+              alt="Lib Moderne"
+              className="w-11 h-11 object-contain shrink-0"
+            />
             <div>
               <h2 className="font-black text-neutral-900 text-sm sm:text-base">إضافة زبون وطلب جديد</h2>
               <p className="text-xs text-neutral-400 font-medium">تسجيل تفاصيل الزبون والخصاص المدرسي</p>
@@ -164,20 +162,20 @@ export default function CreateDemandModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-neutral-400 hover:text-neutral-700 p-2 rounded-full hover:bg-neutral-100 transition-colors shrink-0"
+            className="text-neutral-400 hover:text-neutral-700 p-1.5 sm:p-2 rounded-full hover:bg-neutral-100 transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
           
           {/* Client Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-orange-500" />
+                <User className="w-3.5 h-3.5 text-orange-700" />
                 <span>اسم الزبون</span>
               </label>
               <input
@@ -186,13 +184,13 @@ export default function CreateDemandModal({
                 placeholder="اسم الزبون الكامل..."
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-orange-500" />
+                <Phone className="w-3.5 h-3.5 text-orange-700" />
                 <span>رقم الهاتف (الواتساب)</span>
               </label>
               <input
@@ -201,19 +199,19 @@ export default function CreateDemandModal({
                 placeholder="0661234567"
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
               />
             </div>
           </div>
 
           {/* Missing Items List Sub-section */}
-          <div className="space-y-2.5 pt-1">
+          <div className="space-y-2 pt-1">
             <label className="block text-xs font-bold text-neutral-700">
               قائمة خصاص الكتب والمستلزمات
             </label>
 
             {items.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2">
+              <div key={idx} className="flex items-center gap-1.5 sm:gap-2">
                 <div className="flex-1">
                   <ProductAutocomplete
                     value={item.product_name}
@@ -224,7 +222,7 @@ export default function CreateDemandModal({
                   />
                 </div>
 
-                <div className="w-20">
+                <div className="w-16 sm:w-20">
                   <input
                     type="number"
                     min="1"
@@ -236,7 +234,7 @@ export default function CreateDemandModal({
                       const val = e.target.value;
                       handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
                     }}
-                    className="w-full bg-white border border-neutral-200 rounded-xl px-2 py-2 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-9"
+                    className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-8 sm:h-9"
                   />
                 </div>
 
@@ -244,9 +242,9 @@ export default function CreateDemandModal({
                   <button
                     type="button"
                     onClick={() => handleRemoveItemRow(idx)}
-                    className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
+                    className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 )}
               </div>
@@ -255,15 +253,15 @@ export default function CreateDemandModal({
             <button
               type="button"
               onClick={handleAddItemRow}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-800 hover:text-orange-600 bg-neutral-100 hover:bg-neutral-200 px-3.5 py-1.5 rounded-full transition-colors mt-1"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-bold text-neutral-800 hover:text-orange-700 bg-neutral-100 hover:bg-neutral-200 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full transition-colors mt-0.5"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>إضافة كتاب آخر</span>
             </button>
           </div>
 
           {/* Financials / Avance Section */}
-          <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center justify-between">
                 <span>التسبيق (Avance):</span>
@@ -277,7 +275,7 @@ export default function CreateDemandModal({
                 value={avanceAmount}
                 onKeyDown={handlePreventNegativeKey}
                 onChange={(e) => setAvanceAmount(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
 
@@ -294,26 +292,26 @@ export default function CreateDemandModal({
                 value={totalAmount}
                 onKeyDown={handlePreventNegativeKey}
                 onChange={(e) => setTotalAmount(e.target.value)}
-                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
           </div>
 
           {/* Modal Footer Buttons */}
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-neutral-100">
+          <div className="flex items-center justify-end gap-2 sm:gap-2.5 pt-3 border-t border-neutral-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
+              className="px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
             >
               {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 text-xs sm:text-sm font-bold bg-neutral-900 hover:bg-black text-white rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-neutral-900 hover:bg-black text-white rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 flex items-center gap-1.5 sm:gap-2"
             >
-              <Plus className="w-4 h-4 text-orange-500" />
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
               <span>{isSubmitting ? 'جاري الحفظ...' : t('common.save')}</span>
             </button>
           </div>

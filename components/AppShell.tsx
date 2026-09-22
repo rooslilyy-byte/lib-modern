@@ -22,7 +22,7 @@ import {
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
 import { LanguageProvider, useLanguage } from '@/lib/languageContext';
-import { Menu, PanelLeftOpen, Phone, Globe } from 'lucide-react';
+import { Menu, PanelRightOpen, Phone, Globe } from 'lucide-react';
 
 // Module-level SWR Cache for Instant (<10ms) Tab Navigation
 let globalAppCache: {
@@ -256,40 +256,44 @@ function AppShellContent({ children }: AppShellProps) {
       {/* Main Content Area */}
       <div 
         className={`flex-1 flex flex-col min-h-[100dvh] w-full transition-all duration-300 ${
-          isDesktopCollapsed ? 'lg:ml-0' : 'lg:ml-64'
+          isDesktopCollapsed ? 'lg:mr-0' : 'lg:mr-64'
         }`}
         suppressHydrationWarning
       >
         {/* Top Header Navbar with Mobile Toggle, Central Title, Phone Dial */}
-        <header className="sticky top-0 z-20 bg-orange-500 text-white shadow-md border-b border-orange-600 px-3 sm:px-6 py-3 flex items-center justify-between no-print gap-2">
+        <header className="sticky top-0 z-20 bg-orange-700 text-white shadow-md border-b border-orange-800 px-2.5 sm:px-6 py-2 sm:py-3 flex items-center justify-between no-print gap-2">
           
-          {/* Left Controls: Hamburger for Mobile & Show Sidebar for Collapsed Desktop */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right Controls in RTL: Hamburger for Mobile & Show Sidebar for Collapsed Desktop */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Mobile Menu Button */}
             <button
+              type="button"
               onClick={() => setMobileSidebarOpen(true)}
-              className="lg:hidden p-2 text-white hover:bg-orange-600 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+              className="lg:hidden p-1.5 sm:p-2 text-white hover:bg-orange-800 rounded-full min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] flex items-center justify-center transition-colors"
               title="إظهار القائمة الجانبية"
             >
-              <Menu className="w-7 h-7 text-white" />
+              <Menu className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
             </button>
 
             {/* Desktop Expand Button (Shown when sidebar is collapsed) */}
             {isDesktopCollapsed && (
               <button
+                type="button"
                 onClick={() => setIsDesktopCollapsed(false)}
-                className="hidden lg:flex items-center gap-2 p-2 rounded-full text-white hover:bg-orange-600 transition-all min-h-[44px] min-w-[44px] justify-center"
+                className="hidden lg:flex items-center gap-2 p-1.5 sm:p-2 rounded-full text-white hover:bg-orange-800 transition-all min-h-[36px] min-w-[36px] sm:min-h-[44px] sm:min-w-[44px] justify-center"
                 title="إظهار القائمة الجانبية"
               >
-                <PanelLeftOpen className="w-7 h-7 text-white" />
+                <PanelRightOpen className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
               </button>
             )}
 
             {/* Top Brand Tag */}
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center overflow-hidden shadow-sm shrink-0">
-                <img src="/logo-lib-modern-alt.jpg" alt="Lib Moderne" className="h-full w-auto object-contain" />
-              </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <img
+                src="/logo no background.png"
+                alt="Lib Moderne"
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0"
+              />
               <div className="hidden xl:block">
                 <h2 className="font-black text-xs text-white leading-tight">المكتبة العصرية</h2>
                 <span className="text-[10px] text-orange-100 font-bold block leading-none">Lib Moderne</span>
@@ -298,8 +302,8 @@ function AppShellContent({ children }: AppShellProps) {
           </div>
 
           {/* Central Title */}
-          <div className="flex-1 text-center px-2 min-w-0">
-            <h1 className="text-base sm:text-xl md:text-2xl font-black text-white tracking-tight leading-tight drop-shadow-xs truncate">
+          <div className="flex-1 text-center px-1 sm:px-2 min-w-0">
+            <h1 className="text-xs sm:text-lg md:text-xl font-black text-white tracking-tight leading-tight drop-shadow-xs truncate">
               نظام إدارة المكتبة العصرية
             </h1>
             <p className="hidden md:block text-[11px] font-bold text-orange-100 mt-0.5">
@@ -307,16 +311,16 @@ function AppShellContent({ children }: AppShellProps) {
             </p>
           </div>
 
-          {/* Right Controls: Quick Contacts */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Left Controls in RTL: Quick Contacts */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Phone Quick Dial Pill */}
             <a
               dir="ltr"
               href="tel:+212660563371"
-              className="flex items-center gap-2 text-xs sm:text-sm font-mono font-black text-orange-600 bg-white hover:bg-orange-50 px-3 sm:px-4 py-2 rounded-full transition-all shadow-sm border border-white/80 min-h-[40px]"
+              className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm font-mono font-black text-orange-700 bg-white hover:bg-orange-50 px-2.5 py-1 sm:px-4 sm:py-2 rounded-full transition-all shadow-xs border border-white/80 min-h-[32px] sm:min-h-[40px]"
               title="اتصال سريع بالمكتبة"
             >
-              <Phone className="w-5 h-5 text-orange-600 shrink-0" />
+              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700 shrink-0" />
               <span className="hidden sm:inline">06.60.56.33.71</span>
             </a>
           </div>
@@ -326,7 +330,7 @@ function AppShellContent({ children }: AppShellProps) {
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6" suppressHydrationWarning>
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-28 space-y-4">
-              <div className="w-12 h-12 border-4 border-neutral-900 border-t-orange-500 rounded-full animate-spin shadow-md"></div>
+              <div className="w-12 h-12 border-4 border-neutral-900 border-t-orange-700 rounded-full animate-spin shadow-md"></div>
               <div className="text-center">
                 <p className="text-sm font-bold text-neutral-800">جاري تحميل بيانات المكتبة العصرية...</p>
                 <p className="text-xs text-neutral-400 mt-1 font-semibold">Lib Moderne POS</p>

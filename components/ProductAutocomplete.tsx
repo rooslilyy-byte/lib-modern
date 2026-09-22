@@ -155,7 +155,7 @@ export default function ProductAutocomplete({
                   }`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <PlusCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                    <PlusCircle className="w-4 h-4 text-orange-700 shrink-0" />
                     <span className="text-xs font-bold truncate">
                       إضافة كعنصر مخصص: &quot;{item.name}&quot;
                     </span>

@@ -178,7 +178,7 @@ export default function DemandsList({
         <div className="flex items-center justify-between border-b border-neutral-100 pb-4 mb-5 flex-wrap gap-3">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl bg-neutral-900 text-white flex items-center justify-center font-bold shadow-md">
-              <Plus className="w-5 h-5 text-orange-500" />
+              <Plus className="w-5 h-5 text-orange-700" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-neutral-900">تسجيل طلبية خصاص جديدة</h2>
@@ -186,7 +186,7 @@ export default function DemandsList({
             </div>
           </div>
 
-          <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200/60 px-3.5 py-1 rounded-full">
+          <span className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200/80 px-3.5 py-1 rounded-full">
             تكميل تلقائي سريع
           </span>
         </div>
@@ -196,7 +196,7 @@ export default function DemandsList({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-orange-500" />
+                <User className="w-3.5 h-3.5 text-orange-700" />
                 <span>اسم الزبون الكامل:</span>
               </label>
               <input
@@ -205,13 +205,13 @@ export default function DemandsList({
                 placeholder="مثال: الحسن أيت الطالب"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium min-h-[44px] transition-all shadow-xs"
+                className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium min-h-[38px] sm:min-h-[44px] transition-all shadow-xs"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-orange-500" />
+                <Phone className="w-3.5 h-3.5 text-orange-700" />
                 <span>رقم الهاتف (الواتساب):</span>
               </label>
               <input
@@ -220,20 +220,20 @@ export default function DemandsList({
                 placeholder="مثال: 0661234567"
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
-                className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono dir-ltr text-right min-h-[44px] transition-all shadow-xs"
+                className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono dir-ltr text-right min-h-[38px] sm:min-h-[44px] transition-all shadow-xs"
               />
             </div>
           </div>
 
           {/* Items Dynamic Rows */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2.5 sm:space-y-3 pt-2">
             <label className="block text-xs font-bold text-neutral-700 flex items-center gap-1.5">
-              <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+              <BookOpen className="w-3.5 h-3.5 text-orange-700" />
               <span>الكتب والمستلزمات المطلوبة:</span>
             </label>
 
             {items.map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-1.5 sm:gap-2">
                 <div className="flex-1">
                   <ProductAutocomplete
                     value={item.product_name}
@@ -244,7 +244,7 @@ export default function DemandsList({
                   />
                 </div>
 
-                <div className="w-24">
+                <div className="w-20 sm:w-24">
                   <input
                     type="number"
                     min="1"
@@ -256,7 +256,7 @@ export default function DemandsList({
                       const val = e.target.value;
                       handleItemChange(index, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
                     }}
-                    className="w-full bg-white/90 border border-neutral-200/80 rounded-xl px-3 py-2 text-center text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 min-h-[40px]"
+                    className="w-full bg-white/90 border border-neutral-200/80 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 text-center text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 min-h-[36px] sm:min-h-[40px]"
                   />
                 </div>
 
@@ -264,16 +264,16 @@ export default function DemandsList({
                   <button
                     type="button"
                     onClick={() => handleRemoveItemRow(index)}
-                    className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+                    className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 )}
               </div>
             ))}
 
             {/* Avance & Total */}
-            <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               <div>
                 <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center justify-between">
                   <span>التسبيق (Avance):</span>
@@ -287,7 +287,7 @@ export default function DemandsList({
                   value={avanceAmount}
                   onKeyDown={handlePreventNegativeKey}
                   onChange={(e) => setAvanceAmount(e.target.value)}
-                  className="w-full bg-white/90 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                  className="w-full bg-white/90 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
                 />
               </div>
 
@@ -304,7 +304,7 @@ export default function DemandsList({
                   value={totalAmount}
                   onKeyDown={handlePreventNegativeKey}
                   onChange={(e) => setTotalAmount(e.target.value)}
-                  className="w-full bg-white/90 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+                  className="w-full bg-white/90 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
                 />
               </div>
             </div>
@@ -313,18 +313,18 @@ export default function DemandsList({
               <button
                 type="button"
                 onClick={handleAddItemRow}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-800 hover:text-orange-600 bg-neutral-100 hover:bg-neutral-200 px-4 py-2 rounded-full transition-colors"
+                className="inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-bold text-neutral-800 hover:text-orange-700 bg-neutral-100 hover:bg-neutral-200 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 <span>إضافة سطر كتاب آخر</span>
               </button>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold px-6 py-2.5 rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 sm:gap-2 bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold px-4 sm:px-6 py-2 sm:py-2.5 rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
               >
-                <Plus className="w-4 h-4 text-orange-500" />
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
                 <span>{isSubmitting ? 'جاري الحفظ...' : 'حفظ الطلبية'}</span>
               </button>
             </div>
@@ -367,7 +367,7 @@ export default function DemandsList({
                   key={btn.key}
                   type="button"
                   onClick={() => setStatusFilter(btn.key as any)}
-                  className={`h-9 px-3.5 text-xs font-bold rounded-full transition-all whitespace-nowrap ${
+                  className={`h-7 sm:h-9 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${
                     statusFilter === btn.key
                       ? 'bg-neutral-900 text-white shadow-xs'
                       : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
@@ -388,22 +388,21 @@ export default function DemandsList({
             </div>
           ) : (
             filteredDemands.map((demand) => {
-              const isExpanded = expandedDemandId === demand.id;
               const completedItems = demand.items?.filter(i => i.is_delivered).length || 0;
               const totalItems = demand.items?.length || 0;
 
               return (
-                <div key={demand.id} className="py-3 group transition-colors hover:bg-neutral-50/60 rounded-2xl px-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                <div key={demand.id} className="py-2.5 sm:py-3 group transition-colors hover:bg-neutral-50/60 rounded-2xl px-2.5 sm:px-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-2.5">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shrink-0">
                         {demand.client?.name.substring(0, 2)}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/customers/${encodeURIComponent(demand.id)}`}
-                            className="font-bold text-sm text-neutral-900 hover:text-orange-600 hover:underline transition-colors truncate"
+                            className="font-bold text-xs sm:text-sm text-neutral-900 hover:text-orange-700 hover:underline transition-colors truncate"
                           >
                             {demand.client?.name}
                           </Link>
@@ -417,44 +416,44 @@ export default function DemandsList({
                             {demand.status === 'completed' ? 'مكتمل' : demand.status === 'partial' ? 'جزئي' : 'معلق'}
                           </span>
                         </div>
-                        <p className="text-xs text-neutral-500 font-mono dir-ltr text-right mt-0.5">
+                        <p className="text-[11px] sm:text-xs text-neutral-500 font-mono dir-ltr text-right mt-0.5">
                           {demand.client?.phone}
                         </p>
                       </div>
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
-                      <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded-full">
+                    <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-center flex-wrap">
+                      <span className="text-[11px] sm:text-xs font-bold text-neutral-600 bg-neutral-100 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full">
                         {completedItems} / {totalItems} مستلم
                       </span>
 
                       <button
                         type="button"
                         onClick={() => setSelectedPrintDemand(demand)}
-                        className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors"
                         title="طباعة وصل خصاص"
                       >
-                        <Printer className="w-4 h-4" />
+                        <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
 
                       <a
                         href={getWhatsAppLink(demand)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors"
                         title="إرسال إشعار واتساب"
                       >
-                        <MessageSquare className="w-4 h-4" />
+                        <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </a>
 
                       <button
                         type="button"
                         onClick={() => setEditingDemand(demand)}
-                        className="p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors"
                         title="تعديل الطلب"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
 
                       <button
@@ -464,10 +463,10 @@ export default function DemandsList({
                             onDeleteDemand(demand.id);
                           }
                         }}
-                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full transition-colors"
                         title="حذف الطلب"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </div>
