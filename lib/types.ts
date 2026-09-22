@@ -28,6 +28,7 @@ export interface DemandItem {
   demand_id: string;
   product_name: string;
   quantity: number;
+  unit_price?: number;
   fulfilled_quantity?: number;
   is_in_stock: boolean;
   is_delivered: boolean;
@@ -40,6 +41,8 @@ export interface ClientDemand {
   client_id: string;
   batch_id?: string | null;
   status: DemandStatus;
+  avance_amount?: number;
+  total_amount?: number;
   created_at?: string;
   
   // Joined relational data

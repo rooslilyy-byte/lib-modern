@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { Users, Search, Phone, MessageSquare, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Users, Search, Phone, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { useLanguage } from '@/lib/languageContext';
 import CreateDemandModal from './CreateDemandModal';
 
 interface CustomersDirectoryProps {
@@ -12,20 +14,27 @@ interface CustomersDirectoryProps {
   onCreateDemand?: (
     clientName: string, 
     clientPhone: string, 
-    items: { product_name: string; quantity: number }[]
+    items: { product_name: string; quantity: number }[],
+    avanceAmount?: number,
+    totalAmount?: number
   ) => Promise<void>;
   onDeleteBulkCustomers?: (clientIds: string[]) => Promise<void>;
   onSelectCustomer?: (demandOrClientId: string) => void;
 }
 
-export default function CustomersDirectory({ 
+function CustomersDirectoryContent({ 
   demands, 
   masterProducts = [], 
   onCreateDemand,
   onDeleteBulkCustomers,
-  onSelectCustomer 
 }: CustomersDirectoryProps) {
-  const [filter, setFilter] = useState('all');
+  const searchParams = useSearchParams();
+  const { t } = useLanguage();
+  
+  // Read initial status query parameter if present
+  const initialStatusParam = searchParams.get('status') || 'all';
+
+  const [filter, setFilter] = useState(initialStatusParam);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedDemandId, setExpandedDemandId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -33,7 +42,15 @@ export default function CustomersDirectory({
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
 
-  // Each demand is an independent customer entry (never merge duplicates with same phone)
+  // Sync state if URL query changes (e.g. navigation from dashboard cards)
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    if (statusParam) {
+      setFilter(statusParam);
+    }
+  }, [searchParams]);
+
+  // Each demand is an independent customer entry
   const customerEntries = useMemo(() => {
     return demands
       .filter((dem): dem is ClientDemand & { client: NonNullable<ClientDemand['client']> } => Boolean(dem.client))
@@ -72,13 +89,13 @@ export default function CustomersDirectory({
       c.phone.includes(searchQuery.trim());
     if (!matchesSearch) return false;
 
-    if (filter === 'ready') {
-      return c.totalItems > 0 && c.missingCount === 0;
+    if (filter === 'ready' || filter === 'completed') {
+      return (c.totalItems > 0 && c.missingCount === 0) || c.isComplete || c.isReady;
     }
     if (filter === 'partial') {
       return c.missingCount > 0 && c.missingCount < c.totalItems;
     }
-    if (filter === 'waiting') {
+    if (filter === 'waiting' || filter === 'pending') {
       return c.totalItems > 0 && c.missingCount === c.totalItems;
     }
     return true;
@@ -118,7 +135,7 @@ export default function CustomersDirectory({
         setIsSelectMode(false);
       } catch (err) {
         console.error('Error deleting bulk customers:', err);
-        alert('حدث خطأ أثناء حذف الزبناء المحددات.');
+        alert('حدث خطأ أثناء حذف الزبناء المحددين.');
       } finally {
         setIsDeletingBulk(false);
       }
@@ -126,67 +143,72 @@ export default function CustomersDirectory({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 sm:space-y-6">
       
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
-            <Users className="w-4.5 h-4.5" />
+      {/* 1. Header Floating Glass Card with Custom Logo */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+            <img
+              src="/logo-lib-modern-alt.jpg"
+              alt="Lib Moderne - المكتبة العصرية"
+              className="h-full w-auto object-contain"
+            />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900">دليل الزبناء</h2>
-            <p className="text-[11px] text-slate-500">عرض جميع لوائح وخصاصات الزبناء بشكل منفصل ومستقل</p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('cust.title')}</h2>
+              <span className="bg-neutral-100 text-neutral-600 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                {customerEntries.length} {t('common.items')}
+              </span>
+            </div>
+            <p className="text-xs text-neutral-500 font-medium mt-0.5">{t('cust.subtitle')}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-col sm:flex-row w-full md:w-auto">
+        <div className="flex items-center gap-3 flex-col sm:flex-row w-full md:w-auto">
           {/* Search Bar */}
-          <div className="relative w-full sm:w-60">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 sm:top-3" />
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-neutral-400 absolute right-3.5 top-3.5" />
             <input
               type="text"
-              placeholder="ابحث باسم الزبون أو الهاتف..."
+              placeholder={t('cust.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-9 pl-3 h-9 sm:h-10 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 pl-4 h-11 text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs"
             />
           </div>
 
-          {/* Action Buttons based on isSelectMode */}
+          {/* Action Buttons */}
           {!isSelectMode ? (
-            <>
-              {/* Enter Select Mode Button */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               {onDeleteBulkCustomers && (
                 <button
                   onClick={() => setIsSelectMode(true)}
-                  className="w-full sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all shrink-0"
+                  className="w-full sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-bold text-xs sm:text-sm px-4 h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
                   title="تحديد زبناء لحذفهم"
                 >
                   <Trash2 className="w-4 h-4 text-rose-600" />
-                  <span>حذف زبناء</span>
+                  <span>{t('cust.bulk_delete')}</span>
                 </button>
               )}
 
-              {/* Add Customer & Demand Button */}
               {onCreateDemand && (
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0"
+                  className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-5 h-11 rounded-full shadow-md flex items-center justify-center gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 shrink-0"
                 >
-                  <Plus className="w-4 h-4 text-white" />
-                  <span>إضافة زبون وطلب خصاص</span>
+                  <Plus className="w-4 h-4 text-orange-500" />
+                  <span>{t('dash.new_demand')}</span>
                 </button>
               )}
-            </>
+            </div>
           ) : (
-            <>
-              {/* Confirm Bulk Delete Button */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handleBulkDelete}
                 disabled={selectedCustomerIds.length === 0 || isDeletingBulk}
-                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all shrink-0 disabled:opacity-50"
-                title="تأكيد حذف الزبناء المحددين"
+                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-5 h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 shrink-0"
               >
                 <Trash2 className="w-4 h-4 text-white" />
                 <span>
@@ -198,15 +220,14 @@ export default function CustomersDirectory({
                 </span>
               </button>
 
-              {/* Cancel Selection Mode Button */}
               <button
                 onClick={handleCancelSelectMode}
-                className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm px-3.5 h-9 sm:h-10 rounded-xl shadow-sm flex items-center justify-center gap-1.5 transition-all shrink-0 border border-slate-200"
+                className="w-full sm:w-auto bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs sm:text-sm px-4 h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 shrink-0"
               >
-                <X className="w-4 h-4 text-slate-500" />
-                <span>إلغاء التحديد</span>
+                <X className="w-4 h-4 text-neutral-500" />
+                <span>{t('common.cancel')}</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -221,22 +242,22 @@ export default function CustomersDirectory({
         />
       )}
 
-      {/* Status Filter Buttons */}
+      {/* 2. Status Filter Pill Buttons */}
       <div className="flex flex-wrap items-center gap-2">
         {[
-          { key: 'all', label: 'الكل' },
-          { key: 'ready', label: 'جاهز بالكامل' },
-          { key: 'partial', label: 'جاهز جزئياً' },
-          { key: 'waiting', label: 'في الانتظار' },
+          { key: 'all', label: t('cust.filter_all') },
+          { key: 'ready', label: t('cust.filter_ready') },
+          { key: 'partial', label: t('cust.filter_partial') },
+          { key: 'waiting', label: t('cust.filter_waiting') },
         ].map((btn) => (
           <button
             key={btn.key}
             type="button"
             onClick={() => setFilter(btn.key)}
-            className={`h-9 px-4 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+            className={`h-10 px-4 sm:px-5 text-xs sm:text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap shadow-xs ${
               filter === btn.key
-                ? 'bg-slate-900 text-white shadow-sm border border-slate-900'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                ? 'bg-neutral-900 text-white shadow-md hover:bg-black'
+                : 'bg-white/80 backdrop-blur-sm text-neutral-700 border border-neutral-200/80 hover:bg-white hover:text-neutral-900 hover:-translate-y-0.5'
             }`}
           >
             {btn.label}
@@ -244,56 +265,57 @@ export default function CustomersDirectory({
         ))}
       </div>
 
-      {/* Compact Full-Width Customers Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden space-y-0">
+      {/* 3. Floating Customers Table Card */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl overflow-hidden">
         
         {filteredCustomers.length === 0 ? (
-          <div className="text-center py-12 bg-white">
-            <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm font-bold text-slate-600">لا يوجد زبناء مطابقتون للبحث</p>
+          <div className="text-center py-16 px-4">
+            <Users className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
+            <p className="text-sm font-bold text-neutral-700">{t('cust.no_results')}</p>
+            <p className="text-xs text-neutral-400 mt-1">تأكد من رقم الهاتف أو الاسم المدخل</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-200/80">
+          <div className="divide-y divide-neutral-100">
             
             {/* Desktop Table Header */}
-            <div className="hidden md:flex items-center justify-between px-6 py-2.5 bg-slate-100/80 border-b border-slate-200 text-[11px] font-black text-slate-500 uppercase tracking-wider">
-              <div className="flex items-center gap-3 min-w-[240px]">
+            <div className="hidden md:flex items-center justify-between px-6 py-3.5 bg-neutral-50/60 text-[11px] font-extrabold text-neutral-400 uppercase tracking-wider">
+              <div className="flex items-center gap-3 min-w-[260px]">
                 {isSelectMode && (
                   <div className="w-5 flex items-center justify-center shrink-0">
                     <input
                       type="checkbox"
                       checked={isAllSelected}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer accent-slate-900"
+                      className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer accent-neutral-900"
                       title="تحديد الكل"
                     />
                   </div>
                 )}
-                <span className="w-7 text-center">#</span>
-                <span>الزبون واللائحة</span>
+                <span className="w-8 text-center">#</span>
+                <span>{t('cust.col_client')}</span>
               </div>
-              <div className="w-44 text-right">رقم الهاتف (الواتساب)</div>
-              <div className="flex-1 text-center">حالة الخصاص والاستلام</div>
-              <div className="w-16 text-left">التفاصيل</div>
+              <div className="w-48 text-right">{t('cust.col_phone')}</div>
+              <div className="flex-1 text-center">{t('cust.col_status')}</div>
+              <div className="w-20 text-left">{t('cust.col_details')}</div>
             </div>
 
-            {/* Rows */}
+            {/* Customer Rows */}
             {filteredCustomers.map((cli, idx) => {
               const isExpanded = expandedDemandId === cli.id;
               const isSelected = selectedCustomerIds.includes(cli.clientId);
 
               return (
-                <div key={cli.id} className={`group transition-colors ${isSelected ? 'bg-slate-100/70' : 'bg-white hover:bg-slate-50/80'}`}>
+                <div key={cli.id} className={`group transition-all duration-200 ${isSelected ? 'bg-neutral-100/70' : 'hover:bg-white'}`}>
                   
-                  {/* Main Minimalist Compact Row */}
+                  {/* Row */}
                   <div 
                     onClick={() => setExpandedDemandId(isExpanded ? null : cli.id)}
-                    className="py-2.5 px-3 sm:py-3 sm:px-5 cursor-pointer flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 text-right select-none"
+                    className="py-3 px-4 sm:py-3.5 sm:px-6 cursor-pointer flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-right select-none"
                   >
                     
-                    {/* RTL Section 1: Checkbox + ID + Customer Name */}
-                    <div className="flex items-center justify-between md:justify-start gap-2.5 min-w-[240px]">
-                      <div className="flex items-center gap-2 min-w-0">
+                    {/* Section 1: Checkbox + ID + Customer Name */}
+                    <div className="flex items-center justify-between md:justify-start gap-3 min-w-[260px]">
+                      <div className="flex items-center gap-2.5 min-w-0">
                         {isSelectMode && (
                           <div className="w-5 flex items-center justify-center shrink-0" onClick={(e) => e.stopPropagation()}>
                             <input
@@ -303,124 +325,127 @@ export default function CustomersDirectory({
                                 e.stopPropagation();
                                 handleToggleCustomer(cli.clientId);
                               }}
-                              className="w-4 h-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer accent-slate-900"
+                              className="w-4 h-4 rounded border-neutral-300 text-neutral-900 focus:ring-neutral-900 cursor-pointer accent-neutral-900"
                               title="تحديد هذا الزبون"
                             />
                           </div>
                         )}
 
-                        <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-700 font-extrabold text-[11px] flex items-center justify-center shrink-0 border border-slate-200">
+                        <span className="w-7 h-7 rounded-xl bg-neutral-100 text-neutral-800 font-extrabold text-xs flex items-center justify-center shrink-0 border border-neutral-200/60">
                           #{idx + 1}
                         </span>
                         
                         <Link
                           href={`/customers/${encodeURIComponent(cli.id)}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-extrabold text-slate-900 text-xs sm:text-sm hover:text-slate-600 hover:underline transition-colors truncate dir-rtl text-right"
+                          className="font-extrabold text-neutral-900 text-sm hover:text-orange-600 hover:underline transition-colors truncate dir-rtl text-right"
                           title="انقر لعرض ملف هذه الطلبية بالكامل"
                         >
                           {cli.name}
                         </Link>
                       </div>
 
-                      {/* Mobile Expand Toggle Arrow */}
+                      {/* Mobile Chevron */}
                       <div className="md:hidden flex items-center gap-1.5">
                         <button 
                           type="button" 
-                          className="p-1 rounded-lg text-slate-400"
+                          className="p-1.5 rounded-full text-neutral-400 hover:bg-neutral-100"
                         >
-                          {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-800" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-neutral-900" /> : <ChevronDown className="w-4 h-4 text-neutral-400" />}
                         </button>
                       </div>
                     </div>
 
-                    {/* RTL Section 2: Phone Column */}
-                    <div className="w-full md:w-40 flex items-center justify-between md:justify-start gap-2">
+                    {/* Section 2: Phone */}
+                    <div className="w-full md:w-48 flex items-center justify-between md:justify-start gap-2">
                       <a 
                         href={`tel:${cli.phone}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold font-mono text-slate-700 hover:text-slate-900 bg-slate-100/90 hover:bg-slate-200/90 px-2 py-0.5 rounded border border-slate-200 transition-colors dir-ltr"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-neutral-800 hover:text-orange-600 bg-neutral-100/90 hover:bg-neutral-200/90 px-3 py-1 rounded-full border border-neutral-200/60 transition-colors dir-ltr"
                       >
-                        <Phone className="w-3 h-3 text-slate-500" />
+                        <Phone className="w-3 h-3 text-neutral-500" />
                         <span>{cli.phone}</span>
                       </a>
 
                       {/* Mobile Badges */}
                       <div className="md:hidden flex items-center gap-1.5 flex-wrap">
-                        <span className="bg-amber-50 text-amber-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                        <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200/60">
                           {cli.totalItems} سلعة
                         </span>
                         {cli.missingCount > 0 ? (
-                          <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                          <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-rose-200/60">
                             {cli.missingCount} خصاص
                           </span>
                         ) : cli.isReady ? (
-                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/60">
                             جاهز
                           </span>
                         ) : (
-                          <span className="bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                          <span className="bg-neutral-100 text-neutral-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                             مستلم
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* RTL Section 3: Desktop Badges */}
+                    {/* Section 3: Desktop Badges */}
                     <div className="hidden md:flex flex-1 items-center justify-center gap-2">
-                      <span className="bg-amber-50 text-amber-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
+                      <span className="bg-amber-50 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200/60">
                         {cli.totalItems} سلعة
                       </span>
 
                       {cli.missingCount > 0 ? (
-                        <span className="bg-rose-50 text-rose-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
-                          {cli.missingCount} خصاص
+                        <span className="bg-rose-50 text-rose-700 text-xs font-bold px-3 py-1 rounded-full border border-rose-200/60">
+                          {cli.missingCount} خصاص معلق
                         </span>
                       ) : cli.isReady ? (
-                        <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-2.5 py-0.5 rounded-md">
-                          جاهز للاستلام
+                        <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200/60">
+                          جاهز للتسليم
                         </span>
                       ) : (
-                        <span className="bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-0.5 rounded-md">
+                        <span className="bg-neutral-100 text-neutral-700 text-xs font-bold px-3 py-1 rounded-full">
                           جميع طلباته مستلمة
                         </span>
                       )}
                     </div>
 
-                    {/* RTL Section 4: Desktop Chevron */}
-                    <div className="hidden md:flex w-16 items-center justify-end">
-                      <div className="w-6 h-6 rounded bg-slate-100 group-hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors">
+                    {/* Section 4: Desktop Chevron */}
+                    <div className="hidden md:flex w-20 items-center justify-end gap-2">
+                      <div className="w-7 h-7 rounded-full bg-neutral-100 group-hover:bg-neutral-200 text-neutral-600 flex items-center justify-center transition-colors">
                         {isExpanded ? (
-                          <ChevronUp className="w-3.5 h-3.5 text-slate-900" />
+                          <ChevronUp className="w-4 h-4 text-neutral-900" />
                         ) : (
-                          <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                          <ChevronDown className="w-4 h-4 text-neutral-500" />
                         )}
                       </div>
                     </div>
 
                   </div>
 
-                  {/* Pure Minimalist Inline Missing Items List */}
+                  {/* Inline Expanded Items Preview */}
                   {isExpanded && (
-                    <div className="bg-slate-50/90 border-t border-slate-200 px-4 py-2.5 space-y-1.5 animate-in fade-in duration-150 text-right">
+                    <div className="bg-neutral-50/80 border-t border-neutral-100 px-6 py-4 space-y-2 animate-in fade-in duration-150 text-right">
                       {cli.missingCount === 0 ? (
-                        <div className="text-[11px] font-bold text-emerald-700 py-1">
+                        <div className="text-xs font-bold text-emerald-700 py-1">
                           جميع كتب هذه الطلبية متوفرة بالمحل أو تم تسليمها بالكامل.
                         </div>
                       ) : (
-                        cli.missingItems.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2.5 py-1 border-b border-slate-200/50 last:border-0 text-xs">
-                            <span className="w-6 h-6 rounded bg-slate-200/80 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
-                              {item.quantity}
-                            </span>
-                            <span className="bg-rose-50 text-rose-700 text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0">
-                              خصاص
-                            </span>
-                            <span className="font-extrabold text-slate-900 text-xs truncate">
-                              {item.product_name}
-                            </span>
-                          </div>
-                        ))
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-bold text-neutral-400 uppercase">قائمة المواد المعلقة:</p>
+                          {cli.missingItems.map((item) => (
+                            <div key={item.id} className="flex items-center gap-3 py-1.5 border-b border-neutral-200/50 last:border-0 text-xs">
+                              <span className="w-6 h-6 rounded-lg bg-neutral-200 text-neutral-900 font-extrabold text-xs flex items-center justify-center shrink-0">
+                                {item.quantity}
+                              </span>
+                              <span className="bg-rose-50 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-200/60 shrink-0">
+                                خصاص
+                              </span>
+                              <span className="font-extrabold text-neutral-900 text-xs truncate">
+                                {item.product_name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
@@ -433,5 +458,13 @@ export default function CustomersDirectory({
       </div>
 
     </div>
+  );
+}
+
+export default function CustomersDirectory(props: CustomersDirectoryProps) {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs font-bold text-neutral-400">جاري تحميل دليل الزبائن...</div>}>
+      <CustomersDirectoryContent {...props} />
+    </Suspense>
   );
 }

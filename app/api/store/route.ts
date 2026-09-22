@@ -210,9 +210,64 @@ async function saveProgressiveFulfillmentToDb(map: Record<string, number>, exist
   }
 }
 
+const AVANCE_METADATA_PREFIX = '__METADATA_AVANCE_PAYMENTS__::';
+
+async function getAvancePaymentsFromDb(): Promise<{ id?: string; map: Record<string, { avance: number; total: number }> }> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('purchase_batches')
+      .select('id, batch_name')
+      .like('batch_name', `${AVANCE_METADATA_PREFIX}%`)
+      .limit(1);
+
+    if (data && data.length > 0) {
+      const rawJson = data[0].batch_name.slice(AVANCE_METADATA_PREFIX.length);
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return { id: data[0].id, map: parsed };
+        }
+      } catch (e) {
+        console.warn('Error parsing avance metadata json:', e);
+      }
+      return { id: data[0].id, map: {} };
+    }
+  } catch (err) {
+    console.warn('Error fetching avance metadata row:', err);
+  }
+  return { map: {} };
+}
+
+async function saveAvancePaymentsToDb(map: Record<string, { avance: number; total: number }>, existingId?: string): Promise<void> {
+  const serialized = `${AVANCE_METADATA_PREFIX}${JSON.stringify(map)}`;
+  try {
+    if (existingId) {
+      await supabaseAdmin
+        .from('purchase_batches')
+        .update({ batch_name: serialized, is_archived: true })
+        .eq('id', existingId);
+    } else {
+      const current = await getAvancePaymentsFromDb();
+      if (current.id) {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .update({ batch_name: serialized, is_archived: true })
+          .eq('id', current.id);
+      } else {
+        await supabaseAdmin
+          .from('purchase_batches')
+          .insert({ batch_name: serialized, is_archived: true });
+      }
+    }
+  } catch (err) {
+    console.error('Error saving avance payments metadata:', err);
+  }
+}
+
 async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
   const { products: ruptureProducts } = await getRuptureProductsFromDb();
   const { map: progressiveMap } = await getProgressiveFulfillmentFromDb();
+  const { map: avanceMap } = await getAvancePaymentsFromDb();
 
   const rows = unwrap(
     await supabaseAdmin
@@ -265,11 +320,21 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
         };
       }) as ClientDemand['items'];
 
+    const storedAvance = row.avance_amount !== undefined && row.avance_amount !== null
+      ? Number(row.avance_amount)
+      : (avanceMap[row.id]?.avance !== undefined ? Number(avanceMap[row.id].avance) : 0);
+
+    const storedTotal = row.total_amount !== undefined && row.total_amount !== null
+      ? Number(row.total_amount)
+      : (avanceMap[row.id]?.total !== undefined ? Number(avanceMap[row.id].total) : 0);
+
     demands.push({
       id: row.id,
       client_id: row.client_id,
       batch_id: row.batch_id,
       status: row.status,
+      avance_amount: storedAvance,
+      total_amount: storedTotal,
       created_at: row.created_at,
       client: {
         id: relatedClient.id,
@@ -325,10 +390,12 @@ export async function POST(request: Request) {
     const { action } = body;
 
     if (action === 'create_demand') {
-      const { clientName, clientPhone, items } = body;
+      const { clientName, clientPhone, items, avance_amount, total_amount } = body;
       const cleanPhone = clientPhone.trim();
       const cleanName = clientName.trim();
       const activeBatch = await getActiveBatch();
+      const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
+      const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
       const client = unwrap(
         await supabaseAdmin
@@ -339,14 +406,38 @@ export async function POST(request: Request) {
         'Creating client',
       ) as DatabaseRow;
 
-      const demand = unwrap(
-        await supabaseAdmin
-          .from('client_demands')
-          .insert({ client_id: client.id, batch_id: activeBatch.id, status: 'pending' })
-          .select()
-          .single(),
-        'Creating client demand',
-      ) as DatabaseRow;
+      let demand: DatabaseRow;
+      try {
+        demand = unwrap(
+          await supabaseAdmin
+            .from('client_demands')
+            .insert({ 
+              client_id: client.id, 
+              batch_id: activeBatch.id, 
+              status: 'pending',
+              avance_amount: numAvance,
+              total_amount: numTotal
+            })
+            .select()
+            .single(),
+          'Creating client demand',
+        ) as DatabaseRow;
+      } catch {
+        demand = unwrap(
+          await supabaseAdmin
+            .from('client_demands')
+            .insert({ client_id: client.id, batch_id: activeBatch.id, status: 'pending' })
+            .select()
+            .single(),
+          'Creating client demand fallback',
+        ) as DatabaseRow;
+
+        if (numAvance > 0 || numTotal > 0) {
+          const { id: avId, map: avMap } = await getAvancePaymentsFromDb();
+          avMap[demand.id] = { avance: numAvance, total: numTotal };
+          await saveAvancePaymentsToDb(avMap, avId);
+        }
+      }
 
       for (const item of items) {
         const productName = item.product_name.trim();
@@ -387,9 +478,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'update_demand') {
-      const { demandId, clientName, clientPhone, items } = body;
+      const { demandId, clientName, clientPhone, items, avance_amount, total_amount } = body;
       const cleanPhone = clientPhone.trim();
       const cleanName = clientName.trim();
+      const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
+      const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
       const demand = unwrap(
         await supabaseAdmin
@@ -411,6 +504,17 @@ export async function POST(request: Request) {
           .eq('id', demand.client_id),
         'Updating client',
       );
+
+      try {
+        await supabaseAdmin
+          .from('client_demands')
+          .update({ avance_amount: numAvance, total_amount: numTotal })
+          .eq('id', demandId);
+      } catch {
+        const { id: avId, map: avMap } = await getAvancePaymentsFromDb();
+        avMap[demandId] = { avance: numAvance, total: numTotal };
+        await saveAvancePaymentsToDb(avMap, avId);
+      }
 
       const existingItems = unwrap(
         await supabaseAdmin

@@ -11,6 +11,11 @@ export function proxy(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname === '/logo.png' ||
+    pathname === '/logo.jpg' ||
+    pathname === '/logo-lib-moderne.jpg' ||
+    pathname === '/logo-lib-moderne-alt.jpg' ||
+    pathname === '/logo-lib-modern.jpg' ||
+    pathname === '/logo-lib-modern-alt.jpg' ||
     pathname === '/logo-izourane.jpg' ||
     pathname === '/favicon.ico'
   ) {

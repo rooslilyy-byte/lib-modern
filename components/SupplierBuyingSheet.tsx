@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, FileText, ShoppingCart, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Printer, ShoppingCart, CheckCircle2, AlertCircle, Package } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
 import { compareProductNames } from '@/lib/sortUtils';
+import { useLanguage } from '@/lib/languageContext';
 
 type ReportTab = 'normal' | 'rupture';
 
@@ -19,6 +20,7 @@ export default function SupplierBuyingSheet({
   activeBatch,
   demands,
 }: SupplierBuyingSheetProps) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<ReportTab>('normal');
   const [fetchedReport, setFetchedReport] = useState<SupplierAggregatedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function SupplierBuyingSheet({
     ? (activeTab === 'normal' ? normalReport : ruptureReport) 
     : fetchedReport;
 
-  // Alphabetical sorting (Arabic first أ-ي, followed by French/Latin A-Z)
+  // Alphabetical sorting
   const report = useMemo(() => {
     return [...rawReport].sort((a, b) => compareProductNames(a.productName, b.productName));
   }, [rawReport]);
@@ -115,63 +117,72 @@ export default function SupplierBuyingSheet({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 sm:space-y-6">
       
-      {/* 1. Screen Header Controls (NO-PRINT) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm space-y-3 no-print">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-bold shrink-0">
-              <FileText className="w-4.5 h-4.5" />
+      {/* 1. Screen Header Controls Floating Glass Card with Custom Logo (NO-PRINT) */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4 no-print">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+              <img
+                src="/logo-lib-modern-alt.jpg"
+                alt="Lib Moderne"
+                className="h-full w-auto object-contain"
+              />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {activeTab === 'normal' ? 'تقرير مشتريات الموردين' : 'تقرير السلع غير المتوفرة'}
-              </h2>
-              <p className="text-[11px] text-slate-500">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-neutral-900">
+                  {activeTab === 'normal' ? t('report.title') : t('report.rupture_title')}
+                </h2>
+                <span className="bg-orange-50 text-orange-600 border border-orange-200/60 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  طباعة رسمية
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 font-medium mt-0.5">
                 {activeTab === 'normal' 
-                  ? 'قائمة السلع والكتب المعلقة للشراء من الموردين'
-                  : 'قائمة السلع الموسومة كغير متوفرة (En Rupture)'}
+                  ? 'قائمة السلع والكتب المعلقة للشراء من الموردين ودور النشر'
+                  : 'قائمة السلع الموسومة كغير متوفرة حالياً بالأسواق'}
               </p>
             </div>
           </div>
 
-          {/* Page-level action buttons & counters */}
-          <div className="flex items-center gap-2 flex-wrap w-full md:w-auto justify-end">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 px-3 h-9 rounded-lg">
-              <span className="text-slate-500">العناوين:</span>
-              <strong className="text-slate-900">{totalItemTypes}</strong>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-500">مجموع القطع:</span>
-              <strong className="text-slate-900">{totalPiecesCount}</strong>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            <div className="flex items-center gap-2 text-xs font-bold text-neutral-700 bg-white/90 border border-neutral-200/80 px-4 h-11 rounded-full shadow-xs">
+              <span className="text-neutral-400">العناوين:</span>
+              <strong className="text-neutral-900">{totalItemTypes}</strong>
+              <span className="text-neutral-300">|</span>
+              <span className="text-neutral-400">مجموع القطع:</span>
+              <strong className="text-orange-600">{totalPiecesCount}</strong>
             </div>
 
             <button
               onClick={handlePrint}
               disabled={report.length === 0}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-lg shadow-sm flex items-center gap-1.5 transition-all disabled:opacity-50"
+              className="bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold h-11 px-6 rounded-full shadow-md flex items-center gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
             >
-              <Printer className="w-4 h-4 text-white" />
-              <span>طباعة A4</span>
+              <Printer className="w-4 h-4 text-orange-500" />
+              <span>{t('report.print_btn')}</span>
             </button>
           </div>
         </div>
 
         {/* View Switcher: Normal vs Rupture */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-bold border border-slate-200/80">
+        <div className="flex items-center gap-2 bg-neutral-100/80 p-1.5 rounded-full border border-neutral-200/60 text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('normal')}
-            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
               activeTab === 'normal'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <ShoppingCart className="w-3.5 h-3.5 text-blue-600" />
+            <ShoppingCart className="w-3.5 h-3.5 text-orange-500" />
             <span>المشتريات العادية</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'normal' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'normal' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
               {demands ? normalReport.length : (activeTab === 'normal' ? report.length : '-')}
             </span>
@@ -180,16 +191,16 @@ export default function SupplierBuyingSheet({
           <button
             type="button"
             onClick={() => setActiveTab('rupture')}
-            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
               activeTab === 'rupture'
-                ? 'bg-white text-emerald-800 shadow-2xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <AlertCircle className="w-3.5 h-3.5 text-emerald-600" />
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
             <span>السلع غير المتوفرة</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'rupture' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'rupture' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
               {demands ? ruptureReport.length : (activeTab === 'rupture' ? report.length : '-')}
             </span>
@@ -197,127 +208,92 @@ export default function SupplierBuyingSheet({
         </div>
       </div>
 
-      {/* 2. Screen UI Web View (NO-PRINT) */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 shadow-2xs no-print">
+      {/* 2. Screen UI Web View Floating Glass Card (NO-PRINT) */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 no-print">
         {isLoading ? (
-          <div className="text-center py-8 text-slate-500 font-medium text-xs">جاري تحميل التقرير...</div>
+          <div className="text-center py-12 text-neutral-400 font-bold text-xs">جاري تحميل التقرير...</div>
         ) : report.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-emerald-200 bg-emerald-50/50 rounded-lg space-y-1.5">
-            <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <p className="text-emerald-800 font-bold text-sm">
+          <div className="text-center py-16 px-4">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <p className="text-base font-extrabold text-neutral-900">
               {activeTab === 'normal' ? 'جميع الكتب متوفرة في المخزون' : 'لا توجد سلع مسجلة كغير متوفرة حالياً'}
             </p>
-            <p className="text-xs text-emerald-600">
+            <p className="text-xs text-neutral-400 mt-1">
               {activeTab === 'normal' 
                 ? 'لا توجد خصاصات معلقة للموردين في الوقت الحالي'
                 : 'جميع السلع المطلوبة متوفرة أو مسجلة في قائمة المشتريات العادية'}
             </p>
           </div>
         ) : (
-          <>
-            {/* Mobile Stacked Card View (< md) */}
-            <div className="block md:hidden space-y-2">
-              {report.map((item, idx) => (
-                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="bg-slate-800 text-white font-bold text-xs w-5 h-5 rounded flex items-center justify-center shrink-0">
-                        #{idx + 1}
-                      </span>
-                      <h3 className="font-semibold text-slate-900 text-xs truncate">{item.productName}</h3>
-                    </div>
-                    <span className={`px-2 py-0.5 rounded font-bold text-xs shrink-0 ${
-                      activeTab === 'normal' ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'
-                    }`}>
-                      {item.totalQuantity} قطعة
-                    </span>
-                  </div>
-
-                  <div className="pt-1.5 border-t border-slate-200">
-                    <span className="text-[10px] text-slate-500 font-medium block mb-1">طلبيات الزبناء:</span>
-                    <div className="flex flex-wrap gap-1">
+          <div className="divide-y divide-neutral-100">
+            {report.map((item, idx) => (
+              <div key={idx} className="py-3.5 first:pt-0 last:pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-7 h-7 rounded-xl bg-neutral-100 text-neutral-800 font-extrabold text-xs flex items-center justify-center shrink-0 border border-neutral-200/60">
+                    #{idx + 1}
+                  </span>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-neutral-900 truncate">{item.productName}</h3>
+                    <div className="flex flex-wrap gap-1 mt-1">
                       {item.clients.map((cli, cIdx) => (
-                        <span key={cIdx} className="bg-white border border-slate-200 text-slate-800 px-1.5 py-0.5 rounded text-[11px]">
+                        <span key={cIdx} className="bg-neutral-100 text-neutral-700 px-2.5 py-0.5 rounded-full text-[11px] font-medium">
                           {cli.clientName} ({cli.quantity})
                         </span>
                       ))}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Desktop Table View (>= md) */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <th className="py-2 px-3 w-12 text-center">#</th>
-                    <th className="py-2 px-3">اسم السلعة / الكتاب</th>
-                    <th className="py-2 px-3 text-center w-28">إجمالي العدد</th>
-                    <th className="py-2 px-3">تفاصيل الزبناء المنتظرين</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {report.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2 px-3 text-center font-bold text-slate-400">{idx + 1}</td>
-                      <td className="py-2 px-3 font-semibold text-slate-900 text-xs sm:text-sm">{item.productName}</td>
-                      <td className="py-2 px-3 text-center font-bold text-sm text-slate-900 bg-slate-50/50">
-                        {item.totalQuantity}
-                      </td>
-                      <td className="py-2 px-3 text-slate-700">
-                        <div className="flex flex-wrap gap-1">
-                          {item.clients.map((cli, cIdx) => (
-                            <span key={cIdx} className="bg-slate-100 border border-slate-200 text-slate-800 px-1.5 py-0.5 rounded text-[11px]">
-                              {cli.clientName} ({cli.quantity})
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                <div className="self-end md:self-center">
+                  <span className="bg-neutral-900 text-white font-black text-xs px-4 py-1.5 rounded-full shadow-xs">
+                    {item.totalQuantity} قطعة
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* 3. DEDICATED PRINTABLE PORTAL DIRECTLY AT DOCUMENT BODY */}
+      {/* 3. DEDICATED PRINTABLE A4 PORTAL DIRECTLY AT DOCUMENT BODY */}
       {mounted && createPortal(
         <div id="printable-a4-report" className="print-only">
           <div className="printable-supplier font-cairo bg-white text-black">
-            <div className="border-b-2 border-slate-900 pb-4 mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/logo-izourane.jpg"
-                  alt="شعار شركة إيزوران"
-                  className="h-16 w-auto object-contain shrink-0"
-                />
+            
+            {/* A4 Printable Header */}
+            <div className="border-b-2 border-neutral-900 pb-4 mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="bg-neutral-900 p-2 rounded-xl inline-block shrink-0">
+                  <img
+                    src="/logo-lib-modern-alt.jpg"
+                    alt="Lib Moderne - المكتبة العصرية"
+                    className="h-14 w-auto object-contain block"
+                  />
+                </div>
                 <div>
                   <h1 className="text-2xl font-black text-black">
-                    {activeTab === 'normal' ? 'تقرير مشتريات الموردين' : 'تقرير السلع غير المتوفرة'}
+                    المكتبة العصرية — Lib Moderne
                   </h1>
-                  <p className="text-xs font-semibold text-slate-700">
+                  <p className="text-xs font-bold text-neutral-700 mt-0.5">
                     {activeTab === 'normal'
-                      ? 'متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة'
+                      ? 'متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة للموردين'
                       : 'متابعة خصاصات الدخول المدرسي — قائمة السلع المقطوعة (En Rupture)'}
                   </p>
-                  <p className="text-xs font-mono text-slate-800 mt-0.5 text-right">الهاتف: <span dir="ltr">+212 661-556418</span></p>
+                  <p className="text-xs font-mono text-neutral-800 mt-1 text-right">
+                    الهاتف: <span dir="ltr" className="font-bold">06.60.56.33.71 / 06.60.31.98.68</span>
+                  </p>
                 </div>
               </div>
-              <div className="text-left text-xs text-slate-700 font-medium">
-                <p><span className="font-bold">الدفعة:</span> {activeBatch?.batch_name}</p>
-                <p><span className="font-bold">التاريخ:</span> {formattedDate}</p>
+              <div className="text-left text-xs text-neutral-700 font-medium">
+                <p><span className="font-bold">الدفعة:</span> {activeBatch?.batch_name || 'الدفعة الرئيسية'}</p>
+                <p><span className="font-bold">تاريخ الطباعة:</span> {formattedDate}</p>
               </div>
             </div>
 
+            {/* A4 Table */}
             <table className="w-full text-right border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-100 text-slate-900 font-black border-y-2 border-slate-900">
+                <tr className="bg-neutral-100 text-neutral-900 font-black border-y-2 border-neutral-900">
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
                   <th className="py-2.5 px-3">
                     {activeTab === 'normal' ? 'السلعة / الكتاب المطلوب' : 'السلعة / الكتاب غير المتوفر'}
@@ -326,7 +302,7 @@ export default function SupplierBuyingSheet({
                   <th className="py-2.5 px-3">تفاصيل طلبات الزبناء</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-300">
+              <tbody className="divide-y divide-neutral-300">
                 {report.map((item, idx) => (
                   <tr key={idx}>
                     <td className="py-3 px-3 text-center font-bold">{idx + 1}</td>
@@ -335,7 +311,7 @@ export default function SupplierBuyingSheet({
                     <td className="py-3 px-3">
                       <div className="flex flex-wrap gap-1">
                         {item.clients.map((cli, cIdx) => (
-                          <span key={cIdx} className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px]">
+                          <span key={cIdx} className="bg-neutral-100 border border-neutral-300 px-1.5 py-0.5 rounded text-[10px]">
                             {cli.clientName} ({cli.quantity})
                           </span>
                         ))}
@@ -345,28 +321,30 @@ export default function SupplierBuyingSheet({
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-slate-900 font-black bg-slate-50">
+                <tr className="border-t-2 border-neutral-900 font-black bg-neutral-50">
                   <td colSpan={2} className="py-3 px-3 text-left">
                     {activeTab === 'normal' 
                       ? 'المجموع الإجمالي للقطع المطلوب شراؤها:' 
                       : 'المجموع الإجمالي للقطع غير المتوفرة:'}
                   </td>
-                  <td className="py-3 px-3 text-center text-lg font-black text-slate-900">{totalPiecesCount}</td>
+                  <td className="py-3 px-3 text-center text-lg font-black text-neutral-900">{totalPiecesCount}</td>
                   <td></td>
                 </tr>
               </tfoot>
             </table>
 
-            <div className="mt-12 pt-6 border-t border-slate-300 flex justify-between items-end text-xs font-bold text-slate-800">
+            {/* Signatures / Stamp Footer */}
+            <div className="mt-12 pt-6 border-t border-neutral-300 flex justify-between items-end text-xs font-bold text-neutral-800">
               <div>
                 <p>توقيع مسؤول المشتريات:</p>
                 <div className="h-10"></div>
               </div>
               <div>
-                <p>خاتم شركة إيزوران:</p>
+                <p>خاتم وتوقيع المكتبة العصرية (Lib Moderne):</p>
                 <div className="h-10"></div>
               </div>
             </div>
+
           </div>
         </div>,
         document.body

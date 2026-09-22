@@ -132,13 +132,13 @@ export default function ProductAutocomplete({
           setFocusedIndex(0);
         }}
         onKeyDown={handleKeyDown}
-        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 h-9 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
+        className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 h-10 text-xs sm:text-sm text-neutral-900 focus:bg-white focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs"
       />
 
       {isOpen && suggestions.length > 0 && (
         <div
           ref={listRef}
-          className="absolute top-full left-0 right-0 mt-1 w-full z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto overscroll-contain divide-y divide-slate-100"
+          className="absolute top-full left-0 right-0 mt-1.5 w-full z-50 bg-white/95 backdrop-blur-md border border-neutral-200/80 rounded-2xl shadow-2xl overflow-hidden max-h-[460px] overflow-y-auto overscroll-contain divide-y divide-neutral-100 animate-in fade-in zoom-in-95 duration-150"
         >
           {suggestions.map((item, index) => {
             const isFocused = index === focusedIndex;
@@ -150,17 +150,17 @@ export default function ProductAutocomplete({
                   key={item.id}
                   onClick={() => handleSelect(item.name)}
                   onMouseEnter={() => setFocusedIndex(index)}
-                  className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between gap-2 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 ${
-                    isFocused ? 'bg-emerald-100 text-emerald-900 font-bold' : ''
+                  className={`px-3.5 py-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 text-orange-700 bg-orange-50/80 hover:bg-orange-100/80 min-h-[40px] ${
+                    isFocused ? 'bg-orange-100 text-orange-900 font-bold' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <PlusCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="text-xs font-semibold truncate">
+                    <PlusCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                    <span className="text-xs font-bold truncate">
                       إضافة كعنصر مخصص: &quot;{item.name}&quot;
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded shrink-0">
+                  <span className="text-[10px] font-bold bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full shrink-0">
                     جديد
                   </span>
                 </div>
@@ -172,23 +172,23 @@ export default function ProductAutocomplete({
                 key={item.id}
                 onClick={() => handleSelect(item.name)}
                 onMouseEnter={() => setFocusedIndex(index)}
-                className={`px-3 py-2 cursor-pointer transition-colors flex items-center justify-between gap-2 ${
-                  isFocused || isExactSelected ? 'bg-slate-100 text-slate-900' : 'hover:bg-slate-50 text-slate-800'
+                className={`px-3.5 py-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 min-h-[40px] ${
+                  isFocused || isExactSelected ? 'bg-neutral-100 text-neutral-900 font-bold' : 'hover:bg-neutral-50 text-neutral-800'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <Package className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                   <span className="text-xs sm:text-sm font-medium truncate">{item.name}</span>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   {item.category && (
-                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-semibold text-neutral-500 bg-neutral-100 border border-neutral-200/60 px-2 py-0.5 rounded-full">
                       {item.category}
                     </span>
                   )}
                   {isExactSelected && (
-                    <Check className="w-3.5 h-3.5 text-slate-800 shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-neutral-900 shrink-0" />
                   )}
                 </div>
               </div>

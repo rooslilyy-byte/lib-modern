@@ -3,20 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Edit3, 
   User, 
   Phone, 
   Plus, 
   Trash2, 
-  Minus, 
   Save, 
-  CheckSquare, 
-  Square,
-  CheckCircle2,
-  PackageCheck,
   AlertCircle
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { useLanguage } from '@/lib/languageContext';
 import ProductAutocomplete from './ProductAutocomplete';
 
 interface EditDemandModalProps {
@@ -33,7 +28,9 @@ interface EditDemandModalProps {
       quantity: number;
       is_in_stock?: boolean;
       is_delivered?: boolean;
-    }[]
+    }[],
+    avanceAmount?: number,
+    totalAmount?: number
   ) => Promise<void>;
 }
 
@@ -43,13 +40,20 @@ export default function EditDemandModal({
   onClose,
   onSave,
 }: EditDemandModalProps) {
+  const { t } = useLanguage();
   const [clientName, setClientName] = useState(demand.client?.name || '');
   const [clientPhone, setClientPhone] = useState(demand.client?.phone || '');
+  const [avanceAmount, setAvanceAmount] = useState<string>(
+    demand.avance_amount !== undefined && demand.avance_amount > 0 ? String(demand.avance_amount) : ''
+  );
+  const [totalAmount, setTotalAmount] = useState<string>(
+    demand.total_amount !== undefined && demand.total_amount > 0 ? String(demand.total_amount) : ''
+  );
   const [items, setItems] = useState<
     {
       id?: string;
       product_name: string;
-      quantity: number;
+      quantity: number | string;
       is_in_stock: boolean;
       is_delivered: boolean;
     }[]
@@ -70,7 +74,19 @@ export default function EditDemandModal({
         }))
       );
     }
+    if (demand.avance_amount !== undefined && demand.avance_amount > 0) {
+      setAvanceAmount(String(demand.avance_amount));
+    }
+    if (demand.total_amount !== undefined && demand.total_amount > 0) {
+      setTotalAmount(String(demand.total_amount));
+    }
   }, [demand]);
+
+  const handlePreventNegativeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
+      e.preventDefault();
+    }
+  };
 
   const handleItemChange = (
     index: number,
@@ -90,11 +106,9 @@ export default function EditDemandModal({
     const newItems = [...items];
     const updated = { ...newItems[index], [field]: value };
 
-    // Auto logic: if delivered, set in_stock = true
     if (field === 'is_delivered' && value === true) {
       updated.is_in_stock = true;
     }
-    // If not in stock, cannot be delivered
     if (field === 'is_in_stock' && value === false) {
       updated.is_delivered = false;
     }
@@ -128,23 +142,14 @@ export default function EditDemandModal({
     e.preventDefault();
     setErrorMessage('');
 
-    // Pre-submit validation check for duplicates
-    const nameCounts: Record<string, number> = {};
-    for (const item of items) {
-      const name = item.product_name.trim().toLowerCase();
-      if (!name) continue;
-      nameCounts[name] = (nameCounts[name] || 0) + 1;
-    }
+    const itemMap: Record<string, {
+      id?: string;
+      product_name: string;
+      quantity: number;
+      is_in_stock: boolean;
+      is_delivered: boolean;
+    }> = {};
 
-    const duplicateNames = Object.keys(nameCounts).filter(name => nameCounts[name] > 1);
-    if (duplicateNames.length > 0) {
-      const rawDupName = items.find(i => i.product_name.trim().toLowerCase() === duplicateNames[0])?.product_name || duplicateNames[0];
-      setErrorMessage(`الكتاب "${rawDupName}" مكرر في عدة أسطر. يرجى تعديل العدد (+/-) في السطر الحالي بدلاً من إضافة سطر مكرر.`);
-      return;
-    }
-
-    // Deduplicate items: combine quantities for identical product titles
-    const itemMap: Record<string, typeof items[0]> = {};
     for (const item of items) {
       const name = item.product_name.trim();
       if (!name) continue;
@@ -169,13 +174,18 @@ export default function EditDemandModal({
       return;
     }
 
+    const numAvance = avanceAmount !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : undefined;
+    const numTotal = totalAmount !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : undefined;
+
     setIsSaving(true);
     try {
       await onSave(
         demand.id,
         clientName.trim(),
         clientPhone.trim(),
-        validItems
+        validItems,
+        numAvance,
+        numTotal
       );
       onClose();
     } catch (err: any) {
@@ -187,205 +197,216 @@ export default function EditDemandModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 font-cairo dir-rtl">
-      <div className="bg-white border border-slate-200 text-slate-900 rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
+    <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 font-cairo dir-rtl">
+      <div className="bg-white/95 backdrop-blur-md border border-neutral-200/80 text-neutral-900 rounded-3xl max-w-xl w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
-        {/* Header */}
-        <div className="bg-white border-b border-slate-200 p-3.5 sm:p-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <Edit3 className="w-4 h-4" />
+        {/* Header with Custom White Logo */}
+        <div className="bg-white border-b border-neutral-100 p-4 sm:p-5 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+              <img
+                src="/logo-lib-modern-alt.jpg"
+                alt="Lib Moderne"
+                className="h-full w-auto object-contain"
+              />
             </div>
-            <h3 className="font-bold text-sm sm:text-base text-slate-900 truncate">تعديل الطلب</h3>
+            <div>
+              <h3 className="font-extrabold text-sm sm:text-base text-neutral-900 truncate">تعديل الطلب والخصاص</h3>
+              <p className="text-xs text-neutral-400 font-medium">تعديل معلومات الزبون وحالة المستلزمات</p>
+            </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+            className="text-neutral-400 hover:text-neutral-700 p-2 rounded-full hover:bg-neutral-100 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Scrollable Form */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           
           {errorMessage && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-bold">
-              {errorMessage}
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold p-3.5 rounded-2xl flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Client Info */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-            <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-              <User className="w-4 h-4 text-slate-600" />
-              <span>معلومات الزبون</span>
-            </h4>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">اسم الزبون الكامل:</label>
-                <input
-                  type="text"
-                  required
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-slate-800 font-medium min-h-[44px]"
-                />
-              </div>
+          {/* Customer info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-orange-500" />
+                <span>اسم الزبون:</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs"
+              />
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">رقم الهاتف:</label>
-                <input
-                  type="text"
-                  required
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-slate-800 font-mono dir-ltr text-right min-h-[44px]"
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-orange-500" />
+                <span>رقم الهاتف:</span>
+              </label>
+              <input
+                type="tel"
+                required
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
+              />
             </div>
           </div>
 
-          {/* Items List */}
-          <div className="space-y-3">
+          {/* Items list */}
+          <div className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-800">
-                قائمة الكتب والمستلزمات المطلوبة:
+              <label className="block text-xs font-bold text-neutral-700">
+                قائمة الكتب والمستلزمات:
               </label>
-              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
-                عدد العناصر: {items.length}
-              </span>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="inline-flex items-center gap-1 text-xs font-bold text-neutral-800 hover:text-orange-600 bg-neutral-100 hover:bg-neutral-200 px-3 py-1 rounded-full transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة مادة</span>
+              </button>
             </div>
 
-            {items.map((item, idx) => {
-              const selectedOtherNames = items
-                .filter((_, i) => i !== idx)
-                .map(it => it.product_name.trim().toLowerCase())
-                .filter(Boolean);
-
-              const availableProducts = masterProducts.filter(
-                p => !selectedOtherNames.includes(p.name.trim().toLowerCase())
-              );
-
-              return (
-                <div key={idx} className="bg-slate-50 border border-slate-200 p-3 sm:p-4 rounded-xl space-y-3">
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                    
-                    {/* Product Name Autocomplete */}
-                    <div className="flex-1 relative">
+            <div className="space-y-2.5">
+              {items.map((item, idx) => (
+                <div key={idx} className="bg-neutral-50/80 border border-neutral-200/80 rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
                       <ProductAutocomplete
-                        required
                         value={item.product_name}
                         onChange={(val) => handleItemChange(idx, 'product_name', val)}
-                        masterProducts={availableProducts}
-                        placeholder="اسم الكتاب أو المستلزم..."
+                        masterProducts={masterProducts}
+                        placeholder="اسم الكتاب أو المادة..."
+                        required
                       />
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-start gap-2">
-                      {/* Quantity Stepper */}
-                      <div className="w-32 flex items-center border border-slate-300 rounded-xl bg-white overflow-hidden shrink-0 min-h-[44px]">
-                        <button
-                          type="button"
-                          onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity - 1))}
-                          disabled={item.quantity <= 1}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-40 transition-opacity"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onKeyDown={(e) => {
-                            if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
-                              e.preventDefault();
-                            }
-                          }}
-                          onChange={(e) => handleItemChange(idx, 'quantity', Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-full text-center text-sm font-black text-slate-900 focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleItemChange(idx, 'quantity', Math.max(1, item.quantity + 1))}
-                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 font-bold min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <div className="w-20">
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        placeholder="1"
+                        value={item.quantity || ''}
+                        onKeyDown={handlePreventNegativeKey}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
+                        }}
+                        className="w-full bg-white border border-neutral-200 rounded-xl px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-9"
+                      />
+                    </div>
 
-                      {/* Delete Item Button */}
+                    {items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center border border-rose-200 sm:border-0 bg-white sm:bg-transparent"
-                        title="حذف هذا الكتاب"
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                    </div>
+                    )}
                   </div>
 
-                  {/* State Toggles (In Stock / Delivered) */}
-                  <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-slate-200/60 text-xs font-semibold">
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900 min-h-[40px] px-1">
+                  {/* Status checks */}
+                  <div className="flex items-center gap-4 text-xs font-bold text-neutral-700 pt-1 border-t border-neutral-200/50">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={item.is_in_stock}
                         onChange={(e) => handleItemChange(idx, 'is_in_stock', e.target.checked)}
-                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 w-5 h-5"
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 accent-blue-600 cursor-pointer"
                       />
                       <span>متوفر بالمتجر</span>
                     </label>
 
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900 min-h-[40px] px-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={item.is_delivered}
                         onChange={(e) => handleItemChange(idx, 'is_delivered', e.target.checked)}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-5 h-5"
+                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
                       />
                       <span>تم التسليم للزبون</span>
                     </label>
                   </div>
-
                 </div>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 border border-dashed border-slate-300 transition-colors min-h-[44px]"
-            >
-              <Plus className="w-4 h-4" />
-              <span>إضافة كتاب أو مستلزم جديد للطلب</span>
-            </button>
+              ))}
+            </div>
           </div>
 
-          {/* Sticky Bottom Actions Bar */}
-          <div className="sticky bottom-0 bg-white border-t border-slate-200 pt-3 flex items-center justify-end gap-2.5 z-10 -mx-4 -mb-4 p-3.5 shadow-md">
+          {/* Financials / Avance Section */}
+          <div className="pt-2 border-t border-neutral-100 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center justify-between">
+                <span>التسبيق (Avance):</span>
+                <span className="text-[10px] text-neutral-400 font-normal">درهم (DH)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0"
+                value={avanceAmount}
+                onKeyDown={handlePreventNegativeKey}
+                onChange={(e) => setAvanceAmount(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center justify-between">
+                <span>المبلغ الإجمالي (Total):</span>
+                <span className="text-[10px] text-neutral-400 font-normal">اختياري (DH)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="0"
+                value={totalAmount}
+                onKeyDown={handlePreventNegativeKey}
+                onChange={(e) => setTotalAmount(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-bold text-xs sm:text-sm px-4 h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-neutral-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm rounded-lg transition-colors border border-slate-200"
+              className="px-5 py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
             >
-              إلغاء
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm h-9 px-4 rounded-lg shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 text-xs sm:text-sm font-bold bg-neutral-900 hover:bg-black text-white rounded-full shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
             >
-              <Save className="w-4 h-4" />
-              <span>{isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}</span>
+              <Save className="w-4 h-4 text-orange-500" />
+              <span>{isSaving ? 'جاري الحفظ...' : t('common.save')}</span>
             </button>
           </div>
 
         </form>
-
       </div>
     </div>
   );

@@ -8,8 +8,18 @@
 
 body {
   font-family: var(--font-cairo), system-ui, -apple-system, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #F8F9FA;
+  color: #171717;
+}
+
+/* Custom Floating Card Utility */
+@layer components {
+  .floating-card {
+    @apply bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl transition-all duration-300;
+  }
+  .floating-card-hover {
+    @apply bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_35px_rgb(0,0,0,0.08)];
+  }
 }
 
 /* Scrollbar styling */
@@ -22,7 +32,7 @@ body {
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;

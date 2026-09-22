@@ -3,7 +3,6 @@
 import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { 
-  BookOpen, 
   Clock, 
   AlertCircle, 
   CheckCircle2, 
@@ -11,9 +10,11 @@ import {
   ArrowLeft,
   UserPlus,
   FileSpreadsheet,
-  PackageCheck
+  PackageCheck,
+  Layers
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
+import { useLanguage } from '@/lib/languageContext';
 
 interface DashboardOverviewProps {
   demands: ClientDemand[];
@@ -24,6 +25,8 @@ interface DashboardOverviewProps {
 export default function DashboardOverview({
   demands,
 }: DashboardOverviewProps) {
+  const { t } = useLanguage();
+
   const stats = useMemo(() => {
     const totalDemands = demands.length;
     const pendingDemands = demands.filter(d => d.status === 'pending').length;
@@ -53,163 +56,195 @@ export default function DashboardOverview({
   }, [demands]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 sm:space-y-6">
       
-      {/* 1. Header Banner */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <h2 className="text-base sm:text-lg font-bold text-slate-900">لوحة تحكّم المكتبة</h2>
-          <span className="bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">
-            موسم الدخول المدرسي
-          </span>
+      {/* 1. Header Banner Floating Glass Card with Custom White Logo */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+            <img
+              src="/logo-lib-modern-alt.jpg"
+              alt="Lib Moderne - المكتبة العصرية"
+              className="h-full w-auto object-contain"
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-base sm:text-xl font-black text-neutral-900 tracking-tight">
+                {t('dash.title')}
+              </h2>
+              <span className="bg-orange-50 text-orange-600 border border-orange-200/80 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 rounded-full">
+                {t('dash.season')}
+              </span>
+            </div>
+            <p className="text-xs text-neutral-500 font-medium mt-0.5">
+              {t('brand.tagline')}
+            </p>
+          </div>
         </div>
 
-        <Link
-          href="/customers"
-          className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold h-9 px-3.5 rounded-xl flex items-center justify-center gap-1.5 transition-colors shrink-0"
-        >
-          <Plus className="w-4 h-4 text-white shrink-0" />
-          <span>إضافة طلب جديد</span>
-        </Link>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <Link
+            href="/customers"
+            className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white text-xs sm:text-sm font-bold h-11 px-6 rounded-full flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+          >
+            <Plus className="w-4 h-4 text-orange-500 shrink-0" />
+            <span>{t('dash.new_demand')}</span>
+          </Link>
+        </div>
       </div>
 
-      {/* 2. Professional ERP KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 2. Floating KPI Summary Cards with Status Deep-Linking */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
         
-        {/* Total Demands Card */}
+        {/* Total Demands Card -> links to ?status=all */}
         <Link 
-          href="/customers"
-          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
+          href="/customers?status=all"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 block group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-neutral-300/80"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-slate-900 transition-colors">إجمالي الطلبات</span>
-            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
-              <BookOpen className="w-4 h-4" />
+            <span className="text-xs font-bold text-neutral-500 group-hover:text-neutral-900 transition-colors">
+              {t('dash.total_demands')}
+            </span>
+            <div className="w-9 h-9 rounded-2xl bg-neutral-100 flex items-center justify-center text-neutral-800 transition-colors group-hover:bg-neutral-900 group-hover:text-white">
+              <Layers className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.totalDemands}</span>
-            <span className="text-xs text-slate-500 font-medium">طلب</span>
+          <div className="mt-3 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{stats.totalDemands}</span>
+            <span className="text-xs text-neutral-500 font-bold">طلب مسجل</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>مجموع القطع المطلوبة:</span>
-            <span className="font-bold text-slate-800">{stats.totalItemsCount} قطعة</span>
+          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
+            <span>{t('dash.total_items_needed')}</span>
+            <span className="font-bold text-neutral-800">{stats.totalItemsCount} {t('common.pieces')}</span>
           </div>
         </Link>
 
-        {/* Pending Card */}
+        {/* Pending Card -> links to ?status=waiting */}
         <Link 
-          href="/customers"
-          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
+          href="/customers?status=waiting"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 block group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-rose-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">قيد الانتظار</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-700">
+            <span className="text-xs font-bold text-neutral-500 group-hover:text-rose-600 transition-colors">
+              {t('dash.pending_demands')}
+            </span>
+            <div className="w-9 h-9 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 transition-colors group-hover:bg-rose-500 group-hover:text-white">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.pendingDemands}</span>
-            <span className="text-xs text-slate-500 font-medium">طلب معلق</span>
+          <div className="mt-3 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{stats.pendingDemands}</span>
+            <span className="text-xs text-neutral-500 font-bold">طلب معلق</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تنتظر الشراء للمحل</span>
+          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
+            <span>{t('dash.awaiting_purchase')}</span>
           </div>
         </Link>
 
-        {/* Partial Card */}
+        {/* Partial Card -> links to ?status=partial */}
         <Link 
-          href="/customers"
-          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
+          href="/customers?status=partial"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 block group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-amber-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">تسليم جزئي</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-700">
+            <span className="text-xs font-bold text-neutral-500 group-hover:text-amber-600 transition-colors">
+              {t('dash.partial_demands')}
+            </span>
+            <div className="w-9 h-9 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 transition-colors group-hover:bg-amber-500 group-hover:text-white">
               <AlertCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.partialDemands}</span>
-            <span className="text-xs text-slate-500 font-medium">مستلم جزئياً</span>
+          <div className="mt-3 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{stats.partialDemands}</span>
+            <span className="text-xs text-neutral-500 font-bold">مستلم جزئياً</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>بعض العناصر متوفرة</span>
+          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
+            <span>{t('dash.some_ready')}</span>
           </div>
         </Link>
 
-        {/* Completed Card */}
+        {/* Completed Card -> links to ?status=ready */}
         <Link 
-          href="/customers"
-          className="bg-white border border-slate-200 hover:border-slate-300 transition-colors rounded-xl p-3.5 shadow-sm block group"
+          href="/customers?status=ready"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 block group transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-emerald-200"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">مكتمل المسلمات</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
+            <span className="text-xs font-bold text-neutral-500 group-hover:text-emerald-600 transition-colors">
+              {t('dash.completed_demands')}
+            </span>
+            <div className="w-9 h-9 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 transition-colors group-hover:bg-emerald-500 group-hover:text-white">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-slate-900">{stats.completedDemands}</span>
-            <span className="text-xs text-slate-500 font-medium">تم التسليم بالكامل</span>
+          <div className="mt-3 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{stats.completedDemands}</span>
+            <span className="text-xs text-neutral-500 font-bold">تم تسليمه</span>
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span>تم تسليم جميع الكتب</span>
+          <div className="mt-3 pt-3 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
+            <span>{t('dash.all_delivered')}</span>
           </div>
         </Link>
 
       </div>
 
-      {/* 3. Prominent Quick Action Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+      {/* 3. Quick Action Floating Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 w-full">
         
         {/* Card 1: Add Client & Demand */}
         <Link
           href="/customers"
-          className="bg-slate-900 hover:bg-slate-800 text-white border border-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-neutral-900 text-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl flex flex-col justify-between space-y-4 group min-h-[150px] w-full"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 text-sky-400 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
-              <UserPlus className="w-6 h-6 text-sky-400" />
+            <div className="w-12 h-12 rounded-2xl bg-neutral-800 border border-neutral-700 text-orange-500 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <UserPlus className="w-6 h-6 text-orange-500" />
             </div>
-            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 group-hover:text-white group-hover:bg-neutral-700 transition-all">
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            </div>
           </div>
           <div>
-            <h3 className="font-black text-white text-base sm:text-lg">إضافة زبون جديد</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">تسجيل خصاص مدرسي جديد لزبون</p>
+            <h3 className="font-extrabold text-white text-base sm:text-lg">{t('dash.add_client_card_title')}</h3>
+            <p className="text-xs text-neutral-400 font-medium mt-1">{t('dash.add_client_card_desc')}</p>
           </div>
         </Link>
 
         {/* Card 2: A4 Purchase Report */}
         <Link
           href="/reports"
-          className="bg-white border border-slate-200 hover:border-slate-900 text-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 hover:border-neutral-300 text-neutral-900 rounded-3xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl flex flex-col justify-between space-y-4 group min-h-[150px] w-full"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
-              <FileSpreadsheet className="w-6 h-6 text-slate-900" />
+            <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 border border-orange-100 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <FileSpreadsheet className="w-6 h-6 text-orange-600" />
             </div>
-            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 group-hover:bg-neutral-200 transition-all">
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            </div>
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base sm:text-lg">تقرير المشتريات A4</h3>
-            <p className="text-xs text-slate-500 font-medium mt-1">طباعة ورقة الخصاص للموردين</p>
+            <h3 className="font-extrabold text-neutral-900 text-base sm:text-lg">{t('dash.a4_report_card_title')}</h3>
+            <p className="text-xs text-neutral-500 font-medium mt-1">{t('dash.a4_report_card_desc')}</p>
           </div>
         </Link>
 
         {/* Card 3: Add & Allocate Stock */}
         <Link
           href="/stock"
-          className="bg-white border border-slate-200 hover:border-slate-900 text-slate-900 rounded-xl p-5 sm:p-6 shadow-sm transition-all active:scale-[0.98] flex flex-col justify-between space-y-4 group min-h-[140px] w-full"
+          className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 hover:border-neutral-300 text-neutral-900 rounded-3xl p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl flex flex-col justify-between space-y-4 group min-h-[150px] w-full"
         >
           <div className="flex items-center justify-between">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 text-slate-900 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
-              <PackageCheck className="w-6 h-6 text-slate-900" />
+            <div className="w-12 h-12 rounded-2xl bg-neutral-100 text-neutral-900 border border-neutral-200/60 flex items-center justify-center font-bold group-hover:scale-105 transition-transform shrink-0">
+              <PackageCheck className="w-6 h-6 text-neutral-900" />
             </div>
-            <ArrowLeft className="w-5 h-5 text-slate-400 group-hover:-translate-x-1 transition-transform shrink-0" />
+            <div className="w-9 h-9 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 group-hover:bg-neutral-200 transition-all">
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            </div>
           </div>
           <div>
-            <h3 className="font-black text-slate-900 text-base sm:text-lg">استقبال السلع والمخزون</h3>
-            <p className="text-xs text-slate-500 font-medium mt-1">تأكيد وصول الكتب وتوزيعها فوراً</p>
+            <h3 className="font-extrabold text-neutral-900 text-base sm:text-lg">{t('dash.stock_card_title')}</h3>
+            <p className="text-xs text-neutral-500 font-medium mt-1">{t('dash.stock_card_desc')}</p>
           </div>
         </Link>
 

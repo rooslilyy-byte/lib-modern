@@ -21,6 +21,8 @@ import {
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
+import { LanguageProvider, useLanguage } from '@/lib/languageContext';
+import { Menu, PanelLeftOpen, Phone, Globe } from 'lucide-react';
 
 // Module-level SWR Cache for Instant (<10ms) Tab Navigation
 let globalAppCache: {
@@ -56,12 +58,17 @@ interface AppShellProps {
   children: (data: AppShellData) => React.ReactNode;
 }
 
-export default function AppShell({ children }: AppShellProps) {
+function AppShellContent({ children }: AppShellProps) {
   const router = useRouter();
+  const { language, setLanguage, toggleLanguage, t, dir } = useLanguage();
   const [activeBatch, setActiveBatch] = useState<PurchaseBatch | null>(globalAppCache.activeBatch);
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>(globalAppCache.masterProducts);
   const [demands, setDemands] = useState<ClientDemand[]>(globalAppCache.demands);
   const [isLoading, setIsLoading] = useState<boolean>(!globalAppCache.isInitialized);
+
+  // Sidebar controls
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
 
   const loadData = useCallback(async (isSilent = globalAppCache.isInitialized) => {
     if (!isSilent) {
@@ -74,7 +81,6 @@ export default function AppShell({ children }: AppShellProps) {
       setMasterProducts(fullData.masterProducts);
       setDemands(fullData.demands);
 
-      // Update global SWR cache
       globalAppCache = {
         activeBatch: fullData.activeBatch,
         masterProducts: fullData.masterProducts,
@@ -92,18 +98,17 @@ export default function AppShell({ children }: AppShellProps) {
     loadData();
   }, [loadData]);
 
-  const handleCreateDemand = async (name: string, phone: string, items: any[]) => {
-    await createClientDemand(name, phone, items);
+  const handleCreateDemand = async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+    await createClientDemand(name, phone, items, avanceAmount, totalAmount);
     await loadData(true);
   };
 
-  const handleUpdateDemand = async (id: string, name: string, phone: string, items: any[]) => {
-    await updateClientDemand(id, name, phone, items);
+  const handleUpdateDemand = async (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+    await updateClientDemand(id, name, phone, items, avanceAmount, totalAmount);
     await loadData(true);
   };
 
   const handleUpdateItemState = async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean }) => {
-    // Optimistic item update
     setDemands(prev => {
       const next = prev.map(dem => ({
         ...dem,
@@ -118,7 +123,6 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleAutoAllocateStock = async (productName: string, receivedQty: number) => {
-    // OPTIMISTIC LOCAL ALLOCATION UPDATE WITH PROGRESSIVE FULFILLMENT
     const cleanName = productName.trim().toLowerCase();
     let remaining = Math.max(1, Math.floor(receivedQty));
 
@@ -164,7 +168,6 @@ export default function AppShell({ children }: AppShellProps) {
 
   const handleMarkEnRupture = async (productName: string) => {
     const cleanName = productName.trim().toLowerCase();
-    // Optimistic item update to en_rupture
     setDemands(prev => {
       const updated = prev.map(dem => {
         if (!dem.items) return dem;
@@ -189,7 +192,6 @@ export default function AppShell({ children }: AppShellProps) {
 
   const handleRestoreEnRupture = async (productName: string) => {
     const cleanName = productName.trim().toLowerCase();
-    // Optimistic item update back to pending
     setDemands(prev => {
       const updated = prev.map(dem => {
         if (!dem.items) return dem;
@@ -213,7 +215,6 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleDeleteDemand = async (id: string) => {
-    // Optimistically filter out deleted demand
     setDemands(prev => {
       const next = prev.filter(d => d.id !== id && d.client?.id !== id);
       globalAppCache.demands = next;
@@ -225,7 +226,6 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const handleDeleteBulkCustomers = async (clientIds: string[]) => {
-    // Optimistically filter out deleted clients
     setDemands(prev => {
       const next = prev.filter(d => d.client?.id && !clientIds.includes(d.client.id));
       globalAppCache.demands = next;
@@ -242,15 +242,95 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 flex font-cairo dir-rtl overflow-x-hidden" suppressHydrationWarning>
-      <Sidebar isSupabaseActive={isSupabaseConfigured} />
+    <div className={`min-h-[100dvh] bg-[#F8F9FA] flex font-cairo overflow-x-hidden ${dir === 'rtl' ? 'dir-rtl' : 'dir-ltr'}`} suppressHydrationWarning>
+      
+      {/* Sidebar Component */}
+      <Sidebar 
+        isSupabaseActive={isSupabaseConfigured}
+        isOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        isDesktopCollapsed={isDesktopCollapsed}
+        onToggleDesktopCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
+      />
 
-      <div className="flex-1 lg:mr-64 flex flex-col min-h-[100dvh] pt-14 lg:pt-0 w-full" suppressHydrationWarning>
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6" suppressHydrationWarning>
+      {/* Main Content Area */}
+      <div 
+        className={`flex-1 flex flex-col min-h-[100dvh] w-full transition-all duration-300 ${
+          isDesktopCollapsed ? 'lg:ml-0' : 'lg:ml-64'
+        }`}
+        suppressHydrationWarning
+      >
+        {/* Top Header Navbar with Mobile Toggle, Central Title, Phone Dial */}
+        <header className="sticky top-0 z-20 bg-orange-500 text-white shadow-md border-b border-orange-600 px-3 sm:px-6 py-3 flex items-center justify-between no-print gap-2">
+          
+          {/* Left Controls: Hamburger for Mobile & Show Sidebar for Collapsed Desktop */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="lg:hidden p-2 text-white hover:bg-orange-600 rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+              title="إظهار القائمة الجانبية"
+            >
+              <Menu className="w-7 h-7 text-white" />
+            </button>
+
+            {/* Desktop Expand Button (Shown when sidebar is collapsed) */}
+            {isDesktopCollapsed && (
+              <button
+                onClick={() => setIsDesktopCollapsed(false)}
+                className="hidden lg:flex items-center gap-2 p-2 rounded-full text-white hover:bg-orange-600 transition-all min-h-[44px] min-w-[44px] justify-center"
+                title="إظهار القائمة الجانبية"
+              >
+                <PanelLeftOpen className="w-7 h-7 text-white" />
+              </button>
+            )}
+
+            {/* Top Brand Tag */}
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center overflow-hidden shadow-sm shrink-0">
+                <img src="/logo-lib-modern-alt.jpg" alt="Lib Moderne" className="h-full w-auto object-contain" />
+              </div>
+              <div className="hidden xl:block">
+                <h2 className="font-black text-xs text-white leading-tight">المكتبة العصرية</h2>
+                <span className="text-[10px] text-orange-100 font-bold block leading-none">Lib Moderne</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Central Title */}
+          <div className="flex-1 text-center px-2 min-w-0">
+            <h1 className="text-base sm:text-xl md:text-2xl font-black text-white tracking-tight leading-tight drop-shadow-xs truncate">
+              نظام إدارة المكتبة العصرية
+            </h1>
+            <p className="hidden md:block text-[11px] font-bold text-orange-100 mt-0.5">
+              Lib Moderne • نظام تدبير وتوزيع خصاصات الدخول المدرسي
+            </p>
+          </div>
+
+          {/* Right Controls: Quick Contacts */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Phone Quick Dial Pill */}
+            <a
+              dir="ltr"
+              href="tel:+212660563371"
+              className="flex items-center gap-2 text-xs sm:text-sm font-mono font-black text-orange-600 bg-white hover:bg-orange-50 px-3 sm:px-4 py-2 rounded-full transition-all shadow-sm border border-white/80 min-h-[40px]"
+              title="اتصال سريع بالمكتبة"
+            >
+              <Phone className="w-5 h-5 text-orange-600 shrink-0" />
+              <span className="hidden sm:inline">06.60.56.33.71</span>
+            </a>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6" suppressHydrationWarning>
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-24 space-y-3">
-              <div className="w-10 h-10 border-4 border-slate-800 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-sm font-bold text-slate-600">جاري تحميل بيانات شركة إيزوران...</p>
+            <div className="flex flex-col items-center justify-center py-28 space-y-4">
+              <div className="w-12 h-12 border-4 border-neutral-900 border-t-orange-500 rounded-full animate-spin shadow-md"></div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-neutral-800">جاري تحميل بيانات المكتبة العصرية...</p>
+                <p className="text-xs text-neutral-400 mt-1 font-semibold">Lib Moderne POS</p>
+              </div>
             </div>
           ) : (
             children({
@@ -272,15 +352,27 @@ export default function AppShell({ children }: AppShellProps) {
           )}
         </main>
 
-        <footer className="bg-white text-slate-500 text-xs py-4 text-center border-t border-slate-200 mt-auto no-print">
-          <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="font-bold text-slate-700">
-              شركة إيزوران — الهاتف: <span dir="ltr" className="font-mono text-slate-700">+212 661-556418</span>
+        {/* Footer */}
+        <footer className="bg-white/80 backdrop-blur-md text-neutral-500 text-xs py-4 border-t border-neutral-200/80 mt-auto no-print">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+            <p className="font-bold text-neutral-800 flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+              <span>{t('brand.full')}</span>
+              <span className="text-neutral-300">•</span>
+              <span className="text-neutral-600">الهاتف:</span>
+              <span dir="ltr" className="font-mono text-neutral-900 font-bold">06.60.56.33.71 / 06.60.31.98.68</span>
             </p>
-            <p>© {new Date().getFullYear()} نظام متابعة وتوزيع خصاصات الدخول المدرسي POS.</p>
+            <p className="text-neutral-400 font-medium">© {new Date().getFullYear()} Lib Moderne POS.</p>
           </div>
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function AppShell({ children }: AppShellProps) {
+  return (
+    <LanguageProvider>
+      <AppShellContent>{children}</AppShellContent>
+    </LanguageProvider>
   );
 }

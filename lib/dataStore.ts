@@ -239,10 +239,12 @@ export async function getClientDemands(batchId?: string, forceRefresh = false): 
 export async function createClientDemand(
   clientName: string,
   clientPhone: string,
-  items: { product_name: string; quantity: number }[]
+  items: { product_name: string; quantity: number }[],
+  avance_amount?: number,
+  total_amount?: number
 ): Promise<ClientDemand | any> {
   if (isBrowser) {
-    await fetchStoreApi('create_demand', { clientName, clientPhone, items });
+    await fetchStoreApi('create_demand', { clientName, clientPhone, items, avance_amount, total_amount });
     return;
   }
 
@@ -410,7 +412,7 @@ export async function autoAllocateStock(
     return Object.values(allocatedMap).map(c => {
       let rawPhone = c.phone.replace(/\D/g, '');
       if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
-      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من شركة إيزوران أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: شركة إيزوران\nالهاتف: +212 661-556418`;
+      const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${c.clientName}،\n\nنخبركم من المكتبة العصرية (Lib Moderne) أن كتاب / مستلزم: "${cleanName}" (عدد: ${c.totalFulfilled}) الذي طلبتموه قد وصل للمحل وهو جاهز للتسليم!\n\nالمكان: المكتبة العصرية - Lib Moderne\nالهاتف: 06.60.56.33.71 / 06.60.31.98.68`;
       return {
         clientName: c.clientName,
         phone: c.phone,
@@ -508,10 +510,12 @@ export async function updateClientDemand(
     quantity: number;
     is_in_stock?: boolean;
     is_delivered?: boolean;
-  }[]
+  }[],
+  avance_amount?: number,
+  total_amount?: number
 ): Promise<ClientDemand | any> {
   if (isBrowser) {
-    await fetchStoreApi('update_demand', { demandId, clientName, clientPhone, items });
+    await fetchStoreApi('update_demand', { demandId, clientName, clientPhone, items, avance_amount, total_amount });
     return;
   }
 

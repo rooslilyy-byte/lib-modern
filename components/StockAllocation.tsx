@@ -5,14 +5,17 @@ import {
   PackageCheck, 
   CheckCircle2, 
   Search, 
-  X,
-  Ban,
-  ArrowUpDown,
-  RotateCcw,
-  AlertCircle
+  X, 
+  Ban, 
+  ArrowUpDown, 
+  RotateCcw, 
+  AlertCircle,
+  Plus,
+  Package
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { compareProductNames } from '@/lib/sortUtils';
+import { useLanguage } from '@/lib/languageContext';
 
 type ViewTab = 'normal' | 'rupture';
 type SortOption = 'alphabetical' | 'oldest' | 'newest';
@@ -47,15 +50,14 @@ interface StockAllocationProps {
 export default function StockAllocation({
   demands,
   masterProducts,
-  onUpdateItemState,
   onAutoAllocateStock,
   onMarkEnRupture,
   onRestoreEnRupture,
 }: StockAllocationProps) {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<ViewTab>('normal');
   const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
   const [searchQuery, setSearchQuery] = useState('');
-  const [processingProduct, setProcessingProduct] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Modal State
@@ -64,7 +66,6 @@ export default function StockAllocation({
   const [isProcessingModal, setIsProcessingModal] = useState(false);
   const modalInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Local demands state for instantaneous UI updates without snapping back
   const [localDemands, setLocalDemands] = useState<ClientDemand[]>(demands);
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function StockAllocation({
     }
   }, [modalProduct]);
 
-  // 1. Calculate Active Missing Products Aggregation (Partition Normal vs En Rupture)
+  // Calculate Active Missing Products Aggregation
   const { normalProductsList, ruptureProductsList } = useMemo(() => {
     const normalMap: Record<string, AggregatedProduct> = {};
     const ruptureMap: Record<string, AggregatedProduct> = {};
@@ -115,7 +116,7 @@ export default function StockAllocation({
           const stillNeeded = Math.max(0, totalQty - fulfilledQty);
 
           if (stillNeeded <= 0) {
-            continue; // Fully fulfilled row, no longer missing
+            continue;
           }
 
           targetMap[key].totalDemanded += totalQty;
@@ -161,26 +162,20 @@ export default function StockAllocation({
       if (sort === 'alphabetical') {
         return compareProductNames(a.productName, b.productName);
       }
-
       if (sort === 'oldest') {
-        // Ascending order based on initial demand creation time
         const timeA = new Date(a.initialDemandCreatedAt).getTime() || 0;
         const timeB = new Date(b.initialDemandCreatedAt).getTime() || 0;
         return timeA - timeB;
       }
-
       if (sort === 'newest') {
-        // Descending order based on latest demand creation time
         const timeA = new Date(a.latestDemandCreatedAt).getTime() || 0;
         const timeB = new Date(b.latestDemandCreatedAt).getTime() || 0;
         return timeB - timeA;
       }
-
       return 0;
     });
   };
 
-  // Filter and sort products based on active tab, search query, and selected sort
   const displayedProducts = useMemo(() => {
     const baseList = activeTab === 'normal' ? normalProductsList : ruptureProductsList;
 
@@ -195,457 +190,345 @@ export default function StockAllocation({
     return sortAggregatedProducts(filtered, sortBy);
   }, [activeTab, normalProductsList, ruptureProductsList, searchQuery, sortBy]);
 
-  // Metrics for active view
   const currentTotalItems = displayedProducts.length;
   const currentTotalPieces = displayedProducts.reduce((acc, p) => acc + p.totalMissingQty, 0);
 
-  // Summary counts for badges
-  const totalNormalItems = normalProductsList.length;
-  const totalRuptureItems = ruptureProductsList.length;
-
-  // Handle Modal Open
-  const handleOpenModal = (productName: string, totalMissingQty: number) => {
-    setModalProduct({ productName, totalMissingQty });
-    setModalQty('');
+  const handleOpenAllocationModal = (product: AggregatedProduct) => {
+    setModalProduct({
+      productName: product.productName,
+      totalMissingQty: product.totalMissingQty,
+    });
+    setModalQty(product.totalMissingQty.toString());
   };
 
-  // Handle Mark Product En Rupture
-  const handleMarkEnRupture = async (productName: string) => {
-    const cleanName = productName.trim().toLowerCase();
-    setProcessingProduct(productName);
-
-    // 1. Immediately & synchronously update local React state
-    setLocalDemands(prev =>
-      prev.map(dem => {
-        if (!dem.items) return dem;
-        return {
-          ...dem,
-          items: dem.items.map(it => {
-            if (it.product_name.trim().toLowerCase() === cleanName && !it.is_in_stock && !it.is_delivered) {
-              return { ...it, status: 'en_rupture' as const };
-            }
-            return it;
-          })
-        };
-      })
-    );
-
-    try {
-      if (onMarkEnRupture) {
-        await onMarkEnRupture(productName);
-      }
-      setToastMessage(`تم وسم "${productName}" كغير متوفر ونقلها إلى قائمة السلع غير المتوفرة`);
-      setTimeout(() => setToastMessage(null), 2500);
-    } catch (err) {
-      console.error('Error marking product en rupture:', err);
-      alert('حدث خطأ أثناء تغيير حالة السلعة، يرجى المحاولة مرة أخرى.');
-      // Revert if error occurs
-      setLocalDemands(demands);
-    } finally {
-      setProcessingProduct(null);
-    }
-  };
-
-  // Handle Restore Product from Rupture
-  const handleRestoreEnRupture = async (productName: string) => {
-    const cleanName = productName.trim().toLowerCase();
-    setProcessingProduct(productName);
-
-    // 1. Immediately & synchronously update local React state
-    setLocalDemands(prev =>
-      prev.map(dem => {
-        if (!dem.items) return dem;
-        return {
-          ...dem,
-          items: dem.items.map(it => {
-            if (it.product_name.trim().toLowerCase() === cleanName && it.status === 'en_rupture') {
-              return { ...it, status: 'pending' as const };
-            }
-            return it;
-          })
-        };
-      })
-    );
-
-    try {
-      if (onRestoreEnRupture) {
-        await onRestoreEnRupture(productName);
-      }
-      setToastMessage(`تمت إعادة "${productName}" إلى قائمة الخصاصات العادية`);
-      setTimeout(() => setToastMessage(null), 2500);
-    } catch (err) {
-      console.error('Error restoring product:', err);
-      alert('حدث خطأ أثناء استرجاع السلعة، يرجى المحاولة مرة أخرى.');
-      setLocalDemands(demands);
-    } finally {
-      setProcessingProduct(null);
-    }
-  };
-
-  // Handle Allocation Submit from Modal
-  const handleModalSubmit = async (e: React.FormEvent) => {
+  const handleConfirmAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalProduct) return;
+    if (!modalProduct || !onAutoAllocateStock) return;
 
-    const parsedQty = parseInt(modalQty.trim(), 10);
-    if (isNaN(parsedQty) || parsedQty <= 0) {
-      alert('يرجى إدخال كمية مستلمة صحيحة أكبر من الصفر');
+    const qty = parseInt(modalQty);
+    if (isNaN(qty) || qty <= 0) {
+      alert('يرجى إدخال عدد صحيح موجب');
       return;
     }
 
-    const productName = modalProduct.productName;
-    setProcessingProduct(productName);
     setIsProcessingModal(true);
-
     try {
-      if (onAutoAllocateStock) {
-        await onAutoAllocateStock(productName, parsedQty);
-      } else {
-        // Fallback manually if onAutoAllocateStock is not provided
-        let remaining = parsedQty;
-        const allPending = [...normalProductsList, ...ruptureProductsList];
-        const targetProd = allPending.find(p => p.productName === productName);
-
-        if (targetProd) {
-          for (const cli of targetProd.clients) {
-            if (remaining <= 0) break;
-            for (const dem of localDemands) {
-              if (remaining <= 0) break;
-              if (dem.client?.phone === cli.phone && dem.items) {
-                for (const it of dem.items) {
-                  if (it.product_name.trim().toLowerCase() === productName.toLowerCase() && !it.is_in_stock && !it.is_delivered) {
-                    const currentFulfilled = Number(it.fulfilled_quantity || 0);
-                    const totalQty = Number(it.quantity) || 0;
-                    const needed = Math.max(0, totalQty - currentFulfilled);
-                    if (needed <= 0) continue;
-
-                    if (remaining >= needed) {
-                      await onUpdateItemState(it.id, { is_in_stock: true, fulfilled_quantity: totalQty });
-                      remaining -= needed;
-                    } else {
-                      const newFulfilled = currentFulfilled + remaining;
-                      await onUpdateItemState(it.id, { is_in_stock: false, fulfilled_quantity: newFulfilled });
-                      remaining = 0;
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          }
-          // Surplus stock is strictly discarded (zero global inventory tracking)
-        }
-      }
-
+      await onAutoAllocateStock(modalProduct.productName, qty);
+      setToastMessage(`تم توزيع ${qty} قطعة من "${modalProduct.productName}" بنجاح`);
+      setTimeout(() => setToastMessage(null), 3000);
       setModalProduct(null);
       setModalQty('');
-
-      // Show Toast notification
-      setToastMessage('تمت إضافة وتوزيع السلعة بنجاح');
-      setTimeout(() => {
-        setToastMessage(null);
-      }, 2500);
-
     } catch (err) {
       console.error('Error allocating stock:', err);
-      alert('حدث خطأ أثناء تخصيص السلعة، يرجى إعادة المحاولة.');
+      alert('حدث خطأ أثناء توزيع المخزون.');
     } finally {
-      setProcessingProduct(null);
       setIsProcessingModal(false);
     }
   };
 
+  const handleToggleRupture = async (productName: string, isCurrentlyRupture: boolean) => {
+    if (isCurrentlyRupture) {
+      if (onRestoreEnRupture) {
+        await onRestoreEnRupture(productName);
+        setToastMessage(`تمت استعادة "${productName}" إلى قائمة المشتريات`);
+        setTimeout(() => setToastMessage(null), 3000);
+      }
+    } else {
+      if (onMarkEnRupture) {
+        await onMarkEnRupture(productName);
+        setToastMessage(`تم نقل "${productName}" إلى قائمة السلع غير المتوفرة`);
+        setTimeout(() => setToastMessage(null), 3000);
+      }
+    }
+  };
+
   return (
-    <div className="space-y-3 relative">
+    <div className="space-y-5 sm:space-y-6">
       
-      {/* 1. Header Banner & Section Switcher */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
-              <PackageCheck className="w-4 h-4" />
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border border-neutral-700">
+          <CheckCircle2 className="w-5 h-5 text-orange-500" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* 1. Header Floating Glass Card with Custom White Logo */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+              <img
+                src="/logo-lib-modern-alt.jpg"
+                alt="Lib Moderne"
+                className="h-full w-auto object-contain"
+              />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">توزيع واستقبال السلع</h2>
-              <p className="text-[11px] text-slate-500">توزيع مباشر للسلع الواصلة على الزبناء حسب الأسبقية</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('stock.title')}</h2>
+                <span className="bg-orange-50 text-orange-600 border border-orange-200/60 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  توزيع فوري
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 font-medium mt-0.5">
+                {t('stock.subtitle')}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-              <span className="text-slate-500">العناوين:</span>
-              <strong className="text-slate-900">{currentTotalItems}</strong>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-              <span className="text-slate-500">القطع المطلوبة:</span>
-              <strong className="text-slate-900">{currentTotalPieces}</strong>
+          <div className="flex items-center gap-3 self-end md:self-center">
+            <div className="flex items-center gap-2 text-xs font-bold text-neutral-700 bg-white/90 border border-neutral-200/80 px-4 h-10 rounded-full shadow-xs">
+              <span className="text-neutral-400">العناوين:</span>
+              <strong className="text-neutral-900">{currentTotalItems}</strong>
+              <span className="text-neutral-300">|</span>
+              <span className="text-neutral-400">مجموع القطع:</span>
+              <strong className="text-orange-600">{currentTotalPieces}</strong>
             </div>
           </div>
         </div>
 
-        {/* Section Switcher: Normal Pending vs Out of Stock */}
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-bold border border-slate-200/80">
+        {/* Tab Switcher: Normal vs Rupture */}
+        <div className="flex items-center gap-2 bg-neutral-100/80 p-1.5 rounded-full border border-neutral-200/60 text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('normal')}
-            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
               activeTab === 'normal'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <PackageCheck className="w-3.5 h-3.5 text-blue-600" />
-            <span>قائمة الخصاصات العادية</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'normal' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-600'
+            <Package className="w-3.5 h-3.5" />
+            <span>{t('stock.tab_normal')}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'normal' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
-              {totalNormalItems}
+              {normalProductsList.length}
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('rupture')}
-            className={`flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-full transition-all duration-300 ${
               activeTab === 'rupture'
-                ? 'bg-white text-emerald-800 shadow-2xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
             }`}
           >
-            <AlertCircle className="w-3.5 h-3.5 text-emerald-600" />
-            <span>سلع غير متوفرة</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
-              activeTab === 'rupture' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+            <Ban className="w-3.5 h-3.5" />
+            <span>{t('stock.tab_rupture')}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${
+              activeTab === 'rupture' ? 'bg-orange-500 text-white' : 'bg-neutral-200 text-neutral-700'
             }`}>
-              {totalRuptureItems}
+              {ruptureProductsList.length}
             </span>
           </button>
         </div>
-      </div>
 
-      {/* 2. MAIN VIEW: Products List Table with Sort & Search */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs space-y-2.5">
-        
-        {/* Search & Sort Filter Header */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
-          <span className="text-base font-bold text-slate-800">
-            {activeTab === 'normal' ? 'قائمة الخصاصات المطلوب توفيرها' : 'سلع غير متوفرة (Out of stock)'}
-          </span>
+        {/* Search & Sort Filters */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-neutral-400 absolute right-3.5 top-3.5" />
+            <input
+              type="text"
+              placeholder="ابحث باسم الكتاب أو الصنف..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 pl-4 h-10 text-xs font-medium text-neutral-900 focus:outline-none focus:border-neutral-900 shadow-xs"
+            />
+          </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {/* Minimalist Sorting Dropdown */}
-            <div className="relative flex items-center">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="w-full sm:w-auto bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-slate-800 transition-colors cursor-pointer appearance-none"
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-400 font-bold hidden sm:inline">الترتيب:</span>
+            {[
+              { key: 'alphabetical', label: t('stock.sort_alpha') },
+              { key: 'oldest', label: t('stock.sort_oldest') },
+              { key: 'newest', label: t('stock.sort_newest') },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setSortBy(opt.key as SortOption)}
+                className={`h-9 px-3.5 text-xs font-bold rounded-full transition-all ${
+                  sortBy === opt.key
+                    ? 'bg-neutral-900 text-white shadow-xs'
+                    : 'bg-white border border-neutral-200/80 text-neutral-600 hover:bg-neutral-50'
+                }`}
               >
-                <option value="alphabetical">أبجدياً (أ - ي ثم A - Z)</option>
-                <option value="oldest">الطلب الأقدم أولاً</option>
-                <option value="newest">الطلب الأحدث أولاً</option>
-              </select>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative w-full sm:w-60">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="البحث بالاسم..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg pr-8 pl-3 h-8 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-medium transition-colors"
-              />
-            </div>
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Missing Products List / Table */}
+      {/* 2. Products List Floating Glass Card */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4">
         {displayedProducts.length === 0 ? (
-          <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg bg-slate-50/50 space-y-1.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto" />
-            <p className="font-bold text-slate-800 text-xs">
-              {activeTab === 'normal' 
-                ? 'جميع كتب هذه الدفعة متوفرة بالكامل' 
-                : 'لا توجد سلع مسجلة كغير متوفرة حالياً'}
+          <div className="text-center py-16 px-4">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <p className="text-base font-extrabold text-neutral-900">
+              {activeTab === 'normal' ? 'جميع السلع المطلوبة متوفرة' : 'لا توجد سلع مسجلة كغير متوفرة'}
+            </p>
+            <p className="text-xs text-neutral-400 mt-1">
+              {activeTab === 'normal' ? 'لا توجد خصاصات معلقة للتوزيع حالياً' : 'قائمة السلع المقطوعة فارغة'}
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5">
-            {displayedProducts.map((item) => {
-              const isProcessing = processingProduct === item.productName;
-
-              return (
-                <div 
-                  key={item.productName}
-                  className="border border-slate-200 bg-white hover:border-slate-300 rounded-lg py-2.5 px-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 transition-colors"
-                >
-                  {/* Left: Product Name & Required Quantity */}
-                  <div className="space-y-0.5 flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-base font-bold text-slate-900 leading-tight truncate">
-                        {item.productName}
-                      </h4>
-                      {activeTab === 'rupture' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          غير متوفر
+          <div className="divide-y divide-neutral-100">
+            {displayedProducts.map((prod, idx) => (
+              <div key={idx} className="py-4 first:pt-0 last:pb-0 group transition-colors">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                  
+                  {/* Item info */}
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <span className="w-8 h-8 rounded-xl bg-neutral-100 text-neutral-800 font-black text-xs flex items-center justify-center shrink-0 border border-neutral-200/60">
+                      #{idx + 1}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
+                          {prod.productName}
+                        </h3>
+                        <span className="bg-neutral-100 text-neutral-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {prod.category}
                         </span>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-neutral-500 mt-1">
+                        <span>إجمالي المطلوب: <strong className="text-neutral-800">{prod.totalMissingQty} قطعة</strong></span>
+                        <span>•</span>
+                        <span>عدد الزبناء المنتظرين: <strong className="text-neutral-800">{prod.clients.length}</strong></span>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-500">
-                      الكمية المطلوبة: <strong className="text-slate-800 font-semibold">{item.totalMissingQty} قطعة</strong>
-                      <span className="mx-1.5 text-slate-300">|</span>
-                      <span className="text-xs text-slate-400">
-                        {item.clients.length} {item.clients.length === 1 ? 'زبون' : 'زبناء'}
-                      </span>
-                    </p>
                   </div>
 
-                  {/* Right: Action Buttons (Mobile-Responsive 50/50 Grid, Desktop Flex) */}
-                  <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center mt-3 sm:mt-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 justify-end">
-                    
-                    {/* Blue Ready (جاهز) Button */}
-                    <button
-                      onClick={() => handleOpenModal(item.productName, item.totalMissingQty)}
-                      disabled={isProcessing}
-                      className="h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
-                      <span className="truncate">{isProcessing ? 'جاري...' : 'جاهز'}</span>
-                    </button>
-
-                    {/* In Normal Tab: Green 'غير متوفر' Button */}
+                  {/* Actions */}
+                  <div className="flex items-center gap-2.5 self-end md:self-center flex-wrap">
                     {activeTab === 'normal' ? (
-                      <button
-                        onClick={() => handleMarkEnRupture(item.productName)}
-                        disabled={isProcessing}
-                        title="وسم السلعة كغير متوفرة ونقلها لقسم سلع غير متوفرة"
-                        className="h-8 px-3 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
-                      >
-                        <Ban className="w-3.5 h-3.5 text-white shrink-0" />
-                        <span className="truncate">غير متوفر</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAllocationModal(prod)}
+                          className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md shadow-orange-500/20 hover:-translate-y-0.5 active:translate-y-0"
+                        >
+                          <PackageCheck className="w-4 h-4" />
+                          <span>{t('stock.allocate_btn')} ({prod.totalMissingQty})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRupture(prod.productName, false)}
+                          className="h-10 px-4 text-xs font-bold rounded-full bg-neutral-100 hover:bg-rose-50 hover:text-rose-700 text-neutral-600 flex items-center justify-center gap-1.5 transition-colors border border-neutral-200/60"
+                          title="وسم كغير متوفر (En Rupture)"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">{t('stock.mark_rupture')}</span>
+                        </button>
+                      </>
                     ) : (
-                      /* In Rupture Tab: Restore Button */
                       <button
-                        onClick={() => handleRestoreEnRupture(item.productName)}
-                        disabled={isProcessing}
-                        title="إلغاء الانقطاع وإعادة السلعة لقائمة الخصاصات العادية"
-                        className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50 w-full sm:w-auto shrink-0"
+                        type="button"
+                        onClick={() => handleToggleRupture(prod.productName, true)}
+                        className="h-10 px-5 text-xs sm:text-sm font-bold rounded-full bg-neutral-900 hover:bg-black text-white flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                        <span className="truncate">إلغاء الانقطاع</span>
+                        <RotateCcw className="w-4 h-4 text-orange-500" />
+                        <span>{t('stock.restore_normal')}</span>
                       </button>
                     )}
-
                   </div>
 
                 </div>
-              );
-            })}
+
+                {/* Clients sub-list */}
+                <div className="mt-3 pt-2.5 border-t border-neutral-100 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-neutral-400 ml-1">طلبات الزبناء:</span>
+                  {prod.clients.map((cli, cIdx) => (
+                    <span key={cIdx} className="bg-white border border-neutral-200/80 text-neutral-800 px-2.5 py-1 rounded-full text-xs font-medium shadow-2xs">
+                      {cli.clientName} ({cli.quantity})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
-
       </div>
 
-      {/* 3. Confirmation Input Modal */}
+      {/* Allocation Modal */}
       {modalProduct && (
-        <div 
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setModalProduct(null);
-              setModalQty('');
-            }
-          }}
-        >
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xl max-w-sm w-full space-y-3.5 text-right relative animate-in zoom-in-95 duration-150" dir="rtl">
-            
-            {/* Modal Header */}
-            <div className="flex items-start justify-between gap-2.5 border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold shrink-0">
-                  <PackageCheck className="w-4 h-4" />
+        <div className="fixed inset-0 z-50 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-neutral-900 text-white flex items-center justify-center font-bold">
+                  <PackageCheck className="w-5 h-5 text-orange-500" />
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">
-                    استلام: {modalProduct.productName}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    الكمية المطلوبة: <span className="text-blue-700 font-semibold">{modalProduct.totalMissingQty} قطعة</span>
-                  </p>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">توزيع السلعة الواصلة</h3>
+                  <p className="text-xs text-neutral-500">تخصيص الكمية المستلمة للزبناء</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setModalProduct(null);
-                  setModalQty('');
-                }}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors shrink-0"
+                onClick={() => setModalProduct(null)}
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleModalSubmit} className="space-y-3">
+            <form onSubmit={handleConfirmAllocation} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                  عدد القطع المستلمة:
+                <label className="block text-xs font-bold text-neutral-700 mb-1">اسم الكتاب / السلعة:</label>
+                <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-xs sm:text-sm font-extrabold text-neutral-900">
+                  {modalProduct.productName}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                  العدد المستلم الفعلي للبدء في توزيعه:
                 </label>
                 <input
                   ref={modalInputRef}
                   type="number"
                   min="1"
-                  autoFocus
+                  required
+                  placeholder="0"
                   value={modalQty}
-                  onChange={(e) => setModalQty(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
                       e.preventDefault();
                     }
                   }}
-                  placeholder="الكمية..."
-                  className="w-full bg-slate-50 border border-slate-300 focus:bg-white rounded-lg h-9 px-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-slate-800 transition-colors text-center"
+                  onChange={(e) => setModalQty(e.target.value)}
+                  className="w-full bg-white border border-neutral-200 rounded-2xl p-3 text-center text-lg font-black text-neutral-900 focus:outline-none focus:border-neutral-900"
                 />
+                <p className="text-[11px] text-neutral-400 font-medium mt-1 text-center">
+                  المطلوب الإجمالي: {modalProduct.totalMissingQty} قطعة
+                </p>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalProduct(null)}
+                  className="px-5 py-2.5 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100"
+                >
+                  {t('common.cancel')}
+                </button>
                 <button
                   type="submit"
                   disabled={isProcessingModal}
-                  className="flex-1 h-8 px-3 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-2xs transition-colors disabled:opacity-50"
+                  className="px-6 py-2.5 text-xs sm:text-sm font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-lg shadow-orange-500/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{isProcessingModal ? 'جاري...' : 'تأكيد'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalProduct(null);
-                    setModalQty('');
-                  }}
-                  className="h-8 px-3 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-                >
-                  إلغاء
+                  {isProcessingModal ? 'جاري التوزيع...' : 'تأكيد التوزيع الفوري'}
                 </button>
               </div>
             </form>
-
           </div>
-        </div>
-      )}
-
-      {/* 4. Sleek Floating Toast Notification */}
-      {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white backdrop-blur-xs shadow-lg border border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-150 max-w-md text-center">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-semibold text-xs tracking-wide">
-            {toastMessage}
-          </span>
         </div>
       )}
 

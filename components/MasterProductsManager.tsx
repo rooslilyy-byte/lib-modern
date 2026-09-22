@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Database, Plus, Search, BookOpen, Tag, Sparkles } from 'lucide-react';
+import { Plus, Search, BookOpen, Tag } from 'lucide-react';
 import { MasterProduct } from '@/lib/types';
+import { useLanguage } from '@/lib/languageContext';
 
 interface MasterProductsManagerProps {
   products: MasterProduct[];
@@ -13,6 +14,7 @@ export default function MasterProductsManager({
   products,
   onAddProduct,
 }: MasterProductsManagerProps) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [category, setCategory] = useState('كتب الابتدائية');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,24 +49,28 @@ export default function MasterProductsManager({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       
-      {/* 1. Header & Add Form */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4 flex-wrap">
-          <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-            <Database className="w-5 h-5" />
+      {/* 1. Header & Add Form Floating Glass Card with Custom White Logo */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6">
+        <div className="flex items-center gap-3.5 mb-6 border-b border-neutral-100 pb-4 flex-wrap">
+          <div className="w-12 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shadow-xs shrink-0 overflow-hidden">
+            <img
+              src="/logo-lib-modern-alt.jpg"
+              alt="Lib Moderne"
+              className="h-full w-auto object-contain"
+            />
           </div>
           <div className="min-w-0">
-            <h2 className="text-base sm:text-lg font-extrabold text-slate-900">كتالوج السلع والمواد الرئيسية</h2>
-            <p className="text-xs text-slate-500">إدارة دليل الكتب والمستلزمات لتزويد خاصية التكميل التلقائي السريع أثناء الإدخال</p>
+            <h2 className="text-base sm:text-lg font-black text-neutral-900">كتالوج السلع والمواد الرئيسية</h2>
+            <p className="text-xs text-neutral-500 font-medium">إدارة دليل الكتب والمستلزمات لتزويد خاصية التكميل التلقائي السريع أثناء الإدخال</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-              <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+            <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5 text-orange-500" />
               <span>اسم الكتاب أو السلعة:</span>
             </label>
             <input
@@ -73,19 +79,19 @@ export default function MasterProductsManager({
               placeholder="مثال: الممتاز في التربية الإسلامية - 1 بكالوريا"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-bold"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-11 transition-all shadow-xs"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5 text-slate-500" />
+            <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
+              <Tag className="w-3.5 h-3.5 text-orange-500" />
               <span>الفئة / الصنف:</span>
             </label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800 font-bold"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-bold h-11 transition-all shadow-xs"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -96,64 +102,64 @@ export default function MasterProductsManager({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            className="bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-6 h-11 rounded-full flex items-center justify-center gap-2 transition-all duration-300 shadow-md hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-orange-500" />
             <span>{isSubmitting ? 'جاري الإضافة...' : 'إضافة سلع للكتالوج'}</span>
           </button>
         </form>
       </div>
 
-      {/* 2. Master Products Catalog Table */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm space-y-4">
+      {/* 2. Master Products Catalog Table Floating Glass Card */}
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4">
 
         {/* Search */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+            <Search className="w-4 h-4 text-neutral-400 absolute right-3.5 top-3.5" />
             <input
               type="text"
               placeholder="ابحث بالاسم أو الفئة..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pr-10 pl-4 py-2 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-slate-800"
+              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-10 pl-4 h-10 text-xs font-medium text-neutral-900 focus:outline-none focus:border-neutral-900 shadow-xs"
             />
           </div>
 
-          <div className="text-xs font-bold text-slate-500 shrink-0">
-            إجمالي السلع المسجلة: <span className="text-slate-900">{products.length}</span>
+          <div className="text-xs font-bold text-neutral-500 shrink-0">
+            إجمالي السلع المسجلة: <span className="text-neutral-900">{products.length}</span>
           </div>
         </div>
 
         {/* Table */}
-        <div className="border border-slate-200 rounded-xl overflow-x-auto">
+        <div className="border border-neutral-200/80 rounded-2xl overflow-x-auto">
           <table className="w-full text-right text-xs min-w-[480px]">
             <thead>
-              <tr className="bg-slate-50 text-slate-900 font-bold border-b border-slate-200">
+              <tr className="bg-neutral-50 text-neutral-900 font-extrabold border-b border-neutral-200/80">
                 <th className="py-3 px-4 w-12 text-center">#</th>
                 <th className="py-3 px-4">اسم السلعة / الكتاب</th>
                 <th className="py-3 px-4">الفئة</th>
                 <th className="py-3 px-4 text-center">تاريخ التسجيل</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-neutral-100">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-slate-400 font-bold">
+                  <td colSpan={4} className="py-8 text-center text-neutral-400 font-bold">
                     لا توجد نتائج مطابقة للبحث
                   </td>
                 </tr>
               ) : (
                 filteredProducts.map((prod, idx) => (
-                  <tr key={prod.id || idx} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 text-center font-bold text-slate-400">{idx + 1}</td>
-                    <td className="py-2.5 px-4 font-extrabold text-slate-900 text-sm">{prod.name}</td>
+                  <tr key={prod.id || idx} className="hover:bg-neutral-50/70 transition-colors">
+                    <td className="py-2.5 px-4 text-center font-bold text-neutral-400">{idx + 1}</td>
+                    <td className="py-2.5 px-4 font-extrabold text-neutral-900 text-sm">{prod.name}</td>
                     <td className="py-2.5 px-4">
-                      <span className="bg-slate-100 text-slate-700 font-semibold px-2.5 py-0.5 rounded-full">
+                      <span className="bg-neutral-100 text-neutral-700 font-bold px-3 py-1 rounded-full text-[11px]">
                         {prod.category}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-center text-slate-500">
+                    <td className="py-2.5 px-4 text-center text-neutral-500 font-medium">
                       {prod.created_at ? new Date(prod.created_at).toLocaleDateString('ar-MA') : 'مسجل'}
                     </td>
                   </tr>
