@@ -41,7 +41,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#F8F9FA] flex flex-col items-center justify-center p-4 font-cairo dir-rtl selection:bg-neutral-900 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center p-4 font-cairo dir-rtl selection:bg-neutral-900 selection:text-white relative overflow-hidden">
 
       {/* Subtle Background Glows */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-orange-700/5 rounded-full blur-3xl pointer-events-none"></div>

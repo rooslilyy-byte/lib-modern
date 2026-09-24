@@ -143,52 +143,52 @@ function CustomersDirectoryContent({
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6">
+    <div className="w-full max-w-full space-y-5 sm:space-y-6 overflow-hidden">
       
       {/* 1. Header Floating Glass Card with Custom Logo */}
-      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-3.5 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 w-full max-w-full overflow-hidden">
+        <div className="flex items-center gap-3 min-w-0 max-w-full">
           <img
             src="/logo-lib-modern.jpg"
             alt="Lib Moderne - المكتبة العصرية"
-            className="w-12 h-12 object-contain shrink-0"
+            className="w-10 h-10 sm:w-12 sm:h-12 object-contain shrink-0"
           />
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-neutral-900">{t('cust.title')}</h2>
-              <span className="bg-neutral-100 text-neutral-600 text-xs font-bold px-2.5 py-0.5 rounded-full">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-base sm:text-lg font-black text-neutral-900 truncate">{t('cust.title')}</h2>
+              <span className="bg-neutral-100 text-neutral-600 text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0">
                 {customerEntries.length} {t('common.items')}
               </span>
             </div>
-            <p className="text-xs text-neutral-500 font-medium mt-0.5">{t('cust.subtitle')}</p>
+            <p className="text-xs text-neutral-500 font-medium mt-0.5 truncate">{t('cust.subtitle')}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-col sm:flex-row w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto max-w-full overflow-hidden">
           {/* Search Bar */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 absolute right-3 top-3 sm:right-3.5 sm:top-3.5" />
+          <div className="relative w-full sm:w-64 max-w-full min-w-0">
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder={t('cust.search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/90 border border-neutral-200/80 rounded-full pr-9 sm:pr-10 pl-3.5 sm:pl-4 h-9 sm:h-11 text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs"
+              className="w-full max-w-full bg-white/90 border border-neutral-200/80 rounded-full pr-9 sm:pr-10 pl-3.5 sm:pl-4 h-9 sm:h-11 text-xs sm:text-sm text-neutral-900 placeholder-neutral-400 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-medium transition-all shadow-xs box-border"
             />
           </div>
 
           {/* Action Buttons */}
           {!isSelectMode ? (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-row items-center gap-2 w-full sm:w-auto max-w-full">
               {onDeleteBulkCustomers && (
                 <button
                   type="button"
                   onClick={() => setIsSelectMode(true)}
-                  className="w-full sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                  className="flex-1 sm:flex-initial sm:w-auto bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 text-center whitespace-nowrap min-w-0"
                   title="تحديد زبناء لحذفهم"
                 >
-                  <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600" />
-                  <span>{t('cust.bulk_delete')}</span>
+                  <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 shrink-0" />
+                  <span className="truncate">{t('cust.bulk_delete')}</span>
                 </button>
               )}
 
@@ -196,23 +196,23 @@ function CustomersDirectoryContent({
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="w-full sm:w-auto bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-4 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 shrink-0"
+                  className="flex-1 sm:flex-initial sm:w-auto bg-neutral-900 hover:bg-black text-white font-bold text-xs sm:text-sm px-3 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 sm:gap-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 text-center whitespace-nowrap min-w-0"
                 >
-                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700" />
-                  <span>{t('dash.new_demand')}</span>
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-700 shrink-0" />
+                  <span className="truncate">{t('dash.new_demand')}</span>
                 </button>
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-row items-center gap-2 w-full sm:w-auto max-w-full">
               <button
                 type="button"
                 onClick={handleBulkDelete}
                 disabled={selectedCustomerIds.length === 0 || isDeletingBulk}
-                className="w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-4 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 shrink-0"
+                className="flex-1 sm:flex-initial sm:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-3 sm:px-5 h-9 sm:h-11 rounded-full shadow-md flex items-center justify-center gap-1.5 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 text-center whitespace-nowrap min-w-0"
               >
-                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
-                <span>
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
+                <span className="truncate">
                   {isDeletingBulk 
                     ? 'جاري الحذف...' 
                     : selectedCustomerIds.length > 0 
@@ -224,10 +224,10 @@ function CustomersDirectoryContent({
               <button
                 type="button"
                 onClick={handleCancelSelectMode}
-                className="w-full sm:w-auto bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 shrink-0"
+                className="sm:w-auto bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs sm:text-sm px-3 sm:px-4 h-9 sm:h-11 rounded-full shadow-xs flex items-center justify-center gap-1.5 transition-all duration-300 text-center whitespace-nowrap shrink-0"
               >
-                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500" />
-                <span>{t('common.cancel')}</span>
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 shrink-0" />
+                <span className="truncate">{t('common.cancel')}</span>
               </button>
             </div>
           )}
@@ -316,7 +316,7 @@ function CustomersDirectoryContent({
                   >
                     
                     {/* Section 1: Checkbox + ID + Customer Name */}
-                    <div className="flex items-center justify-between md:justify-start gap-3 min-w-[260px]">
+                    <div className="flex items-center justify-between md:justify-start gap-3 min-w-0 md:min-w-[260px] max-w-full">
                       <div className="flex items-center gap-2.5 min-w-0">
                         {isSelectMode && (
                           <div className="w-5 flex items-center justify-center shrink-0" onClick={(e) => e.stopPropagation()}>

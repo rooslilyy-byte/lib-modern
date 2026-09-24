@@ -242,7 +242,7 @@ function AppShellContent({ children }: AppShellProps) {
   };
 
   return (
-    <div className={`min-h-[100dvh] bg-[#F8F9FA] flex font-cairo overflow-x-hidden ${dir === 'rtl' ? 'dir-rtl' : 'dir-ltr'}`} suppressHydrationWarning>
+    <div className={`min-h-screen w-full max-w-full bg-[#F8F9FA] flex font-cairo overflow-x-hidden ${dir === 'rtl' ? 'dir-rtl' : 'dir-ltr'}`} suppressHydrationWarning>
       
       {/* Sidebar Component */}
       <Sidebar 
@@ -255,7 +255,7 @@ function AppShellContent({ children }: AppShellProps) {
 
       {/* Main Content Area */}
       <div 
-        className={`flex-1 flex flex-col min-h-[100dvh] w-full transition-all duration-300 ${
+        className={`flex-1 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-300 ${
           isDesktopCollapsed ? 'lg:mr-0' : 'lg:mr-64'
         }`}
         suppressHydrationWarning
@@ -327,7 +327,7 @@ function AppShellContent({ children }: AppShellProps) {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6" suppressHydrationWarning>
+        <main className="flex-1 flex-grow max-w-7xl w-full max-w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden" suppressHydrationWarning>
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-28 space-y-4">
               <div className="w-12 h-12 border-4 border-neutral-900 border-t-orange-700 rounded-full animate-spin shadow-md"></div>
