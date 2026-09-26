@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -50,7 +50,7 @@ interface CustomerDetailsProps {
   onDeleteDemand: (demandId: string) => Promise<void>;
 }
 
-export default function CustomerDetails({
+function CustomerDetails({
   id,
   demands,
   masterProducts,
@@ -77,9 +77,15 @@ export default function CustomerDetails({
       return { total: 0, inStock: 0, delivered: 0, missing: 0, isComplete: false, isReady: false, isPartial: false };
     }
     const total = targetDemand.items.length;
-    const inStock = targetDemand.items.filter(i => i.is_in_stock && !i.is_delivered).length;
-    const delivered = targetDemand.items.filter(i => i.is_delivered).length;
-    const missing = targetDemand.items.filter(i => !i.is_in_stock && !i.is_delivered).length;
+    let inStock = 0;
+    let delivered = 0;
+    let missing = 0;
+    for (let i = 0; i < total; i++) {
+      const it = targetDemand.items[i];
+      if (it.is_delivered) delivered++;
+      else if (it.is_in_stock) inStock++;
+      else missing++;
+    }
     const isComplete = total > 0 && delivered === total;
     const isReady = !isComplete && total > 0 && (inStock + delivered) === total;
     const isPartial = !isComplete && !isReady && (inStock + delivered) > 0;
@@ -100,13 +106,13 @@ export default function CustomerDetails({
     return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
   }, [targetDemand]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     if (!targetDemand) return;
     if (confirm('هل أنت متأكد من رغبتك في حذف ملف طلبية هذا الزبون نهائياً؟')) {
       await onDeleteDemand(targetDemand.id);
       router.push('/customers');
     }
-  };
+  }, [targetDemand, onDeleteDemand, router]);
 
   if (!targetDemand) {
     return (
@@ -403,3 +409,5 @@ export default function CustomerDetails({
     </div>
   );
 }
+
+export default React.memo(CustomerDetails);

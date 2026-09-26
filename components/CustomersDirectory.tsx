@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Users, Search, Phone, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
@@ -22,7 +22,7 @@ interface CustomersDirectoryProps {
   onSelectCustomer?: (demandOrClientId: string) => void;
 }
 
-function CustomersDirectoryContent({ 
+const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent({ 
   demands, 
   masterProducts = [], 
   onCreateDemand,
@@ -82,47 +82,50 @@ function CustomersDirectoryContent({
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [demands]);
 
-  const filteredCustomers = customerEntries.filter(c => {
-    const matchesSearch = 
-      !searchQuery.trim() ||
-      c.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-      c.phone.includes(searchQuery.trim());
-    if (!matchesSearch) return false;
+  const filteredCustomers = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return customerEntries.filter(c => {
+      const matchesSearch = 
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q);
+      if (!matchesSearch) return false;
 
-    if (filter === 'ready' || filter === 'completed') {
-      return (c.totalItems > 0 && c.missingCount === 0) || c.isComplete || c.isReady;
-    }
-    if (filter === 'partial') {
-      return c.missingCount > 0 && c.missingCount < c.totalItems;
-    }
-    if (filter === 'waiting' || filter === 'pending') {
-      return c.totalItems > 0 && c.missingCount === c.totalItems;
-    }
-    return true;
-  });
+      if (filter === 'ready' || filter === 'completed') {
+        return (c.totalItems > 0 && c.missingCount === 0) || c.isComplete || c.isReady;
+      }
+      if (filter === 'partial') {
+        return c.missingCount > 0 && c.missingCount < c.totalItems;
+      }
+      if (filter === 'waiting' || filter === 'pending') {
+        return c.totalItems > 0 && c.missingCount === c.totalItems;
+      }
+      return true;
+    });
+  }, [customerEntries, searchQuery, filter]);
 
   const isAllSelected = filteredCustomers.length > 0 && filteredCustomers.every(c => selectedCustomerIds.includes(c.clientId));
 
-  const handleToggleSelectAll = () => {
+  const handleToggleSelectAll = useCallback(() => {
     if (isAllSelected) {
       setSelectedCustomerIds([]);
     } else {
       setSelectedCustomerIds(filteredCustomers.map(c => c.clientId));
     }
-  };
+  }, [isAllSelected, filteredCustomers]);
 
-  const handleToggleCustomer = (clientId: string) => {
+  const handleToggleCustomer = useCallback((clientId: string) => {
     setSelectedCustomerIds(prev => 
       prev.includes(clientId) ? prev.filter(x => x !== clientId) : [...prev, clientId]
     );
-  };
+  }, []);
 
-  const handleCancelSelectMode = () => {
+  const handleCancelSelectMode = useCallback(() => {
     setIsSelectMode(false);
     setSelectedCustomerIds([]);
-  };
+  }, []);
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = useCallback(async () => {
     if (selectedCustomerIds.length === 0) return;
     const count = selectedCustomerIds.length;
     if (window.confirm(`هل أنت متأكد من حذف ${count} طلبات زبناء نهائياً؟`)) {
@@ -140,7 +143,7 @@ function CustomersDirectoryContent({
         setIsDeletingBulk(false);
       }
     }
-  };
+  }, [selectedCustomerIds, onDeleteBulkCustomers]);
 
   return (
     <div className="w-full max-w-full space-y-5 sm:space-y-6 overflow-hidden">
@@ -461,12 +464,14 @@ function CustomersDirectoryContent({
 
     </div>
   );
-}
+});
 
-export default function CustomersDirectory(props: CustomersDirectoryProps) {
+const CustomersDirectory = React.memo(function CustomersDirectory(props: CustomersDirectoryProps) {
   return (
     <Suspense fallback={<div className="p-8 text-center text-xs font-bold text-neutral-400">جاري تحميل دليل الزبائن...</div>}>
       <CustomersDirectoryContent {...props} />
     </Suspense>
   );
-}
+});
+
+export default CustomersDirectory;

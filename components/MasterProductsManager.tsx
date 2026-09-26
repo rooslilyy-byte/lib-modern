@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Plus, Search, BookOpen, Tag } from 'lucide-react';
 import { MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
@@ -10,7 +10,7 @@ interface MasterProductsManagerProps {
   onAddProduct: (name: string, category: string) => Promise<void>;
 }
 
-export default function MasterProductsManager({
+function MasterProductsManager({
   products,
   onAddProduct,
 }: MasterProductsManagerProps) {
@@ -20,16 +20,16 @@ export default function MasterProductsManager({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categories = [
+  const categories = useMemo(() => [
     'كتب الابتدائية',
     'كتب الإعدادية',
     'كتب التأهيلية',
     'دفاتر وكراسات',
     'أدوات ومستلزمات',
     'معاجم وقصص',
-  ];
+  ], []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -40,13 +40,16 @@ export default function MasterProductsManager({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [name, category, onAddProduct]);
 
-  const filteredProducts = products.filter(p => 
-    !searchQuery.trim() || 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-    p.category?.toLowerCase().includes(searchQuery.toLowerCase().trim())
-  );
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(p => 
+      p.name.toLowerCase().includes(q) ||
+      (p.category && p.category.toLowerCase().includes(q))
+    );
+  }, [products, searchQuery]);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -172,3 +175,5 @@ export default function MasterProductsManager({
     </div>
   );
 }
+
+export default React.memo(MasterProductsManager);

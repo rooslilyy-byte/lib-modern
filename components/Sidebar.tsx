@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -26,7 +26,7 @@ interface SidebarProps {
   onToggleDesktopCollapse?: () => void;
 }
 
-export default function Sidebar({
+function Sidebar({
   isSupabaseActive,
   isOpen = false,
   onClose,
@@ -52,21 +52,21 @@ export default function Sidebar({
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const navItems = [
+  const navItems = useMemo(() => [
     { href: '/', label: 'الرئيسية', subtitle: 'Dashboard', icon: LayoutDashboard },
     { href: '/customers', label: 'دليل الزبائن', subtitle: 'Clients', icon: Users },
     { href: '/stock', label: 'استقبال وتوزيع السلع', subtitle: 'Stock & Dispatch', icon: PackageCheck },
     { href: '/search', label: 'بحث عن منتج', subtitle: 'Search Catalog', icon: LucideSearch },
     { href: '/reports', label: 'التقارير والمشتريات', subtitle: 'A4 Reports', icon: FileSpreadsheet },
-  ];
+  ], []);
 
-  const isActive = (href: string) =>
-    href === '/' ? pathname === '/' : Boolean(pathname?.startsWith(href));
+  const isActive = useCallback((href: string) =>
+    href === '/' ? pathname === '/' : Boolean(pathname?.startsWith(href)), [pathname]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
-  };
+  }, []);
 
   const sidebarContent = (
     <div className="flex flex-col h-full w-64 bg-orange-700 text-white border-l border-orange-800 no-print transition-all duration-300 shadow-xl font-cairo">
@@ -248,3 +248,5 @@ export default function Sidebar({
     </>
   );
 }
+
+export default React.memo(Sidebar);

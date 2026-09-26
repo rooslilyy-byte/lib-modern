@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { MasterProduct } from '@/lib/types';
 import { Package, PlusCircle, Check } from 'lucide-react';
 
@@ -13,7 +13,7 @@ interface ProductAutocompleteProps {
   required?: boolean;
 }
 
-export default function ProductAutocomplete({
+function ProductAutocomplete({
   value,
   onChange,
   masterProducts,
@@ -42,14 +42,30 @@ export default function ProductAutocomplete({
   }, []);
 
   const suggestions = useMemo(() => {
-    const query = value.trim().toLowerCase();
-    const matches = masterProducts.filter(mp => 
-      mp.name.toLowerCase().includes(query) || (mp.category && mp.category.toLowerCase().includes(query))
-    );
+    const query = (value || '').trim().toLowerCase();
+    
+    let matches: MasterProduct[] = [];
+    let hasExactMatch = false;
 
-    const hasExactMatch = masterProducts.some(
-      mp => mp.name.trim().toLowerCase() === query
-    );
+    if (!query) {
+      matches = masterProducts.slice(0, 40);
+    } else {
+      let count = 0;
+      for (let i = 0; i < masterProducts.length && count < 40; i++) {
+        const mp = masterProducts[i];
+        const mpLower = mp.name.toLowerCase();
+        if (mpLower === query) {
+          hasExactMatch = true;
+        }
+        if (mpLower.includes(query) || (mp.category && mp.category.toLowerCase().includes(query))) {
+          matches.push(mp);
+          count++;
+        }
+      }
+      if (!hasExactMatch) {
+        hasExactMatch = masterProducts.some(mp => mp.name.trim().toLowerCase() === query);
+      }
+    }
 
     const result: Array<{ id: string; name: string; category?: string; available_stock?: number; isCustom?: boolean }> = matches.map(m => ({
       id: m.id,
@@ -88,13 +104,13 @@ export default function ProductAutocomplete({
     }
   }, [focusedIndex, isOpen]);
 
-  const handleSelect = (name: string) => {
+  const handleSelect = useCallback((name: string) => {
     onChange(name);
     setIsOpen(false);
     setFocusedIndex(-1);
-  };
+  }, [onChange]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         setIsOpen(true);
@@ -116,7 +132,7 @@ export default function ProductAutocomplete({
     } else if (e.key === 'Escape') {
       setIsOpen(false);
     }
-  };
+  }, [isOpen, suggestions, focusedIndex, handleSelect]);
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
@@ -199,3 +215,5 @@ export default function ProductAutocomplete({
     </div>
   );
 }
+
+export default React.memo(ProductAutocomplete);

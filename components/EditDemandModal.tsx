@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   X, 
   User, 
@@ -34,7 +34,7 @@ interface EditDemandModalProps {
   ) => Promise<void>;
 }
 
-export default function EditDemandModal({
+function EditDemandModal({
   demand,
   masterProducts,
   onClose,
@@ -82,44 +82,60 @@ export default function EditDemandModal({
     }
   }, [demand]);
 
-  const handlePreventNegativeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handlePreventNegativeKey = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
       e.preventDefault();
     }
-  };
+  }, []);
 
-  const handleItemChange = (
+  const handleItemChange = React.useCallback((
     index: number,
     field: 'product_name' | 'quantity' | 'is_in_stock' | 'is_delivered',
     value: any
   ) => {
     if (field === 'product_name' && typeof value === 'string' && value.trim()) {
       const trimmedLower = value.trim().toLowerCase();
-      const isDuplicate = items.some(
-        (it, idx) => idx !== index && it.product_name.trim().toLowerCase() === trimmedLower
-      );
-      if (isDuplicate) {
-        setErrorMessage(`الكتاب "${value.trim()}" مختار بالفعل في سطر آخر. يرجى زيادة العدد (+/-) في السطر الحالي.`);
-        return;
+      setItems(prev => {
+        const isDuplicate = prev.some(
+          (it, idx) => idx !== index && it.product_name.trim().toLowerCase() === trimmedLower
+        );
+        if (isDuplicate) {
+          setErrorMessage(`الكتاب "${value.trim()}" مختار بالفعل في سطر آخر. يرجى زيادة العدد (+/-) في السطر الحالي.`);
+          return prev;
+        }
+        const newItems = [...prev];
+        const updated = { ...newItems[index], [field]: value };
+        if (field === 'is_delivered' && value === true) {
+          updated.is_in_stock = true;
+        }
+        if (field === 'is_in_stock' && value === false) {
+          updated.is_delivered = false;
+        }
+        newItems[index] = updated;
+        return newItems;
+      });
+      return;
+    }
+
+    setItems(prev => {
+      const newItems = [...prev];
+      const updated = { ...newItems[index], [field]: value };
+
+      if (field === 'is_delivered' && value === true) {
+        updated.is_in_stock = true;
       }
-    }
-    const newItems = [...items];
-    const updated = { ...newItems[index], [field]: value };
+      if (field === 'is_in_stock' && value === false) {
+        updated.is_delivered = false;
+      }
 
-    if (field === 'is_delivered' && value === true) {
-      updated.is_in_stock = true;
-    }
-    if (field === 'is_in_stock' && value === false) {
-      updated.is_delivered = false;
-    }
+      newItems[index] = updated;
+      return newItems;
+    });
+  }, []);
 
-    newItems[index] = updated;
-    setItems(newItems);
-  };
-
-  const handleAddItem = () => {
-    setItems([
-      ...items,
+  const handleAddItem = React.useCallback(() => {
+    setItems(prev => [
+      ...prev,
       {
         product_name: '',
         quantity: 1,
@@ -127,18 +143,20 @@ export default function EditDemandModal({
         is_delivered: false,
       },
     ]);
-  };
+  }, []);
 
-  const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) {
-      setErrorMessage('يجب أن تحتوي الطلبية على عنصر واحد على الأقل');
-      return;
-    }
-    setErrorMessage('');
-    setItems(items.filter((_, i) => i !== index));
-  };
+  const handleRemoveItem = React.useCallback((index: number) => {
+    setItems(prev => {
+      if (prev.length <= 1) {
+        setErrorMessage('يجب أن تحتوي الطلبية على عنصر واحد على الأقل');
+        return prev;
+      }
+      setErrorMessage('');
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -194,7 +212,7 @@ export default function EditDemandModal({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [items, clientName, clientPhone, avanceAmount, totalAmount, demand.id, onSave, onClose]);
 
   return (
     <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 font-cairo dir-rtl">
@@ -409,3 +427,5 @@ export default function EditDemandModal({
     </div>
   );
 }
+
+export default React.memo(EditDemandModal);

@@ -59,35 +59,61 @@ async function getActiveBatch(): Promise<PurchaseBatch> {
 }
 
 async function getMasterProductByName(name: string): Promise<MasterProduct | null> {
-  const products = unwrap(
-    await supabaseAdmin
-      .from('master_products')
-      .select('*'),
-    'Loading master products',
-  ) as MasterProduct[];
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
 
-  const normalizedName = normalizeProductName(name);
-  return products.find((product) => normalizeProductName(product.name) === normalizedName) || null;
+  const { data, error } = await supabaseAdmin
+    .from('master_products')
+    .select('*')
+    .ilike('name', trimmed)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Error fetching master product by name:', error);
+    return null;
+  }
+  return data;
 }
 
-async function ensureMasterProduct(name: string, category = DEFAULT_PRODUCT_CATEGORY): Promise<MasterProduct> {
-  const existing = await getMasterProductByName(name);
-  if (existing) {
-    return existing;
-  }
+async function ensureMasterProducts(names: string[], category = DEFAULT_PRODUCT_CATEGORY): Promise<void> {
+  const uniqueNames = Array.from(
+    new Set(names.map((n) => (n || '').trim()).filter(Boolean))
+  );
+  if (uniqueNames.length === 0) return;
+
+  const rows = uniqueNames.map((name) => ({
+    name,
+    category,
+  }));
+
+  unwrap(
+    await supabaseAdmin
+      .from('master_products')
+      .upsert(rows, { onConflict: 'name' }),
+    'Upserting master products',
+  );
+}
+
+async function ensureMasterProduct(name: string, category = DEFAULT_PRODUCT_CATEGORY): Promise<MasterProduct | null> {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
 
   return unwrap(
     await supabaseAdmin
       .from('master_products')
-      .insert({ name, category })
+      .upsert({ name: trimmed, category }, { onConflict: 'name' })
       .select()
-      .single(),
-    'Creating master product',
-  ) as MasterProduct;
+      .maybeSingle(),
+    'Upserting master product',
+  ) as MasterProduct | null;
 }
 
 async function updateMasterProductStock(productName: string, delta: number): Promise<void> {
-  const product = await getMasterProductByName(productName);
+  const trimmed = (productName || '').trim();
+  if (!trimmed) return;
+
+  const product = await getMasterProductByName(trimmed);
   if (!product) {
     return;
   }
@@ -391,12 +417,13 @@ export async function POST(request: Request) {
 
     if (action === 'create_demand') {
       const { clientName, clientPhone, items, avance_amount, total_amount } = body;
-      const cleanPhone = clientPhone.trim();
-      const cleanName = clientName.trim();
+      const cleanPhone = (clientPhone || '').trim();
+      const cleanName = (clientName || '').trim();
       const activeBatch = await getActiveBatch();
       const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
       const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
+      // 1. Create client
       const client = unwrap(
         await supabaseAdmin
           .from('clients')
@@ -406,6 +433,7 @@ export async function POST(request: Request) {
         'Creating client',
       ) as DatabaseRow;
 
+      // 2. Create client demand
       let demand: DatabaseRow;
       try {
         demand = unwrap(
@@ -439,37 +467,41 @@ export async function POST(request: Request) {
         }
       }
 
-      for (const item of items) {
-        const productName = item.product_name.trim();
-        const quantity = Math.max(1, Math.floor(item.quantity || 1));
-        await ensureMasterProduct(productName);
+      // 3. Bulk Safe Upsert Master Products (onConflict: 'name')
+      const validItems = (Array.isArray(items) ? items : []).filter(
+        (it: any) => it && it.product_name && it.product_name.trim()
+      );
+      const productNames = validItems.map((it: any) => it.product_name.trim());
+      await ensureMasterProducts(productNames);
+
+      // 4. Bulk Insert Demand Items in a single network request
+      if (validItems.length > 0) {
+        const demandItemsToInsert = validItems.map((item: any) => ({
+          demand_id: demand.id,
+          product_name: item.product_name.trim(),
+          quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+          fulfilled_quantity: 0,
+          is_in_stock: false,
+          is_delivered: false,
+          status: 'pending',
+        }));
 
         try {
           unwrap(
             await supabaseAdmin
               .from('demand_items')
-              .insert({
-                demand_id: demand.id,
-                product_name: productName,
-                quantity,
-                fulfilled_quantity: 0,
-                is_in_stock: false,
-                is_delivered: false,
-              }),
-            'Creating demand item',
+              .insert(demandItemsToInsert),
+            'Bulk creating demand items',
           );
         } catch {
+          const fallbackItems = demandItemsToInsert.map(
+            ({ fulfilled_quantity, status, ...rest }) => rest
+          );
           unwrap(
             await supabaseAdmin
               .from('demand_items')
-              .insert({
-                demand_id: demand.id,
-                product_name: productName,
-                quantity,
-                is_in_stock: false,
-                is_delivered: false,
-              }),
-            'Creating demand item fallback',
+              .insert(fallbackItems),
+            'Bulk creating demand items fallback',
           );
         }
       }
@@ -479,8 +511,8 @@ export async function POST(request: Request) {
 
     if (action === 'update_demand') {
       const { demandId, clientName, clientPhone, items, avance_amount, total_amount } = body;
-      const cleanPhone = clientPhone.trim();
-      const cleanName = clientName.trim();
+      const cleanPhone = (clientPhone || '').trim();
+      const cleanName = (clientName || '').trim();
       const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
       const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
@@ -497,6 +529,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'Demand not found' }, { status: 404 });
       }
 
+      // 1. Update client details
       unwrap(
         await supabaseAdmin
           .from('clients')
@@ -505,6 +538,7 @@ export async function POST(request: Request) {
         'Updating client',
       );
 
+      // 2. Update demand amounts
       try {
         await supabaseAdmin
           .from('client_demands')
@@ -516,56 +550,50 @@ export async function POST(request: Request) {
         await saveAvancePaymentsToDb(avMap, avId);
       }
 
-      const existingItems = unwrap(
+      // 3. Bulk Safe Upsert Master Products (onConflict: 'name')
+      const validItems = (Array.isArray(items) ? items : []).filter(
+        (it: any) => it && it.product_name && it.product_name.trim()
+      );
+      const productNames = validItems.map((it: any) => it.product_name.trim());
+      await ensureMasterProducts(productNames);
+
+      // 4. Clean update: Delete all existing demand items for this demand/client
+      unwrap(
         await supabaseAdmin
           .from('demand_items')
-          .select('id')
+          .delete()
           .eq('demand_id', demandId),
-        'Loading existing demand items',
-      ) as Array<{ id: string }>;
-      const keepIds = new Set(items.map((item: DatabaseRow) => item.id).filter(Boolean));
-      const removedIds = existingItems.map((item) => item.id).filter((id) => !keepIds.has(id));
+        'Deleting existing demand items',
+      );
 
-      if (removedIds.length > 0) {
-        unwrap(
-          await supabaseAdmin.from('demand_items').delete().in('id', removedIds),
-          'Removing deleted demand items',
-        );
-      }
+      // 5. Bulk Insert newly submitted array of products into demand_items table
+      if (validItems.length > 0) {
+        const demandItemsToInsert = validItems.map((item: any) => ({
+          demand_id: demandId,
+          product_name: item.product_name.trim(),
+          quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+          fulfilled_quantity: Number(item.fulfilled_quantity) || 0,
+          is_in_stock: Boolean(item.is_in_stock),
+          is_delivered: Boolean(item.is_delivered),
+          status: item.status || (item.is_in_stock ? 'ready' : 'pending'),
+        }));
 
-      for (const item of items) {
-        const productName = item.product_name.trim();
-        const quantity = Math.max(1, Math.floor(item.quantity || 1));
-        const isInStock = Boolean(item.is_in_stock);
-        const isDelivered = Boolean(item.is_delivered);
-
-        await ensureMasterProduct(productName);
-
-        if (item.id) {
+        try {
           unwrap(
             await supabaseAdmin
               .from('demand_items')
-              .update({
-                product_name: productName,
-                quantity,
-                is_in_stock: isInStock,
-                is_delivered: isDelivered,
-              })
-              .eq('id', item.id),
-            'Updating demand item',
+              .insert(demandItemsToInsert),
+            'Bulk inserting updated demand items',
           );
-        } else {
+        } catch {
+          const fallbackItems = demandItemsToInsert.map(
+            ({ fulfilled_quantity, status, ...rest }) => rest
+          );
           unwrap(
             await supabaseAdmin
               .from('demand_items')
-              .insert({
-                demand_id: demandId,
-                product_name: productName,
-                quantity,
-                is_in_stock: isInStock,
-                is_delivered: isDelivered,
-              }),
-            'Creating replacement demand item',
+              .insert(fallbackItems),
+            'Bulk inserting updated demand items fallback',
           );
         }
       }

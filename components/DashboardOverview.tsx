@@ -22,31 +22,36 @@ interface DashboardOverviewProps {
   onNavigateTab?: (tab: string) => void;
 }
 
-export default function DashboardOverview({
+function DashboardOverview({
   demands,
 }: DashboardOverviewProps) {
   const { t } = useLanguage();
 
   const stats = useMemo(() => {
-    const totalDemands = demands.length;
-    const pendingDemands = demands.filter(d => d.status === 'pending').length;
-    const partialDemands = demands.filter(d => d.status === 'partial').length;
-    const completedDemands = demands.filter(d => d.status === 'completed').length;
-
+    let pendingDemands = 0;
+    let partialDemands = 0;
+    let completedDemands = 0;
     let totalItemsCount = 0;
     let deliveredItemsCount = 0;
 
-    for (const d of demands) {
+    for (let i = 0; i < demands.length; i++) {
+      const d = demands[i];
+      if (d.status === 'pending') pendingDemands++;
+      else if (d.status === 'partial') partialDemands++;
+      else if (d.status === 'completed') completedDemands++;
+
       if (d.items) {
-        for (const item of d.items) {
-          totalItemsCount += item.quantity;
-          if (item.is_delivered) deliveredItemsCount += item.quantity;
+        for (let j = 0; j < d.items.length; j++) {
+          const item = d.items[j];
+          const qty = item.quantity || 0;
+          totalItemsCount += qty;
+          if (item.is_delivered) deliveredItemsCount += qty;
         }
       }
     }
 
     return {
-      totalDemands,
+      totalDemands: demands.length,
       pendingDemands,
       partialDemands,
       completedDemands,
@@ -251,3 +256,5 @@ export default function DashboardOverview({
     </div>
   );
 }
+
+export default React.memo(DashboardOverview);

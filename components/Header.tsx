@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   BookOpen, 
   PackageCheck, 
@@ -22,7 +22,14 @@ interface HeaderProps {
   isSupabaseActive: boolean;
 }
 
-export default function Header({
+const navItems = [
+  { id: 'demands', label: 'الرئيسية والطلبات', icon: BookOpen },
+  { id: 'stock', label: 'توزيع السلع', icon: PackageCheck },
+  { id: 'supplier', label: 'المشتريات (A4)', icon: FileText },
+  { id: 'master', label: 'كتالوج السلع', icon: Database },
+] as const;
+
+function Header({
   activeTab,
   setActiveTab,
   activeBatch,
@@ -33,20 +40,13 @@ export default function Header({
   const [newBatchName, setNewBatchName] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleArchive = (e: React.FormEvent) => {
+  const handleArchive = React.useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!newBatchName.trim()) return;
     onArchiveBatch(newBatchName.trim());
     setNewBatchName('');
     setShowArchiveModal(false);
-  };
-
-  const navItems = [
-    { id: 'demands', label: 'الرئيسية والطلبات', icon: BookOpen },
-    { id: 'stock', label: 'توزيع السلع', icon: PackageCheck },
-    { id: 'supplier', label: 'المشتريات (A4)', icon: FileText },
-    { id: 'master', label: 'كتالوج السلع', icon: Database },
-  ] as const;
+  }, [newBatchName, onArchiveBatch]);
 
   return (
     <>
@@ -231,3 +231,5 @@ export default function Header({
     </>
   );
 }
+
+export default React.memo(Header);

@@ -6,50 +6,11 @@ import AppShell from '@/components/AppShell';
 import { Search, ArrowRight, Phone, BookOpen } from 'lucide-react';
 import { useLanguage } from '@/lib/languageContext';
 
-export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
-
-  useEffect(() => {
-    const fetchResults = async () => {
-      const trimmed = searchQuery.trim();
-      if (!trimmed) {
-        setResults([]);
-        return;
-      }
-      setIsLoadingResults(true);
-      try {
-        const res = await fetch(`/api/search-product?q=${encodeURIComponent(trimmed)}`);
-        const data = await res.json();
-        if (data.success) {
-          setResults(data.results || []);
-        } else {
-          console.error(data.message);
-        }
-      } catch (err) {
-        console.error('Error fetching search results:', err);
-      } finally {
-        setIsLoadingResults(false);
-      }
-    };
-
-    const debounceTimer = setTimeout(fetchResults, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery]);
-
-  return (
-    <AppShell>
-      {() => <SearchPageContent searchQuery={searchQuery} setSearchQuery={setSearchQuery} results={results} isLoadingResults={isLoadingResults} />}
-    </AppShell>
-  );
-}
-
 function SearchPageContent({
   searchQuery,
   setSearchQuery,
   results,
-  isLoadingResults
+  isLoadingResults,
 }: {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
@@ -238,5 +199,51 @@ function SearchPageContent({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [isLoadingResults, setIsLoadingResults] = useState(false);
+
+  useEffect(() => {
+    const fetchResults = async () => {
+      const trimmed = searchQuery.trim();
+      if (!trimmed) {
+        setResults([]);
+        return;
+      }
+      setIsLoadingResults(true);
+      try {
+        const res = await fetch(`/api/search-product?q=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        if (data.success) {
+          setResults(data.results || []);
+        } else {
+          console.error(data.message);
+        }
+      } catch (err) {
+        console.error('Error fetching search results:', err);
+      } finally {
+        setIsLoadingResults(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(fetchResults, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
+
+  return (
+    <AppShell>
+      {() => (
+        <SearchPageContent
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          results={results}
+          isLoadingResults={isLoadingResults}
+        />
+      )}
+    </AppShell>
   );
 }

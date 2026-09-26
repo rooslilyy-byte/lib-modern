@@ -252,39 +252,43 @@ export async function createClientDemand(
     const activeBatch = await getActiveBatch();
     const cleanPhone = clientPhone.trim();
     const cleanName = clientName.trim();
+    const validItems = items.filter(it => it.product_name?.trim());
 
-    for (const item of items) {
-      await addMasterProduct(item.product_name);
+    // Bulk Safe Upsert master products
+    const productNames = Array.from(new Set(validItems.map(it => it.product_name.trim())));
+    if (productNames.length > 0) {
+      const prodRows = productNames.map(name => ({ name, category: 'كتاب مدرسي' }));
+      await supabase.from('master_products').upsert(prodRows, { onConflict: 'name' });
     }
 
     const { data: newCli } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone }).select().single();
     const existingClient = newCli;
 
     if (existingClient) {
-      const { data: demand } = await supabase.from('client_demands').insert({ client_id: existingClient.id, batch_id: activeBatch.id, status: 'pending' }).select().single();
-      if (demand) {
-        for (const it of items) {
-          const prodName = it.product_name.trim();
-          const qty = Math.max(1, Math.floor(it.quantity || 1));
+      const { data: demand } = await supabase.from('client_demands').insert({
+        client_id: existingClient.id,
+        batch_id: activeBatch.id,
+        status: 'pending',
+        avance_amount: Number(avance_amount) || 0,
+        total_amount: Number(total_amount) || 0,
+      }).select().single();
 
-          try {
-            await supabase.from('demand_items').insert({
-              demand_id: demand.id,
-              product_name: prodName,
-              quantity: qty,
-              fulfilled_quantity: 0,
-              is_in_stock: false,
-              is_delivered: false,
-            });
-          } catch {
-            await supabase.from('demand_items').insert({
-              demand_id: demand.id,
-              product_name: prodName,
-              quantity: qty,
-              is_in_stock: false,
-              is_delivered: false,
-            });
-          }
+      if (demand && validItems.length > 0) {
+        const demandItems = validItems.map(it => ({
+          demand_id: demand.id,
+          product_name: it.product_name.trim(),
+          quantity: Math.max(1, Math.floor(it.quantity || 1)),
+          fulfilled_quantity: 0,
+          is_in_stock: false,
+          is_delivered: false,
+          status: 'pending',
+        }));
+
+        try {
+          await supabase.from('demand_items').insert(demandItems);
+        } catch {
+          const fallback = demandItems.map(({ fulfilled_quantity, status, ...rest }) => rest);
+          await supabase.from('demand_items').insert(fallback);
         }
       }
     }
@@ -522,30 +526,39 @@ export async function updateClientDemand(
   if (isSupabaseConfigured) {
     const cleanPhone = clientPhone.trim();
     const cleanName = clientName.trim();
+    const validItems = items.filter(it => it.product_name?.trim());
 
-    for (const item of items) {
-      if (item.product_name?.trim()) {
-        await addMasterProduct(item.product_name);
-      }
+    // Bulk Safe Upsert master products
+    const productNames = Array.from(new Set(validItems.map(it => it.product_name.trim())));
+    if (productNames.length > 0) {
+      const prodRows = productNames.map(name => ({ name, category: 'كتاب مدرسي' }));
+      await supabase.from('master_products').upsert(prodRows, { onConflict: 'name' });
     }
 
     const { data: currentDemand } = await supabase.from('client_demands').select('*, items:demand_items(*)').eq('id', demandId).single();
     if (currentDemand) {
       await supabase.from('clients').update({ name: cleanName, phone: cleanPhone }).eq('id', currentDemand.client_id);
-      const keepItemIds = items.map(i => i.id).filter(Boolean) as string[];
-      if (keepItemIds.length > 0) {
-        await supabase.from('demand_items').delete().eq('demand_id', demandId).not('id', 'in', `(${keepItemIds.join(',')})`);
-      } else {
-        await supabase.from('demand_items').delete().eq('demand_id', demandId);
-      }
+      
+      try {
+        await supabase.from('client_demands').update({
+          avance_amount: Number(avance_amount) || 0,
+          total_amount: Number(total_amount) || 0,
+        }).eq('id', demandId);
+      } catch {}
 
-      for (const item of items) {
-        const validQty = Math.max(1, Math.floor(item.quantity || 1));
-        if (item.id) {
-          await supabase.from('demand_items').update({ product_name: item.product_name.trim(), quantity: validQty, is_in_stock: item.is_in_stock ?? false, is_delivered: item.is_delivered ?? false }).eq('id', item.id);
-        } else {
-          await supabase.from('demand_items').insert({ demand_id: demandId, product_name: item.product_name.trim(), quantity: validQty, is_in_stock: item.is_in_stock ?? false, is_delivered: item.is_delivered ?? false });
-        }
+      // 1. Delete all existing demand items
+      await supabase.from('demand_items').delete().eq('demand_id', demandId);
+
+      // 2. Bulk insert new items
+      if (validItems.length > 0) {
+        const demandItems = validItems.map(item => ({
+          demand_id: demandId,
+          product_name: item.product_name.trim(),
+          quantity: Math.max(1, Math.floor(item.quantity || 1)),
+          is_in_stock: Boolean(item.is_in_stock),
+          is_delivered: Boolean(item.is_delivered),
+        }));
+        await supabase.from('demand_items').insert(demandItems);
       }
     }
     invalidateStoreCache();

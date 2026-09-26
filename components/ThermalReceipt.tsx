@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { ClientDemand } from '@/lib/types';
@@ -11,36 +11,40 @@ interface ThermalReceiptProps {
   onClose: () => void;
 }
 
-export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps) {
+function ThermalReceipt({ demand, onClose }: ThermalReceiptProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handlePrint = () => {
+  const handlePrint = React.useCallback(() => {
     window.print();
-  };
+  }, []);
 
-  const formattedDate = new Date().toLocaleDateString('ar-MA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const formattedDate = React.useMemo(() => {
+    return new Date().toLocaleDateString('ar-MA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, []);
 
-  const getStatusText = (status: string) => {
+  const getStatusText = React.useCallback((status: string) => {
     switch (status) {
       case 'completed': return 'مكتمل التسليم';
       case 'partial': return 'تسليم جزئي';
       default: return 'قيد الانتظار';
     }
-  };
+  }, []);
 
-  const sortedItems = [...(demand.items || [])].sort((a, b) =>
-    compareProductNames(a.product_name, b.product_name)
-  );
+  const sortedItems = React.useMemo(() => {
+    return [...(demand.items || [])].sort((a, b) =>
+      compareProductNames(a.product_name, b.product_name)
+    );
+  }, [demand.items]);
 
   const renderSingleReceiptCopy = () => (
     <div className="receipt-single-copy bg-white text-black font-cairo dir-rtl p-1">
@@ -215,3 +219,5 @@ export default function ThermalReceipt({ demand, onClose }: ThermalReceiptProps)
     </>
   );
 }
+
+export default React.memo(ThermalReceipt);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { 
@@ -98,17 +98,96 @@ function AppShellContent({ children }: AppShellProps) {
     loadData();
   }, [loadData]);
 
-  const handleCreateDemand = async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
-    await createClientDemand(name, phone, items, avanceAmount, totalAmount);
-    await loadData(true);
-  };
+  const handleCreateDemand = useCallback(async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+    const cleanName = (name || '').trim();
+    const cleanPhone = (phone || '').trim();
+    const tempId = 'temp-' + Date.now();
+    const validItems = (Array.isArray(items) ? items : []).filter(it => it && it.product_name && it.product_name.trim());
+    
+    // Optimistic Demand Insertion
+    const optimisticDemand: ClientDemand = {
+      id: tempId,
+      client_id: 'client-' + tempId,
+      batch_id: activeBatch?.id || 'batch-001',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      avance_amount: avanceAmount || 0,
+      total_amount: totalAmount || 0,
+      client: {
+        id: 'client-' + tempId,
+        name: cleanName,
+        phone: cleanPhone,
+        created_at: new Date().toISOString(),
+      },
+      items: validItems.map((it, idx) => ({
+        id: `item-${tempId}-${idx}`,
+        demand_id: tempId,
+        product_name: it.product_name.trim(),
+        quantity: Math.max(1, Number(it.quantity) || 1),
+        fulfilled_quantity: 0,
+        is_in_stock: false,
+        is_delivered: false,
+        status: 'pending',
+      })),
+    };
 
-  const handleUpdateDemand = async (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
-    await updateClientDemand(id, name, phone, items, avanceAmount, totalAmount);
-    await loadData(true);
-  };
+    setDemands(prev => {
+      const next = [optimisticDemand, ...prev];
+      globalAppCache.demands = next;
+      return next;
+    });
 
-  const handleUpdateItemState = async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean }) => {
+    try {
+      await createClientDemand(name, phone, validItems, avanceAmount, totalAmount);
+    } finally {
+      await loadData(true);
+    }
+  }, [activeBatch, loadData]);
+
+  const handleUpdateDemand = useCallback(async (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+    const cleanName = (name || '').trim();
+    const cleanPhone = (phone || '').trim();
+    const validItems = (Array.isArray(items) ? items : []).filter(it => it && it.product_name && it.product_name.trim());
+
+    // Optimistic Demand Update
+    setDemands(prev => {
+      const next = prev.map(dem => {
+        if (dem.id !== id && dem.client?.id !== id) return dem;
+        const updatedItems = validItems.map((it, idx) => ({
+          id: it.id || `item-upd-${id}-${idx}`,
+          demand_id: dem.id,
+          product_name: it.product_name.trim(),
+          quantity: Math.max(1, Number(it.quantity) || 1),
+          fulfilled_quantity: Number(it.fulfilled_quantity) || 0,
+          is_in_stock: Boolean(it.is_in_stock),
+          is_delivered: Boolean(it.is_delivered),
+          status: it.status || (it.is_in_stock ? 'ready' : 'pending'),
+        }));
+
+        return {
+          ...dem,
+          avance_amount: avanceAmount !== undefined ? avanceAmount : dem.avance_amount,
+          total_amount: totalAmount !== undefined ? totalAmount : dem.total_amount,
+          client: {
+            ...dem.client,
+            name: cleanName,
+            phone: cleanPhone,
+          },
+          items: updatedItems,
+        };
+      });
+      globalAppCache.demands = next;
+      return next;
+    });
+
+    try {
+      await updateClientDemand(id, name, phone, validItems, avanceAmount, totalAmount);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const handleUpdateItemState = useCallback(async (itemId: string, updates: { is_in_stock?: boolean; is_delivered?: boolean }) => {
     setDemands(prev => {
       const next = prev.map(dem => ({
         ...dem,
@@ -118,11 +197,14 @@ function AppShellContent({ children }: AppShellProps) {
       return next;
     });
 
-    await updateDemandItemState(itemId, updates);
-    await loadData(true);
-  };
+    try {
+      await updateDemandItemState(itemId, updates);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
 
-  const handleAutoAllocateStock = async (productName: string, receivedQty: number) => {
+  const handleAutoAllocateStock = useCallback(async (productName: string, receivedQty: number) => {
     const cleanName = productName.trim().toLowerCase();
     let remaining = Math.max(1, Math.floor(receivedQty));
 
@@ -162,11 +244,10 @@ function AppShellContent({ children }: AppShellProps) {
 
     const res = await autoAllocateStock(productName, receivedQty);
     await loadData(true);
-    router.refresh();
     return res;
-  };
+  }, [loadData]);
 
-  const handleMarkEnRupture = async (productName: string) => {
+  const handleMarkEnRupture = useCallback(async (productName: string) => {
     const cleanName = productName.trim().toLowerCase();
     setDemands(prev => {
       const updated = prev.map(dem => {
@@ -187,10 +268,9 @@ function AppShellContent({ children }: AppShellProps) {
     await markProductEnRupture(productName);
     invalidateStoreCache();
     await loadData(true);
-    router.refresh();
-  };
+  }, [loadData]);
 
-  const handleRestoreEnRupture = async (productName: string) => {
+  const handleRestoreEnRupture = useCallback(async (productName: string) => {
     const cleanName = productName.trim().toLowerCase();
     setDemands(prev => {
       const updated = prev.map(dem => {
@@ -211,35 +291,75 @@ function AppShellContent({ children }: AppShellProps) {
     await restoreProductEnRupture(productName);
     invalidateStoreCache();
     await loadData(true);
-    router.refresh();
-  };
+  }, [loadData]);
 
-  const handleDeleteDemand = async (id: string) => {
+  const handleDeleteDemand = useCallback(async (id: string) => {
     setDemands(prev => {
       const next = prev.filter(d => d.id !== id && d.client?.id !== id);
       globalAppCache.demands = next;
       return next;
     });
 
-    await deleteClientDemand(id);
-    await loadData(true);
-  };
+    try {
+      await deleteClientDemand(id);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
 
-  const handleDeleteBulkCustomers = async (clientIds: string[]) => {
+  const handleDeleteBulkCustomers = useCallback(async (clientIds: string[]) => {
     setDemands(prev => {
       const next = prev.filter(d => d.client?.id && !clientIds.includes(d.client.id));
       globalAppCache.demands = next;
       return next;
     });
 
-    await deleteBulkCustomers(clientIds);
-    await loadData(true);
-  };
+    try {
+      await deleteBulkCustomers(clientIds);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
 
-  const handleArchiveBatch = async (newBatchName: string) => {
-    await archiveActiveBatch(newBatchName);
-    await loadData(true);
-  };
+  const handleArchiveBatch = useCallback(async (newBatchName: string) => {
+    try {
+      await archiveActiveBatch(newBatchName);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const appShellData: AppShellData = useMemo(() => ({
+    demands,
+    masterProducts,
+    activeBatch,
+    isLoading,
+    loadData,
+    handleCreateDemand,
+    handleUpdateDemand,
+    handleUpdateItemState,
+    handleAutoAllocateStock,
+    handleMarkEnRupture,
+    handleRestoreEnRupture,
+    handleDeleteDemand,
+    handleDeleteBulkCustomers,
+    handleArchiveBatch,
+  }), [
+    demands,
+    masterProducts,
+    activeBatch,
+    isLoading,
+    loadData,
+    handleCreateDemand,
+    handleUpdateDemand,
+    handleUpdateItemState,
+    handleAutoAllocateStock,
+    handleMarkEnRupture,
+    handleRestoreEnRupture,
+    handleDeleteDemand,
+    handleDeleteBulkCustomers,
+    handleArchiveBatch,
+  ]);
 
   return (
     <div className={`min-h-screen w-full max-w-full bg-[#F8F9FA] flex font-cairo overflow-x-hidden ${dir === 'rtl' ? 'dir-rtl' : 'dir-ltr'}`} suppressHydrationWarning>
@@ -329,30 +449,33 @@ function AppShellContent({ children }: AppShellProps) {
         {/* Main Content */}
         <main className="flex-1 flex-grow max-w-7xl w-full max-w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden" suppressHydrationWarning>
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-28 space-y-4">
-              <div className="w-12 h-12 border-4 border-neutral-900 border-t-orange-700 rounded-full animate-spin shadow-md"></div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-neutral-800">جاري تحميل بيانات المكتبة العصرية...</p>
-                <p className="text-xs text-neutral-400 mt-1 font-semibold">Lib Moderne POS</p>
+            <div className="space-y-5 animate-pulse">
+              <div className="h-28 bg-white/60 backdrop-blur-md rounded-3xl border border-white/60 p-6 flex items-center gap-4">
+                <div className="w-12 h-12 bg-neutral-200 rounded-2xl"></div>
+                <div className="space-y-2 flex-1">
+                  <div className="h-4 bg-neutral-200 rounded-full w-48"></div>
+                  <div className="h-3 bg-neutral-100 rounded-full w-32"></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="h-24 bg-white/60 backdrop-blur-md rounded-3xl border border-white/60 p-4 space-y-3">
+                    <div className="h-3 bg-neutral-200 rounded-full w-24"></div>
+                    <div className="h-6 bg-neutral-200 rounded-full w-16"></div>
+                  </div>
+                ))}
+              </div>
+              <div className="h-64 bg-white/60 backdrop-blur-md rounded-3xl border border-white/60 p-6 space-y-4">
+                <div className="h-4 bg-neutral-200 rounded-full w-40"></div>
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-10 bg-neutral-100 rounded-2xl w-full"></div>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
-            children({
-              demands,
-              masterProducts,
-              activeBatch,
-              isLoading,
-              loadData,
-              handleCreateDemand,
-              handleUpdateDemand,
-              handleUpdateItemState,
-              handleAutoAllocateStock,
-              handleMarkEnRupture,
-              handleRestoreEnRupture,
-              handleDeleteDemand,
-              handleDeleteBulkCustomers,
-              handleArchiveBatch,
-            })
+            children(appShellData)
           )}
         </main>
 

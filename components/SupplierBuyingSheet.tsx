@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, ShoppingCart, CheckCircle2, AlertCircle, Package } from 'lucide-react';
 import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
@@ -16,7 +16,7 @@ interface SupplierBuyingSheetProps {
   onArchiveBatch?: (newBatchName: string) => void;
 }
 
-export default function SupplierBuyingSheet({
+function SupplierBuyingSheet({
   activeBatch,
   demands,
 }: SupplierBuyingSheetProps) {
@@ -30,7 +30,7 @@ export default function SupplierBuyingSheet({
     setMounted(true);
   }, []);
 
-  const fetchReport = async (tab: ReportTab) => {
+  const fetchReport = useCallback(async (tab: ReportTab) => {
     setIsLoading(true);
     try {
       const data = await getSupplierAggregatedReport(activeBatch?.id, tab);
@@ -38,7 +38,7 @@ export default function SupplierBuyingSheet({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeBatch?.id]);
 
   useEffect(() => {
     if (!demands) {
@@ -46,7 +46,7 @@ export default function SupplierBuyingSheet({
     } else {
       setIsLoading(false);
     }
-  }, [activeBatch, demands, activeTab]);
+  }, [activeBatch, demands, activeTab, fetchReport]);
 
   const { normalReport, ruptureReport } = useMemo(() => {
     if (!demands) return { normalReport: [], ruptureReport: [] };
@@ -101,12 +101,14 @@ export default function SupplierBuyingSheet({
     return [...rawReport].sort((a, b) => compareProductNames(a.productName, b.productName));
   }, [rawReport]);
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     window.print();
-  };
+  }, []);
 
   const totalItemTypes = report.length;
-  const totalPiecesCount = report.reduce((acc, curr) => acc + curr.totalQuantity, 0);
+  const totalPiecesCount = useMemo(() => {
+    return report.reduce((acc, curr) => acc + curr.totalQuantity, 0);
+  }, [report]);
 
   const formattedDate = new Date().toLocaleDateString('ar-MA', {
     year: 'numeric',
@@ -350,3 +352,5 @@ export default function SupplierBuyingSheet({
     </div>
   );
 }
+
+export default React.memo(SupplierBuyingSheet);

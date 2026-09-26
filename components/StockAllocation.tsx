@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   PackageCheck, 
   CheckCircle2, 
@@ -47,7 +47,7 @@ interface StockAllocationProps {
   onRestoreEnRupture?: (productName: string) => Promise<void>;
 }
 
-export default function StockAllocation({
+function StockAllocation({
   demands,
   masterProducts,
   onAutoAllocateStock,
@@ -66,12 +66,6 @@ export default function StockAllocation({
   const [isProcessingModal, setIsProcessingModal] = useState(false);
   const modalInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [localDemands, setLocalDemands] = useState<ClientDemand[]>(demands);
-
-  useEffect(() => {
-    setLocalDemands(demands);
-  }, [demands]);
-
   useEffect(() => {
     if (modalProduct) {
       setTimeout(() => {
@@ -80,12 +74,22 @@ export default function StockAllocation({
     }
   }, [modalProduct]);
 
+  // Master product dictionary for O(1) lookup
+  const masterProductMap = useMemo(() => {
+    const map = new Map<string, MasterProduct>();
+    for (let i = 0; i < masterProducts.length; i++) {
+      const mp = masterProducts[i];
+      map.set(mp.name.trim().toLowerCase(), mp);
+    }
+    return map;
+  }, [masterProducts]);
+
   // Calculate Active Missing Products Aggregation
   const { normalProductsList, ruptureProductsList } = useMemo(() => {
     const normalMap: Record<string, AggregatedProduct> = {};
     const ruptureMap: Record<string, AggregatedProduct> = {};
 
-    for (const dem of localDemands) {
+    for (const dem of demands) {
       if (!dem.items || !dem.client) continue;
       for (const item of dem.items) {
         if (!item.is_delivered && !item.is_in_stock) {
@@ -95,9 +99,7 @@ export default function StockAllocation({
           const targetMap = isRupture ? ruptureMap : normalMap;
 
           if (!targetMap[key]) {
-            const masterProd = masterProducts.find(
-              mp => mp.name.trim().toLowerCase() === key
-            );
+            const masterProd = masterProductMap.get(key);
             targetMap[key] = {
               productName: pName,
               category: masterProd?.category || 'كتاب مدرسي',
@@ -154,10 +156,10 @@ export default function StockAllocation({
       normalProductsList: processList(normalMap),
       ruptureProductsList: processList(ruptureMap),
     };
-  }, [localDemands, masterProducts]);
+  }, [demands, masterProductMap]);
 
   // Sorting Function
-  const sortAggregatedProducts = (list: AggregatedProduct[], sort: SortOption) => {
+  const sortAggregatedProducts = useCallback((list: AggregatedProduct[], sort: SortOption) => {
     return [...list].sort((a, b) => {
       if (sort === 'alphabetical') {
         return compareProductNames(a.productName, b.productName);
@@ -174,7 +176,7 @@ export default function StockAllocation({
       }
       return 0;
     });
-  };
+  }, []);
 
   const displayedProducts = useMemo(() => {
     const baseList = activeTab === 'normal' ? normalProductsList : ruptureProductsList;
@@ -188,20 +190,22 @@ export default function StockAllocation({
     }
 
     return sortAggregatedProducts(filtered, sortBy);
-  }, [activeTab, normalProductsList, ruptureProductsList, searchQuery, sortBy]);
+  }, [activeTab, normalProductsList, ruptureProductsList, searchQuery, sortBy, sortAggregatedProducts]);
 
   const currentTotalItems = displayedProducts.length;
-  const currentTotalPieces = displayedProducts.reduce((acc, p) => acc + p.totalMissingQty, 0);
+  const currentTotalPieces = useMemo(() => {
+    return displayedProducts.reduce((acc, p) => acc + p.totalMissingQty, 0);
+  }, [displayedProducts]);
 
-  const handleOpenAllocationModal = (product: AggregatedProduct) => {
+  const handleOpenAllocationModal = useCallback((product: AggregatedProduct) => {
     setModalProduct({
       productName: product.productName,
       totalMissingQty: product.totalMissingQty,
     });
     setModalQty(product.totalMissingQty.toString());
-  };
+  }, []);
 
-  const handleConfirmAllocation = async (e: React.FormEvent) => {
+  const handleConfirmAllocation = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalProduct || !onAutoAllocateStock) return;
 
@@ -224,9 +228,9 @@ export default function StockAllocation({
     } finally {
       setIsProcessingModal(false);
     }
-  };
+  }, [modalProduct, modalQty, onAutoAllocateStock]);
 
-  const handleToggleRupture = async (productName: string, isCurrentlyRupture: boolean) => {
+  const handleToggleRupture = useCallback(async (productName: string, isCurrentlyRupture: boolean) => {
     if (isCurrentlyRupture) {
       if (onRestoreEnRupture) {
         await onRestoreEnRupture(productName);
@@ -240,7 +244,7 @@ export default function StockAllocation({
         setTimeout(() => setToastMessage(null), 3000);
       }
     }
-  };
+  }, [onRestoreEnRupture, onMarkEnRupture]);
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -533,3 +537,5 @@ export default function StockAllocation({
     </div>
   );
 }
+
+export default React.memo(StockAllocation);

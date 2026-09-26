@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { User, Phone, Plus, Trash2, X, CheckCircle2 } from 'lucide-react';
 import { MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
@@ -19,7 +19,7 @@ interface CreateDemandModalProps {
   ) => Promise<void>;
 }
 
-export default function CreateDemandModal({
+function CreateDemandModal({
   isOpen,
   onClose,
   masterProducts = [],
@@ -36,40 +36,48 @@ export default function CreateDemandModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
-  const handlePreventNegativeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handlePreventNegativeKey = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
       e.preventDefault();
     }
-  };
+  }, []);
 
-  const handleItemChange = (index: number, field: 'product_name' | 'quantity', value: any) => {
+  const handleItemChange = React.useCallback((index: number, field: 'product_name' | 'quantity', value: any) => {
     if (field === 'product_name' && typeof value === 'string' && value.trim()) {
       const trimmedLower = value.trim().toLowerCase();
-      const isDuplicate = items.some(
-        (it, idx) => idx !== index && it.product_name.trim().toLowerCase() === trimmedLower
-      );
-      if (isDuplicate) {
-        alert(`الكتاب "${value.trim()}" مختار بالفعل في سطر آخر. يرجى زيادة العدد (+/-) في السطر الحالي.`);
-        return;
-      }
+      setItems(prev => {
+        const isDuplicate = prev.some(
+          (it, idx) => idx !== index && it.product_name.trim().toLowerCase() === trimmedLower
+        );
+        if (isDuplicate) {
+          alert(`الكتاب "${value.trim()}" مختار بالفعل في سطر آخر. يرجى زيادة العدد (+/-) في السطر الحالي.`);
+          return prev;
+        }
+        const newItems = [...prev];
+        newItems[index] = { ...newItems[index], [field]: value };
+        return newItems;
+      });
+      return;
     }
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setItems(newItems);
-  };
+    setItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return newItems;
+    });
+  }, []);
 
-  const handleAddItemRow = () => {
-    setItems([...items, { product_name: '', quantity: 1 }]);
-  };
+  const handleAddItemRow = React.useCallback(() => {
+    setItems(prev => [...prev, { product_name: '', quantity: 1 }]);
+  }, []);
 
-  const handleRemoveItemRow = (index: number) => {
-    if (items.length <= 1) return;
-    setItems(items.filter((_, idx) => idx !== index));
-  };
+  const handleRemoveItemRow = React.useCallback((index: number) => {
+    setItems(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, idx) => idx !== index);
+    });
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim() || !clientPhone.trim()) return;
 
@@ -130,7 +138,9 @@ export default function CreateDemandModal({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [clientName, clientPhone, items, avanceAmount, totalAmount, onCreateDemand, onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200" dir="rtl">
@@ -322,3 +332,5 @@ export default function CreateDemandModal({
     </div>
   );
 }
+
+export default React.memo(CreateDemandModal);

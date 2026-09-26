@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Plus, 
@@ -58,7 +58,7 @@ interface DemandsListProps {
   initialSearchQuery?: string;
 }
 
-export default function DemandsList({
+function DemandsList({
   demands,
   masterProducts,
   onCreateDemand,
@@ -88,36 +88,45 @@ export default function DemandsList({
 
   const formRef = useRef<HTMLDivElement>(null);
 
-  const handlePreventNegativeKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handlePreventNegativeKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
       e.preventDefault();
     }
-  };
+  }, []);
 
   const stats = useMemo(() => {
-    const total = demands.length;
-    const pending = demands.filter(d => d.status === 'pending').length;
-    const partial = demands.filter(d => d.status === 'partial').length;
-    const completed = demands.filter(d => d.status === 'completed').length;
-    return { total, pending, partial, completed };
+    let pending = 0;
+    let partial = 0;
+    let completed = 0;
+    for (let i = 0; i < demands.length; i++) {
+      const s = demands[i].status;
+      if (s === 'pending') pending++;
+      else if (s === 'partial') partial++;
+      else if (s === 'completed') completed++;
+    }
+    return { total: demands.length, pending, partial, completed };
   }, [demands]);
 
-  const handleItemChange = (index: number, field: 'product_name' | 'quantity', value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setItems(newItems);
-  };
+  const handleItemChange = useCallback((index: number, field: 'product_name' | 'quantity', value: any) => {
+    setItems(prev => {
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return newItems;
+    });
+  }, []);
 
-  const handleAddItemRow = () => {
-    setItems([...items, { product_name: '', quantity: 1 }]);
-  };
+  const handleAddItemRow = useCallback(() => {
+    setItems(prev => [...prev, { product_name: '', quantity: 1 }]);
+  }, []);
 
-  const handleRemoveItemRow = (index: number) => {
-    if (items.length <= 1) return;
-    setItems(items.filter((_, i) => i !== index));
-  };
+  const handleRemoveItemRow = useCallback((index: number) => {
+    setItems(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     const validItems = items
       .filter(i => i.product_name.trim().length > 0)
@@ -142,22 +151,23 @@ export default function DemandsList({
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [items, clientName, clientPhone, avanceAmount, totalAmount, onCreateDemand]);
 
   const filteredDemands = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return demands.filter(dem => {
       const matchesStatus = statusFilter === 'all' || dem.status === statusFilter;
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch = 
-        !q ||
+      if (!matchesStatus) return false;
+      if (!q) return true;
+      return (
         dem.client?.name.toLowerCase().includes(q) ||
         dem.client?.phone.includes(q) ||
-        dem.items?.some(i => i.product_name.toLowerCase().includes(q));
-      return matchesStatus && matchesSearch;
+        dem.items?.some(i => i.product_name.toLowerCase().includes(q))
+      );
     });
   }, [demands, searchQuery, statusFilter]);
 
-  const getWhatsAppLink = (demand: ClientDemand) => {
+  const getWhatsAppLink = useCallback((demand: ClientDemand) => {
     if (!demand.client?.phone) return '#';
     let rawPhone = demand.client.phone.replace(/\D/g, '');
     if (rawPhone.startsWith('0')) rawPhone = '212' + rawPhone.slice(1);
@@ -168,7 +178,7 @@ export default function DemandsList({
     const message = `السلام عليكم ورحمة الله وبركاته السيد(ة) ${demand.client.name}،\n\nنخبركم من المكتبة العصرية (Lib Moderne) أن الكتب والخصاصات التالية قد وصلت وتنتظر استلامكم:\n\n${readyText}\n\nالمكان: المكتبة العصرية - Lib Moderne\nالهاتف: 06.60.56.33.71 / 06.60.31.98.68`;
     
     return `https://wa.me/${rawPhone}?text=${encodeURIComponent(message)}`;
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -499,3 +509,5 @@ export default function DemandsList({
     </div>
   );
 }
+
+export default React.memo(DemandsList);
