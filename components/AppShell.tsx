@@ -169,9 +169,10 @@ function AppShellContent({ children }: AppShellProps) {
           avance_amount: avanceAmount !== undefined ? avanceAmount : dem.avance_amount,
           total_amount: totalAmount !== undefined ? totalAmount : dem.total_amount,
           client: {
-            ...dem.client,
+            id: dem.client?.id || dem.client_id || ('client-' + dem.id),
             name: cleanName,
             phone: cleanPhone,
+            created_at: dem.client?.created_at || new Date().toISOString(),
           },
           items: updatedItems,
         };

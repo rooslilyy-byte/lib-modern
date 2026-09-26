@@ -90,7 +90,7 @@ function EditDemandModal({
 
   const handleItemChange = React.useCallback((
     index: number,
-    field: 'product_name' | 'quantity' | 'is_in_stock' | 'is_delivered',
+    field: string,
     value: any
   ) => {
     if (field === 'product_name' && typeof value === 'string' && value.trim()) {
@@ -104,14 +104,7 @@ function EditDemandModal({
           return prev;
         }
         const newItems = [...prev];
-        const updated = { ...newItems[index], [field]: value };
-        if (field === 'is_delivered' && value === true) {
-          updated.is_in_stock = true;
-        }
-        if (field === 'is_in_stock' && value === false) {
-          updated.is_delivered = false;
-        }
-        newItems[index] = updated;
+        newItems[index] = { ...newItems[index], product_name: value };
         return newItems;
       });
       return;
