@@ -700,7 +700,7 @@ export async function createEmployee(name: string): Promise<Employee> {
   if (isSupabaseConfigured) {
     const { data } = await supabase.from('employees').insert({ name: cleanName }).select().single();
     invalidateStoreCache();
-    return data;
+    if (data) return data;
   }
   return { id: `emp-${Date.now()}`, name: cleanName, created_at: new Date().toISOString() };
 }
@@ -716,7 +716,7 @@ export async function updateEmployee(id: string, name: string): Promise<Employee
   if (isSupabaseConfigured) {
     const { data } = await supabase.from('employees').update({ name: cleanName }).eq('id', id).select().single();
     invalidateStoreCache();
-    return data;
+    if (data) return data;
   }
   return { id, name: cleanName, created_at: new Date().toISOString() };
 }
@@ -766,7 +766,7 @@ export async function createSchoolList(payload: {
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    return data;
+    if (data) return data as SchoolList;
   }
   return {
     id: `list-${Date.now()}`,
@@ -793,7 +793,7 @@ export async function updateSchoolList(id: string, updates: Partial<SchoolList>)
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    return data;
+    if (data) return data as SchoolList;
   }
   return { id, client_name: '', school_name: '', status: 'pending', ...updates };
 }
@@ -827,7 +827,7 @@ export async function linkSchoolListClient(listId: string, clientId: string | nu
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    return data;
+    if (data) return data as SchoolList;
   }
   return { id: listId, client_name: '', school_name: '', status: clientId ? 'pending' : 'done', client_id: clientId };
 }
@@ -851,7 +851,7 @@ export async function convertSchoolListToClient(listId: string): Promise<{
     let clientId = listData.client_id;
     if (!clientId && listData.client_name) {
       const { data: matched } = await supabase.from('clients').select('*').ilike('name', listData.client_name.trim()).limit(1);
-      if (matched && matched.length > 0) {
+      if (matched && matched.length > 0 && matched[0]) {
         clientId = matched[0].id;
       } else {
         const { data: newC } = await supabase.from('clients').insert({ name: listData.client_name.trim(), phone: '' }).select().single();
@@ -868,7 +868,7 @@ export async function convertSchoolListToClient(listId: string): Promise<{
     return {
       clientId: clientId || '',
       demandId: '',
-      schoolList: updatedList || listData,
+      schoolList: (updatedList || listData) as SchoolList,
     };
   }
 

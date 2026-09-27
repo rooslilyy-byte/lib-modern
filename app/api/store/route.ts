@@ -1347,7 +1347,11 @@ export async function POST(request: Request) {
           `)
           .single(),
         'Creating school list',
-      );
+      ) as DatabaseRow | null;
+
+      if (!schoolList) {
+        return NextResponse.json({ success: false, message: 'Failed to create school list' }, { status: 500 });
+      }
 
       return NextResponse.json({
         success: true,
@@ -1393,7 +1397,11 @@ export async function POST(request: Request) {
           `)
           .single(),
         'Updating school list',
-      );
+      ) as DatabaseRow | null;
+
+      if (!schoolList) {
+        return NextResponse.json({ success: false, message: 'School list not found' }, { status: 404 });
+      }
 
       return NextResponse.json({
         success: true,
@@ -1451,7 +1459,11 @@ export async function POST(request: Request) {
           `)
           .single(),
         'Linking client to school list',
-      );
+      ) as DatabaseRow | null;
+
+      if (!schoolList) {
+        return NextResponse.json({ success: false, message: 'School list not found' }, { status: 404 });
+      }
 
       return NextResponse.json({
         success: true,
@@ -1507,20 +1519,23 @@ export async function POST(request: Request) {
           .ilike('name', cleanClientName)
           .limit(1);
 
-        if (matchedClients && matchedClients.length > 0) {
+        if (matchedClients && matchedClients.length > 0 && matchedClients[0]) {
           clientRow = matchedClients[0];
           targetClientId = clientRow.id;
         } else {
           // INSERT new client with list's client_name
-          clientRow = unwrap(
+          const insertedClient = unwrap(
             await supabaseAdmin
               .from('clients')
               .insert({ name: cleanClientName, phone: '' })
               .select()
               .single(),
             'Inserting new client from school list',
-          ) as DatabaseRow;
-          targetClientId = clientRow.id;
+          ) as DatabaseRow | null;
+          if (insertedClient) {
+            clientRow = insertedClient;
+            targetClientId = insertedClient.id;
+          }
         }
       }
 
@@ -1560,7 +1575,14 @@ export async function POST(request: Request) {
           `)
           .single(),
         'Updating school list with client link',
-      );
+      ) as DatabaseRow | null;
+
+      if (!updatedList) {
+        return NextResponse.json(
+          { success: false, message: 'Failed to update school list' },
+          { status: 500 },
+        );
+      }
 
       // Step C Preparation: Ensure a client_demands record exists in the active batch
       const activeBatch = await getActiveBatch();
@@ -1572,10 +1594,10 @@ export async function POST(request: Request) {
         .limit(1);
 
       let demandId = '';
-      if (existingDemands && existingDemands.length > 0) {
+      if (existingDemands && existingDemands.length > 0 && existingDemands[0]) {
         demandId = existingDemands[0].id;
       } else {
-        let newDemand: DatabaseRow;
+        let newDemand: DatabaseRow | null = null;
         try {
           newDemand = unwrap(
             await supabaseAdmin
@@ -1605,7 +1627,7 @@ export async function POST(request: Request) {
             'Creating initial client demand fallback',
           ) as DatabaseRow;
         }
-        demandId = newDemand.id;
+        demandId = newDemand?.id || '';
       }
 
       return NextResponse.json({
