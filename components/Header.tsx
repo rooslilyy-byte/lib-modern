@@ -10,9 +10,11 @@ import {
   Archive, 
   Menu, 
   X, 
-  Layers
+  Layers,
+  KeyRound
 } from 'lucide-react';
 import { PurchaseBatch } from '@/lib/types';
+import ChangePasswordModal from './ChangePasswordModal';
 
 interface HeaderProps {
   activeTab: 'demands' | 'stock' | 'supplier' | 'master';
@@ -37,6 +39,7 @@ function Header({
   isSupabaseActive
 }: HeaderProps) {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newBatchName, setNewBatchName] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -87,7 +90,7 @@ function Header({
             </div>
 
             {/* Desktop Actions */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2.5">
               <div className="bg-orange-800/70 border border-orange-600/40 rounded-full px-3.5 py-1.5 flex items-center gap-2 text-xs text-white">
                 <Layers className="w-5 h-5 text-white" />
                 <span className="text-orange-100">الدفعة الحالية:</span>
@@ -95,6 +98,17 @@ function Header({
               </div>
 
               <button
+                type="button"
+                onClick={() => setShowPasswordModal(true)}
+                className="bg-orange-800/80 hover:bg-orange-800 text-white border border-orange-600/50 text-xs font-bold px-3.5 py-2 rounded-full flex items-center gap-1.5 transition-all shadow-sm hover:-translate-y-0.5 active:translate-y-0"
+                title="تغيير الرمز السري"
+              >
+                <KeyRound className="w-4 h-4 text-orange-200" />
+                <span>الرمز السري</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowArchiveModal(true)}
                 className="bg-white hover:bg-orange-50 text-orange-700 text-xs font-bold px-4 py-2 rounded-full flex items-center gap-1.5 transition-all shadow-md hover:-translate-y-0.5 active:translate-y-0"
               >
@@ -105,6 +119,14 @@ function Header({
 
             {/* Mobile Hamburger Menu Button */}
             <div className="flex md:hidden items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(true)}
+                className="bg-orange-800/80 text-white text-xs p-1.5 sm:p-2 rounded-full shadow-sm border border-orange-600/50"
+                title="تغيير الرمز السري"
+              >
+                <KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
               <button
                 type="button"
                 onClick={() => setShowArchiveModal(true)}
@@ -228,8 +250,16 @@ function Header({
           </div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </>
   );
 }
 
+
 export default React.memo(Header);
+

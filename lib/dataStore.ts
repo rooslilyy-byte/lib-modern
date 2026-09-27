@@ -5,7 +5,10 @@ import {
   PurchaseBatch, 
   ClientDemand, 
   DemandItem,
-  SupplierAggregatedItem 
+  SupplierAggregatedItem,
+  Employee,
+  SchoolList,
+  SchoolListStatus
 } from './types';
 
 // Helper to determine if we are running in browser context to fetch API route
@@ -15,6 +18,8 @@ export interface FullStoreData {
   activeBatch: PurchaseBatch;
   masterProducts: MasterProduct[];
   demands: ClientDemand[];
+  employees: Employee[];
+  schoolLists: SchoolList[];
 }
 
 let storeCache: { data: FullStoreData | null; timestamp: number } = {
@@ -63,6 +68,8 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
                 status: it.status || 'pending' 
               })),
             })),
+            employees: data.employees || [],
+            schoolLists: data.schoolLists || [],
           };
           storeCache = { data: fullData, timestamp: Date.now() };
           return fullData;
@@ -73,6 +80,8 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
       let batch: PurchaseBatch = { id: 'batch-001', batch_name: 'دفعة الدخول المدرسي الرئيسي', is_archived: false };
       let masterProducts: MasterProduct[] = [];
       let demands: ClientDemand[] = [];
+      let employees: Employee[] = [];
+      let schoolLists: SchoolList[] = [];
 
       if (isSupabaseConfigured) {
         const { data: bData } = await supabase
@@ -86,11 +95,25 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
           batch = bData[0];
         }
 
-        const { data: pData } = await supabase
-          .from('master_products')
-          .select('*')
-          .order('name');
-        if (pData) masterProducts = pData;
+        let pFrom = 0;
+        let pHasMore = true;
+        while (pHasMore) {
+          const { data: pChunk } = await supabase
+            .from('master_products')
+            .select('*', { count: 'exact' })
+            .order('name')
+            .range(pFrom, pFrom + 999);
+          if (pChunk && pChunk.length > 0) {
+            masterProducts = masterProducts.concat(pChunk);
+            if (pChunk.length < 1000) {
+              pHasMore = false;
+            } else {
+              pFrom += 1000;
+            }
+          } else {
+            pHasMore = false;
+          }
+        }
 
         const { data: dData } = await supabase
           .from('client_demands')
@@ -128,9 +151,25 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             items: (d.items || []).map((it: any) => ({ ...it, status: it.status || 'pending' })),
           }));
         }
+
+        const { data: empData } = await supabase.from('employees').select('*').order('name');
+        if (empData) employees = empData;
+
+        const { data: listData } = await supabase.from('school_lists').select(`
+          id, client_name, school_name, employee_id, status, client_id, created_at,
+          employee:employees (id, name),
+          client:clients (id, name, phone)
+        `).order('created_at', { ascending: false });
+        if (listData) {
+          schoolLists = listData.map((row: any) => ({
+            ...row,
+            employee: Array.isArray(row.employee) ? row.employee[0] : row.employee,
+            client: Array.isArray(row.client) ? row.client[0] : row.client,
+          }));
+        }
       }
 
-      const fullData: FullStoreData = { activeBatch: batch, masterProducts, demands };
+      const fullData: FullStoreData = { activeBatch: batch, masterProducts, demands, employees, schoolLists };
       storeCache = { data: fullData, timestamp: Date.now() };
       return fullData;
     } finally {
@@ -185,6 +224,30 @@ export async function addMasterProduct(name: string, category: string = 'كتا�
 
   return { id: 'mp-' + Date.now(), name: trimmedName, category };
 }
+
+export async function updateProductCategory(productId: string, category: string, productName?: string): Promise<MasterProduct> {
+  const cleanCategory = category.trim();
+  if (isBrowser) {
+    const data = await fetchStoreApi('update_product_category', { productId, category: cleanCategory, productName });
+    invalidateStoreCache();
+    return data.product;
+  }
+
+  if (isSupabaseConfigured) {
+    let query = supabase.from('master_products').update({ category: cleanCategory });
+    if (productId) {
+      query = query.eq('id', productId);
+    } else if (productName) {
+      query = query.eq('name', productName.trim());
+    }
+    const { data } = await query.select().single();
+    invalidateStoreCache();
+    if (data) return data;
+  }
+
+  return { id: productId || 'mp-' + Date.now(), name: productName || '', category: cleanCategory };
+}
+
 
 export async function updateMasterProductStock(productName: string, deltaQty: number): Promise<void> {
   const trimmed = productName.trim();
@@ -619,3 +682,201 @@ export async function getSupplierAggregatedReport(
   const result: SupplierAggregatedItem[] = Object.values(itemMap);
   return result.sort((a, b) => b.totalQuantity - a.totalQuantity);
 }
+
+// --- EMPLOYEES CRUD ---
+export async function getEmployees(): Promise<Employee[]> {
+  const fullData = await getFullStoreData();
+  return fullData.employees || [];
+}
+
+export async function createEmployee(name: string): Promise<Employee> {
+  const cleanName = name.trim();
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('add_employee', { name: cleanName });
+    invalidateStoreCache();
+    return data.employee;
+  }
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('employees').insert({ name: cleanName }).select().single();
+    invalidateStoreCache();
+    return data;
+  }
+  return { id: `emp-${Date.now()}`, name: cleanName, created_at: new Date().toISOString() };
+}
+
+export async function updateEmployee(id: string, name: string): Promise<Employee> {
+  const cleanName = name.trim();
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('update_employee', { id, name: cleanName });
+    invalidateStoreCache();
+    return data.employee;
+  }
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('employees').update({ name: cleanName }).eq('id', id).select().single();
+    invalidateStoreCache();
+    return data;
+  }
+  return { id, name: cleanName, created_at: new Date().toISOString() };
+}
+
+export async function deleteEmployee(id: string): Promise<void> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    await fetchStoreApi('delete_employee', { id });
+    invalidateStoreCache();
+    return;
+  }
+  if (isSupabaseConfigured) {
+    await supabase.from('employees').delete().eq('id', id);
+    invalidateStoreCache();
+  }
+}
+
+// --- SCHOOL LISTS CRUD & SMART LINKING ---
+export async function getSchoolLists(): Promise<SchoolList[]> {
+  const fullData = await getFullStoreData();
+  return fullData.schoolLists || [];
+}
+
+export async function createSchoolList(payload: {
+  client_name: string;
+  school_name: string;
+  employee_id?: string | null;
+  status?: SchoolListStatus;
+  client_id?: string | null;
+}): Promise<SchoolList> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('create_school_list', payload);
+    invalidateStoreCache();
+    return data.schoolList;
+  }
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('school_lists').insert({
+      client_name: payload.client_name.trim(),
+      school_name: payload.school_name.trim(),
+      employee_id: payload.employee_id || null,
+      status: payload.status || 'pending',
+      client_id: payload.client_id || null,
+    }).select(`
+      id, client_name, school_name, employee_id, status, client_id, created_at,
+      employee:employees (id, name),
+      client:clients (id, name, phone)
+    `).single();
+    invalidateStoreCache();
+    return data;
+  }
+  return {
+    id: `list-${Date.now()}`,
+    client_name: payload.client_name,
+    school_name: payload.school_name,
+    employee_id: payload.employee_id || null,
+    status: payload.status || 'pending',
+    client_id: payload.client_id || null,
+    created_at: new Date().toISOString(),
+  };
+}
+
+export async function updateSchoolList(id: string, updates: Partial<SchoolList>): Promise<SchoolList> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('update_school_list', { id, updates });
+    invalidateStoreCache();
+    return data.schoolList;
+  }
+  if (isSupabaseConfigured) {
+    const { data } = await supabase.from('school_lists').update(updates).eq('id', id).select(`
+      id, client_name, school_name, employee_id, status, client_id, created_at,
+      employee:employees (id, name),
+      client:clients (id, name, phone)
+    `).single();
+    invalidateStoreCache();
+    return data;
+  }
+  return { id, client_name: '', school_name: '', status: 'pending', ...updates };
+}
+
+export async function deleteSchoolList(id: string): Promise<void> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    await fetchStoreApi('delete_school_list', { id });
+    invalidateStoreCache();
+    return;
+  }
+  if (isSupabaseConfigured) {
+    await supabase.from('school_lists').delete().eq('id', id);
+    invalidateStoreCache();
+  }
+}
+
+export async function linkSchoolListClient(listId: string, clientId: string | null): Promise<SchoolList> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('link_school_list_client', { listId, clientId });
+    invalidateStoreCache();
+    return data.schoolList;
+  }
+  if (isSupabaseConfigured) {
+    const updateData: any = { client_id: clientId || null };
+    if (clientId) updateData.status = 'pending';
+    const { data } = await supabase.from('school_lists').update(updateData).eq('id', listId).select(`
+      id, client_name, school_name, employee_id, status, client_id, created_at,
+      employee:employees (id, name),
+      client:clients (id, name, phone)
+    `).single();
+    invalidateStoreCache();
+    return data;
+  }
+  return { id: listId, client_name: '', school_name: '', status: clientId ? 'pending' : 'done', client_id: clientId };
+}
+
+export async function convertSchoolListToClient(listId: string): Promise<{
+  clientId: string;
+  demandId: string;
+  schoolList: SchoolList;
+}> {
+  invalidateStoreCache();
+  if (isBrowser) {
+    const data = await fetchStoreApi('convert_school_list_to_client', { listId });
+    invalidateStoreCache();
+    return data;
+  }
+  if (isSupabaseConfigured) {
+    // 1. Fetch list
+    const { data: listData } = await supabase.from('school_lists').select('*').eq('id', listId).single();
+    if (!listData) throw new Error('List not found');
+
+    let clientId = listData.client_id;
+    if (!clientId && listData.client_name) {
+      const { data: matched } = await supabase.from('clients').select('*').ilike('name', listData.client_name.trim()).limit(1);
+      if (matched && matched.length > 0) {
+        clientId = matched[0].id;
+      } else {
+        const { data: newC } = await supabase.from('clients').insert({ name: listData.client_name.trim(), phone: '' }).select().single();
+        clientId = newC?.id;
+      }
+    }
+
+    const { data: updatedList } = await supabase.from('school_lists').update({ client_id: clientId, status: 'pending' }).eq('id', listId).select(`
+      id, client_name, school_name, employee_id, status, client_id, created_at,
+      employee:employees (id, name),
+      client:clients (id, name, phone)
+    `).single();
+
+    return {
+      clientId: clientId || '',
+      demandId: '',
+      schoolList: updatedList || listData,
+    };
+  }
+
+  return {
+    clientId: `client-${Date.now()}`,
+    demandId: `demand-${Date.now()}`,
+    schoolList: { id: listId, client_name: '', school_name: '', status: 'pending' },
+  };
+}
+
+

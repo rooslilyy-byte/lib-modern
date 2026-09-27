@@ -366,7 +366,7 @@ function DemandsList({
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto">
+            <div className="flex items-center gap-1 bg-neutral-100/90 p-1 rounded-xl border border-neutral-200/80 overflow-x-auto">
               {[
                 { key: 'all', label: 'الكل' },
                 { key: 'pending', label: 'معلق' },
@@ -377,10 +377,10 @@ function DemandsList({
                   key={btn.key}
                   type="button"
                   onClick={() => setStatusFilter(btn.key as any)}
-                  className={`h-7 sm:h-9 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${
+                  className={`h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
                     statusFilter === btn.key
-                      ? 'bg-neutral-900 text-white shadow-xs'
-                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      ? 'bg-orange-700 text-white shadow-xs font-bold'
+                      : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/60'
                   }`}
                 >
                   {btn.label}

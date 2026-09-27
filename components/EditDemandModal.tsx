@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
+import { PRODUCT_CATEGORIES, ProductCategoryKey, normalizeCategory } from '@/lib/categoryUtils';
 import ProductAutocomplete from './ProductAutocomplete';
 
 interface EditDemandModalProps {
@@ -28,6 +29,7 @@ interface EditDemandModalProps {
       quantity: number;
       is_in_stock?: boolean;
       is_delivered?: boolean;
+      category?: ProductCategoryKey;
     }[],
     avanceAmount?: number,
     totalAmount?: number
@@ -56,6 +58,7 @@ function EditDemandModal({
       quantity: number | string;
       is_in_stock: boolean;
       is_delivered: boolean;
+      category: ProductCategoryKey;
     }[]
   >([]);
 
@@ -65,13 +68,20 @@ function EditDemandModal({
   useEffect(() => {
     if (demand.items) {
       setItems(
-        demand.items.map(it => ({
-          id: it.id,
-          product_name: it.product_name,
-          quantity: it.quantity,
-          is_in_stock: it.is_in_stock,
-          is_delivered: it.is_delivered,
-        }))
+        demand.items.map(it => {
+          const matched = masterProducts.find(
+            mp => mp.name.trim().toLowerCase() === it.product_name.trim().toLowerCase()
+          );
+          const cat = normalizeCategory((it as any).category || matched?.category || 'books');
+          return {
+            id: it.id,
+            product_name: it.product_name,
+            quantity: it.quantity,
+            is_in_stock: it.is_in_stock,
+            is_delivered: it.is_delivered,
+            category: cat,
+          };
+        })
       );
     }
     if (demand.avance_amount !== undefined && demand.avance_amount > 0) {
@@ -80,7 +90,7 @@ function EditDemandModal({
     if (demand.total_amount !== undefined && demand.total_amount > 0) {
       setTotalAmount(String(demand.total_amount));
     }
-  }, [demand]);
+  }, [demand, masterProducts]);
 
   const handlePreventNegativeKey = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
@@ -134,6 +144,7 @@ function EditDemandModal({
         quantity: 1,
         is_in_stock: false,
         is_delivered: false,
+        category: 'books',
       },
     ]);
   }, []);
@@ -159,14 +170,16 @@ function EditDemandModal({
       quantity: number;
       is_in_stock: boolean;
       is_delivered: boolean;
+      category: ProductCategoryKey;
     }> = {};
 
     for (const item of items) {
       const name = item.product_name.trim();
       if (!name) continue;
       const qty = Math.max(1, Number(item.quantity) || 1);
+      const cat = item.category || 'books';
       if (!itemMap[name]) {
-        itemMap[name] = { ...item, product_name: name, quantity: qty };
+        itemMap[name] = { ...item, product_name: name, quantity: qty, category: cat };
       } else {
         itemMap[name].quantity += qty;
         itemMap[name].is_in_stock = itemMap[name].is_in_stock || item.is_in_stock;
@@ -299,6 +312,11 @@ function EditDemandModal({
                       <ProductAutocomplete
                         value={item.product_name}
                         onChange={(val) => handleItemChange(idx, 'product_name', val)}
+                        onSelectProduct={(prod) => {
+                          if (prod.category) {
+                            handleItemChange(idx, 'category', normalizeCategory(prod.category));
+                          }
+                        }}
                         masterProducts={masterProducts}
                         placeholder="اسم الكتاب أو المادة..."
                         required
@@ -317,7 +335,7 @@ function EditDemandModal({
                           const val = e.target.value;
                           handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
                         }}
-                        className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-8 sm:h-9"
+                        className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-10"
                       />
                     </div>
 
@@ -325,11 +343,33 @@ function EditDemandModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
                       >
-                        <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
+                  </div>
+
+                  {/* Category Pill Selector */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-1">
+                    <span className="text-[11px] sm:text-xs font-bold text-gray-700 ml-1">الصنف:</span>
+                    {PRODUCT_CATEGORIES.map(cat => {
+                      const isSelected = (item.category || 'books') === cat.key;
+                      return (
+                        <button
+                          key={cat.key}
+                          type="button"
+                          onClick={() => handleItemChange(idx, 'category', cat.key)}
+                          className={`px-3 py-1 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-orange-700 text-white font-bold border border-transparent shadow-sm scale-105 ring-2 ring-orange-700/20'
+                              : 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Status checks */}

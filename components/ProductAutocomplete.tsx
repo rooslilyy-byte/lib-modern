@@ -7,6 +7,7 @@ import { Package, PlusCircle, Check } from 'lucide-react';
 interface ProductAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
+  onSelectProduct?: (product: { name: string; category?: string }) => void;
   masterProducts: MasterProduct[];
   placeholder?: string;
   className?: string;
@@ -16,6 +17,7 @@ interface ProductAutocompleteProps {
 function ProductAutocomplete({
   value,
   onChange,
+  onSelectProduct,
   masterProducts,
   placeholder = 'ابحث أو اكتب اسم الكتاب...',
   className = '',
@@ -104,11 +106,14 @@ function ProductAutocomplete({
     }
   }, [focusedIndex, isOpen]);
 
-  const handleSelect = useCallback((name: string) => {
-    onChange(name);
+  const handleSelect = useCallback((item: { name: string; category?: string }) => {
+    onChange(item.name);
+    if (onSelectProduct) {
+      onSelectProduct(item);
+    }
     setIsOpen(false);
     setFocusedIndex(-1);
-  }, [onChange]);
+  }, [onChange, onSelectProduct]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen) {
@@ -127,7 +132,7 @@ function ProductAutocomplete({
     } else if (e.key === 'Enter') {
       if (focusedIndex >= 0 && focusedIndex < suggestions.length) {
         e.preventDefault();
-        handleSelect(suggestions[focusedIndex].name);
+        handleSelect(suggestions[focusedIndex]);
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
@@ -164,7 +169,7 @@ function ProductAutocomplete({
               return (
                 <div
                   key={item.id}
-                  onClick={() => handleSelect(item.name)}
+                  onClick={() => handleSelect(item)}
                   onMouseEnter={() => setFocusedIndex(index)}
                   className={`px-3.5 py-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 text-orange-700 bg-orange-50/80 hover:bg-orange-100/80 min-h-[40px] ${
                     isFocused ? 'bg-orange-100 text-orange-900 font-bold' : ''
@@ -186,7 +191,7 @@ function ProductAutocomplete({
             return (
               <div
                 key={item.id}
-                onClick={() => handleSelect(item.name)}
+                onClick={() => handleSelect(item)}
                 onMouseEnter={() => setFocusedIndex(index)}
                 className={`px-3.5 py-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 min-h-[40px] ${
                   isFocused || isExactSelected ? 'bg-neutral-100 text-neutral-900 font-bold' : 'hover:bg-neutral-50 text-neutral-800'

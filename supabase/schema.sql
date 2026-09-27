@@ -124,12 +124,53 @@ ALTER TABLE public.master_products ADD COLUMN IF NOT EXISTS available_stock INTE
 -- Add status column to demand_items if missing
 ALTER TABLE public.demand_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
 
+-- 6. EMPLOYEES TABLE (الموظفين)
+CREATE TABLE IF NOT EXISTS public.employees (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_employees_name ON public.employees(name);
+
+-- 7. SCHOOL LISTS TABLE (اللوائح المدرسية)
+CREATE TABLE IF NOT EXISTS public.school_lists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_name TEXT NOT NULL,
+    school_name TEXT NOT NULL,
+    employee_id UUID REFERENCES public.employees(id) ON DELETE SET NULL,
+    status TEXT NOT NULL CHECK (status IN ('done', 'pending')) DEFAULT 'pending',
+    client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_school_lists_employee ON public.school_lists(employee_id);
+CREATE INDEX IF NOT EXISTS idx_school_lists_client ON public.school_lists(client_id);
+CREATE INDEX IF NOT EXISTS idx_school_lists_status ON public.school_lists(status);
+
+-- 8. APP SETTINGS TABLE (إعدادات التطبيق وكلمة المرور)
+CREATE TABLE IF NOT EXISTS public.app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_settings_key ON public.app_settings(key);
+
+-- Insert default admin password if not exists
+INSERT INTO public.app_settings (key, value)
+VALUES ('admin_password', 'librarymodern2026')
+ON CONFLICT (key) DO NOTHING;
+
 -- Enable Row Level Security (RLS) and allow anonymous dashboard access
 ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.master_products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_batches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_demands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.demand_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.school_lists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public full access clients" ON public.clients;
 CREATE POLICY "Public full access clients" ON public.clients FOR ALL USING (true) WITH CHECK (true);
@@ -145,3 +186,14 @@ CREATE POLICY "Public full access client_demands" ON public.client_demands FOR A
 
 DROP POLICY IF EXISTS "Public full access demand_items" ON public.demand_items;
 CREATE POLICY "Public full access demand_items" ON public.demand_items FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access employees" ON public.employees;
+CREATE POLICY "Public full access employees" ON public.employees FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access school_lists" ON public.school_lists;
+CREATE POLICY "Public full access school_lists" ON public.school_lists FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public full access app_settings" ON public.app_settings;
+CREATE POLICY "Public full access app_settings" ON public.app_settings FOR ALL USING (true) WITH CHECK (true);
+
+

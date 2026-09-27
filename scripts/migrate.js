@@ -62,7 +62,7 @@ async function runMigration() {
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name IN ('clients', 'master_products', 'purchase_batches', 'client_demands', 'demand_items')
+      AND table_name IN ('clients', 'master_products', 'purchase_batches', 'client_demands', 'demand_items', 'employees', 'school_lists')
       ORDER BY table_name;
     `);
 
@@ -75,10 +75,10 @@ async function runMigration() {
       console.log(`Table public.${tbl}: ${cntRes.rows[0].count} records`);
     }
 
-    if (existingTables.length === 5) {
-      console.log('\nSUCCESS: All 5 database tables (clients, master_products, purchase_batches, client_demands, demand_items) exist and are ready for read/write operations!');
+    if (existingTables.length >= 7) {
+      console.log('\nSUCCESS: All 7 database tables (clients, master_products, purchase_batches, client_demands, demand_items, employees, school_lists) exist and are ready for read/write operations!');
     } else {
-      console.warn(`Warning: Expected 5 tables but found ${existingTables.length}: ${existingTables.join(', ')}`);
+      console.warn(`Warning: Expected 7 tables but found ${existingTables.length}: ${existingTables.join(', ')}`);
     }
 
   } catch (err) {

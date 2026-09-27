@@ -7,6 +7,7 @@ import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
 import { compareProductNames } from '@/lib/sortUtils';
 import { useLanguage } from '@/lib/languageContext';
+import { printIsolated, preloadPrintAssets } from '@/lib/printUtils';
 
 type ReportTab = 'normal' | 'rupture';
 
@@ -28,7 +29,9 @@ function SupplierBuyingSheet({
 
   useEffect(() => {
     setMounted(true);
+    preloadPrintAssets();
   }, []);
+
 
   const fetchReport = useCallback(async (tab: ReportTab) => {
     setIsLoading(true);
@@ -102,8 +105,16 @@ function SupplierBuyingSheet({
   }, [rawReport]);
 
   const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
+    const el = document.getElementById('printable-a4-report');
+    if (el) {
+      printIsolated(el.innerHTML, {
+        type: 'a4',
+        title: activeTab === 'normal' ? 'تقرير-المشتريات-المعلقة-A4' : 'تقرير-السلع-المقطوعة-A4',
+      });
+    } else {
+      window.print();
+    }
+  }, [activeTab]);
 
   const totalItemTypes = report.length;
   const totalPiecesCount = useMemo(() => {
@@ -129,6 +140,8 @@ function SupplierBuyingSheet({
               src="/logo-lib-modern.jpg"
               alt="Lib Moderne"
               className="w-12 h-12 object-contain shrink-0"
+              loading="eager"
+              decoding="sync"
             />
             <div>
               <div className="flex items-center gap-2">
@@ -169,21 +182,21 @@ function SupplierBuyingSheet({
           </div>
         </div>
 
-        {/* View Switcher: Normal vs Rupture */}
-        <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-100/80 p-1 sm:p-1.5 rounded-full border border-neutral-200/60 text-[11px] sm:text-xs font-bold">
+        {/* View Switcher: Brand Segmented Control */}
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-neutral-100/90 p-1 sm:p-1.5 rounded-2xl border border-neutral-200/80 text-[11px] sm:text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('normal')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
               activeTab === 'normal'
-                ? 'bg-neutral-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
+                ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
-            <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-orange-700" />
+            <ShoppingCart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'normal' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
             <span>المشتريات العادية</span>
-            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
-              activeTab === 'normal' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+              activeTab === 'normal' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {demands ? normalReport.length : (activeTab === 'normal' ? report.length : '-')}
             </span>
@@ -192,16 +205,16 @@ function SupplierBuyingSheet({
           <button
             type="button"
             onClick={() => setActiveTab('rupture')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
               activeTab === 'rupture'
-                ? 'bg-neutral-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
+                ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
-            <AlertCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+            <AlertCircle className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'rupture' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
             <span>السلع غير المتوفرة</span>
-            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
-              activeTab === 'rupture' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+              activeTab === 'rupture' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {demands ? ruptureReport.length : (activeTab === 'rupture' ? report.length : '-')}
             </span>
@@ -268,7 +281,10 @@ function SupplierBuyingSheet({
                   src="/logo-lib-modern.jpg"
                   alt="Lib Moderne - المكتبة العصرية"
                   className="h-14 w-auto object-contain block shrink-0"
+                  loading="eager"
+                  decoding="sync"
                 />
+
                 <div>
                   <h1 className="text-2xl font-black text-black">
                     المكتبة العصرية — Lib Moderne

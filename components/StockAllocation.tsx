@@ -59,12 +59,34 @@ function StockAllocation({
   const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Modal State
   const [modalProduct, setModalProduct] = useState<{ productName: string; totalMissingQty: number } | null>(null);
   const [modalQty, setModalQty] = useState<string>('');
-  const [isProcessingModal, setIsProcessingModal] = useState(false);
   const modalInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Helper for displaying auto-dismissing toast notifications
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success', duration = 3000) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToastType(type);
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, duration);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (modalProduct) {
@@ -205,7 +227,7 @@ function StockAllocation({
     setModalQty(product.totalMissingQty.toString());
   }, []);
 
-  const handleConfirmAllocation = useCallback(async (e: React.FormEvent) => {
+  const handleConfirmAllocation = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (!modalProduct || !onAutoAllocateStock) return;
 
@@ -215,44 +237,57 @@ function StockAllocation({
       return;
     }
 
-    setIsProcessingModal(true);
-    try {
-      await onAutoAllocateStock(modalProduct.productName, qty);
-      setToastMessage(`تم توزيع ${qty} قطعة من "${modalProduct.productName}" بنجاح`);
-      setTimeout(() => setToastMessage(null), 3000);
-      setModalProduct(null);
-      setModalQty('');
-    } catch (err) {
-      console.error('Error allocating stock:', err);
-      alert('حدث خطأ أثناء توزيع المخزون.');
-    } finally {
-      setIsProcessingModal(false);
-    }
-  }, [modalProduct, modalQty, onAutoAllocateStock]);
+    const { productName } = modalProduct;
 
-  const handleToggleRupture = useCallback(async (productName: string, isCurrentlyRupture: boolean) => {
+    // 1. Frontend Non-Blocking Logic (Instant UI response):
+    // IMMEDIATELY execute UI closing actions: close modal, reset form, and display success toast
+    setModalProduct(null);
+    setModalQty('');
+    showToast(`تم توزيع ${qty} قطعة من "${productName}" بنجاح`, 'success', 3000);
+
+    // 2. Background Execution ("Fire and Forget"):
+    // Let backend API run asynchronously in background without blocking UI thread
+    onAutoAllocateStock(productName, qty).catch((err) => {
+      console.error('Error allocating stock in background:', err);
+      showToast('حدث خطأ أثناء توزيع المخزون في الخلفية.', 'error', 4500);
+    });
+  }, [modalProduct, modalQty, onAutoAllocateStock, showToast]);
+
+  const handleToggleRupture = useCallback((productName: string, isCurrentlyRupture: boolean) => {
     if (isCurrentlyRupture) {
       if (onRestoreEnRupture) {
-        await onRestoreEnRupture(productName);
-        setToastMessage(`تمت استعادة "${productName}" إلى قائمة المشتريات`);
-        setTimeout(() => setToastMessage(null), 3000);
+        showToast(`تمت استعادة "${productName}" إلى قائمة المشتريات`, 'success', 3000);
+        onRestoreEnRupture(productName).catch((err) => {
+          console.error('Error restoring en rupture:', err);
+          showToast('حدث خطأ أثناء استعادة السلعة.', 'error', 4500);
+        });
       }
     } else {
       if (onMarkEnRupture) {
-        await onMarkEnRupture(productName);
-        setToastMessage(`تم نقل "${productName}" إلى قائمة السلع غير المتوفرة`);
-        setTimeout(() => setToastMessage(null), 3000);
+        showToast(`تم نقل "${productName}" إلى قائمة السلع غير المتوفرة`, 'success', 3000);
+        onMarkEnRupture(productName).catch((err) => {
+          console.error('Error marking en rupture:', err);
+          showToast('حدث خطأ أثناء نقل السلعة إلى غير المتوفرة.', 'error', 4500);
+        });
       }
     }
-  }, [onRestoreEnRupture, onMarkEnRupture]);
+  }, [onRestoreEnRupture, onMarkEnRupture, showToast]);
 
   return (
     <div className="space-y-5 sm:space-y-6">
       
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border border-neutral-700">
-          <CheckCircle2 className="w-5 h-5 text-orange-700" />
+        <div className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border ${
+          toastType === 'error'
+            ? 'bg-rose-950/95 border-rose-600/80 text-rose-100'
+            : 'bg-neutral-900 border-neutral-700'
+        }`}>
+          {toastType === 'error' ? (
+            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-orange-700 shrink-0" />
+          )}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -290,21 +325,21 @@ function StockAllocation({
           </div>
         </div>
 
-        {/* Tab Switcher: Normal vs Rupture */}
-        <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-100/80 p-1 sm:p-1.5 rounded-full border border-neutral-200/60 text-[11px] sm:text-xs font-bold">
+        {/* Tab Switcher: Brand Segmented Control */}
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-neutral-100/90 p-1 sm:p-1.5 rounded-2xl border border-neutral-200/80 text-[11px] sm:text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('normal')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
               activeTab === 'normal'
-                ? 'bg-neutral-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
+                ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
-            <Package className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <Package className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'normal' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
             <span>{t('stock.tab_normal')}</span>
-            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
-              activeTab === 'normal' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+              activeTab === 'normal' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {normalProductsList.length}
             </span>
@@ -313,16 +348,16 @@ function StockAllocation({
           <button
             type="button"
             onClick={() => setActiveTab('rupture')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-full transition-all duration-300 min-h-[34px] sm:min-h-[38px] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
               activeTab === 'rupture'
-                ? 'bg-neutral-900 text-white shadow-sm'
-                : 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60'
+                ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
-            <Ban className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <Ban className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'rupture' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
             <span>{t('stock.tab_rupture')}</span>
-            <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] ${
-              activeTab === 'rupture' ? 'bg-orange-700 text-white' : 'bg-neutral-200 text-neutral-700'
+            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+              activeTab === 'rupture' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {ruptureProductsList.length}
             </span>
@@ -342,8 +377,8 @@ function StockAllocation({
             />
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-            <span className="text-[11px] sm:text-xs text-neutral-400 font-bold hidden sm:inline">الترتيب:</span>
+          <div className="flex items-center gap-1 bg-neutral-100/90 p-1 rounded-xl border border-neutral-200/80 flex-wrap">
+            <span className="text-[11px] text-neutral-500 font-bold px-2 hidden sm:inline">الترتيب:</span>
             {[
               { key: 'alphabetical', label: t('stock.sort_alpha') },
               { key: 'oldest', label: t('stock.sort_oldest') },
@@ -353,10 +388,10 @@ function StockAllocation({
                 key={opt.key}
                 type="button"
                 onClick={() => setSortBy(opt.key as SortOption)}
-                className={`h-7 sm:h-9 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-full transition-all ${
+                className={`h-7 sm:h-8 px-2.5 sm:px-3.5 text-[11px] sm:text-xs font-bold rounded-lg transition-all ${
                   sortBy === opt.key
-                    ? 'bg-neutral-900 text-white shadow-xs'
-                    : 'bg-white border border-neutral-200/80 text-neutral-600 hover:bg-neutral-50'
+                    ? 'bg-orange-700 text-white shadow-xs font-bold'
+                    : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/60'
                 }`}
               >
                 {opt.label}
@@ -523,10 +558,9 @@ function StockAllocation({
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessingModal}
-                  className="px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full shadow-lg shadow-orange-700/20 transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50"
+                  className="px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full shadow-lg shadow-orange-700/20 transition-all duration-300 hover:-translate-y-0.5"
                 >
-                  {isProcessingModal ? 'جاري التوزيع...' : 'تأكيد التوزيع الفوري'}
+                  تأكيد التوزيع الفوري
                 </button>
               </div>
             </form>

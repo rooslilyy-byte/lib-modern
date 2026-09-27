@@ -73,3 +73,26 @@ export interface SupplierAggregatedItem {
     demandId: string;
   }[];
 }
+
+export interface Employee {
+  id: string;
+  name: string;
+  created_at?: string;
+}
+
+export type SchoolListStatus = 'done' | 'pending';
+
+export interface SchoolList {
+  id: string;
+  client_name: string;
+  school_name: string;
+  employee_id?: string | null;
+  status: SchoolListStatus;
+  client_id?: string | null;
+  created_at?: string;
+
+  // Joined relational data
+  employee?: Employee;
+  client?: Client;
+}
+

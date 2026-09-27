@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Phone, 
   Calendar, 
@@ -18,7 +18,8 @@ import {
   Square,
   Wallet,
   Receipt,
-  Coins
+  Coins,
+  Plus
 } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
@@ -59,9 +60,18 @@ function CustomerDetails({
   onDeleteDemand,
 }: CustomerDetailsProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const [isEditing, setIsEditing] = useState(false);
+  
+  const autoEditParam = searchParams.get('edit') === 'true';
+  const [isEditing, setIsEditing] = useState(autoEditParam);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  useEffect(() => {
+    if (autoEditParam) {
+      setIsEditing(true);
+    }
+  }, [autoEditParam]);
 
   // Match target demand strictly by demand id or client id
   const targetDemand = useMemo(() => {
@@ -322,69 +332,87 @@ function CustomerDetails({
           </span>
         </div>
 
-        {/* Dense Items Table */}
-        <div className="divide-y divide-neutral-100 overflow-hidden">
-          {targetDemand.items?.map((item, idx) => {
-            const isStockOnly = item.is_in_stock && !item.is_delivered;
-            const isDelivered = item.is_delivered;
+        {/* Dense Items Table / Empty State */}
+        {(!targetDemand.items || targetDemand.items.length === 0) ? (
+          <div className="text-center py-10 px-4 bg-neutral-50/70 rounded-2xl border border-dashed border-neutral-200 space-y-3">
+            <BookOpen className="w-10 h-10 text-neutral-300 mx-auto" />
+            <div>
+              <p className="text-sm font-black text-neutral-800">لا توجد خصاصات أو كتب مسجلة لهذا الزبون بعد</p>
+              <p className="text-xs text-neutral-400 mt-0.5">انقر على الزر أدناه لإضافة الكتب والمستلزمات المطلوبة مباشرة</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex items-center gap-2 bg-orange-700 hover:bg-orange-800 text-white text-xs font-bold px-4 sm:px-5 h-9 sm:h-10 rounded-full shadow-md shadow-orange-700/20 transition-all active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>إضافة الكتب والمستلزمات المطلوبة</span>
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-neutral-100 overflow-hidden">
+            {targetDemand.items.map((item, idx) => {
+              const isStockOnly = item.is_in_stock && !item.is_delivered;
+              const isDelivered = item.is_delivered;
 
-            return (
-              <div 
-                key={item.id} 
-                className={`py-3.5 px-3 sm:px-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
-                  isDelivered
-                    ? 'bg-neutral-50/50 text-neutral-400'
-                    : isStockOnly
-                    ? 'bg-blue-50/40 text-neutral-900'
-                    : 'hover:bg-white text-neutral-900'
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="w-6 h-6 rounded-lg bg-neutral-100 text-neutral-700 font-bold text-xs flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <h4 className={`text-xs sm:text-sm font-extrabold leading-snug ${isDelivered ? 'line-through text-neutral-400' : 'text-neutral-900'}`}>
-                      {item.product_name}
-                    </h4>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      الكمية: <strong className="text-neutral-800">{item.quantity}</strong> قطعة
-                    </p>
+              return (
+                <div 
+                  key={item.id} 
+                  className={`py-3.5 px-3 sm:px-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
+                    isDelivered
+                      ? 'bg-neutral-50/50 text-neutral-400'
+                      : isStockOnly
+                      ? 'bg-blue-50/40 text-neutral-900'
+                      : 'hover:bg-white text-neutral-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-lg bg-neutral-100 text-neutral-700 font-bold text-xs flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div>
+                      <h4 className={`text-xs sm:text-sm font-extrabold leading-snug ${isDelivered ? 'line-through text-neutral-400' : 'text-neutral-900'}`}>
+                        {item.product_name}
+                      </h4>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">
+                        الكمية: <strong className="text-neutral-800">{item.quantity}</strong> قطعة
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* State Toggles (In Stock & Delivered) */}
+                  <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
+                      className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
+                        item.is_in_stock
+                          ? 'bg-blue-500 text-white border-blue-500 shadow-xs'
+                          : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      {item.is_in_stock ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                      <span>متوفر بالمتجر</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onUpdateItemState(item.id, { is_delivered: !item.is_delivered, is_in_stock: true })}
+                      className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
+                        item.is_delivered
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      {item.is_delivered ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                      <span>تم التسليم للزبون</span>
+                    </button>
                   </div>
                 </div>
-
-                {/* State Toggles (In Stock & Delivered) */}
-                <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => onUpdateItemState(item.id, { is_in_stock: !item.is_in_stock })}
-                    className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
-                      item.is_in_stock
-                        ? 'bg-blue-500 text-white border-blue-500 shadow-xs'
-                        : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
-                    }`}
-                  >
-                    {item.is_in_stock ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                    <span>متوفر بالمتجر</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onUpdateItemState(item.id, { is_delivered: !item.is_delivered, is_in_stock: true })}
-                    className={`text-[11px] sm:text-xs font-bold px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full border flex items-center gap-1 sm:gap-1.5 transition-all ${
-                      item.is_delivered
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-300'
-                    }`}
-                  >
-                    {item.is_delivered ? <CheckSquare className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-                    <span>تم التسليم للزبون</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
       </div>
 

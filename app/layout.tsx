@@ -20,9 +20,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} overflow-x-hidden`} suppressHydrationWarning>
+      <head>
+        <link rel="preload" as="image" href="/logo-lib-modern.jpg" />
+        <link rel="preload" as="image" href="/logo no background.png" />
+      </head>
       <body className="min-h-screen bg-[#F8F9FA] font-cairo antialiased selection:bg-neutral-900 selection:text-white overflow-x-hidden" suppressHydrationWarning>
         {children}
       </body>
     </html>
   );
 }
+

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db';
-import type { ClientDemand, MasterProduct, PurchaseBatch } from '@/lib/types';
+import type { ClientDemand, MasterProduct, PurchaseBatch, Employee, SchoolList } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -94,6 +94,33 @@ async function ensureMasterProducts(names: string[], category = DEFAULT_PRODUCT_
     'Upserting master products',
   );
 }
+
+async function ensureMasterProductsWithCategories(
+  items: { product_name: string; category?: string }[]
+): Promise<void> {
+  const map = new Map<string, string>();
+  for (const item of items) {
+    const name = (item.product_name || '').trim();
+    if (!name) continue;
+    const cat = item.category ? item.category.trim() : DEFAULT_PRODUCT_CATEGORY;
+    map.set(name, cat);
+  }
+
+  if (map.size === 0) return;
+
+  const rows = Array.from(map.entries()).map(([name, category]) => ({
+    name,
+    category,
+  }));
+
+  unwrap(
+    await supabaseAdmin
+      .from('master_products')
+      .upsert(rows, { onConflict: 'name' }),
+    'Upserting master products with categories',
+  );
+}
+
 
 async function ensureMasterProduct(name: string, category = DEFAULT_PRODUCT_CATEGORY): Promise<MasterProduct | null> {
   const trimmed = (name || '').trim();
@@ -375,25 +402,176 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
   return demands;
 }
 
+async function getEmployeesFromDb(): Promise<Employee[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('employees')
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) {
+      console.warn('Error loading employees from db:', error);
+      return [];
+    }
+    return (data || []) as Employee[];
+  } catch (err) {
+    console.warn('Exception loading employees:', err);
+    return [];
+  }
+}
+
+async function getSchoolListsFromDb(): Promise<SchoolList[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('school_lists')
+      .select(`
+        id,
+        client_name,
+        school_name,
+        employee_id,
+        status,
+        client_id,
+        created_at,
+        employee:employees (
+          id,
+          name
+        ),
+        client:clients (
+          id,
+          name,
+          phone
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Error loading school lists from db:', error);
+      return [];
+    }
+    return (data || []).map((row: any) => ({
+      ...row,
+      employee: Array.isArray(row.employee) ? row.employee[0] : row.employee,
+      client: Array.isArray(row.client) ? row.client[0] : row.client,
+    })) as SchoolList[];
+  } catch (err) {
+    console.warn('Exception loading school lists:', err);
+    return [];
+  }
+}
+
+async function checkAndUpdateFulfilledSchoolLists(clientIds: string[]): Promise<void> {
+  const uniqueClientIds = Array.from(new Set(clientIds.filter(Boolean)));
+  if (uniqueClientIds.length === 0) return;
+
+  try {
+    for (const cId of uniqueClientIds) {
+      const { data: demands } = await supabaseAdmin
+        .from('client_demands')
+        .select(`
+          id,
+          items:demand_items (
+            id,
+            quantity,
+            fulfilled_quantity,
+            is_in_stock,
+            is_delivered
+          )
+        `)
+        .eq('client_id', cId);
+
+      if (!demands || demands.length === 0) continue;
+
+      let allFulfilled = true;
+      let totalItemsCount = 0;
+
+      for (const d of demands) {
+        const items = d.items || [];
+        totalItemsCount += items.length;
+        for (const it of items) {
+          const totalQty = Number(it.quantity) || 0;
+          const fulfilled = Number(it.fulfilled_quantity) || (it.is_in_stock ? totalQty : 0);
+          if (!it.is_in_stock && !it.is_delivered && fulfilled < totalQty) {
+            allFulfilled = false;
+            break;
+          }
+        }
+        if (!allFulfilled) break;
+      }
+
+      if (allFulfilled && totalItemsCount > 0) {
+        await supabaseAdmin
+          .from('school_lists')
+          .update({ status: 'done' })
+          .eq('client_id', cId)
+          .eq('status', 'pending');
+      }
+    }
+  } catch (err) {
+    console.warn('Warning: Could not check/update fulfilled school lists:', err);
+  }
+}
+
+async function getAllMasterProductsFromDb(): Promise<{ products: MasterProduct[]; totalCount: number }> {
+  const CHUNK_SIZE = 1000;
+  let all: MasterProduct[] = [];
+  let from = 0;
+  let totalCount = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, count, error } = await supabaseAdmin
+      .from('master_products')
+      .select('*', { count: 'exact' })
+      .order('name', { ascending: true })
+      .range(from, from + CHUNK_SIZE - 1);
+
+    if (error) {
+      console.error('Error fetching master products chunk:', error);
+      break;
+    }
+
+    if (count !== null && count !== undefined) {
+      totalCount = count;
+    }
+
+    if (data && data.length > 0) {
+      all = all.concat(data as MasterProduct[]);
+      if (data.length < CHUNK_SIZE) {
+        hasMore = false;
+      } else {
+        from += CHUNK_SIZE;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return { products: all, totalCount: totalCount || all.length };
+}
+
 export async function GET() {
   try {
     const activeBatch = await getActiveBatch();
 
-    const masterProducts = unwrap(
-      await supabaseAdmin
-        .from('master_products')
-        .select('*')
-        .order('name', { ascending: true }),
-      'Loading master products',
-    ) as MasterProduct[];
-
-    const demands = await getDemandsForBatch(activeBatch.id);
+    const [
+      { products: masterProducts, totalCount: masterProductsCount },
+      demands,
+      employees,
+      schoolLists,
+    ] = await Promise.all([
+      getAllMasterProductsFromDb(),
+      getDemandsForBatch(activeBatch.id),
+      getEmployeesFromDb(),
+      getSchoolListsFromDb(),
+    ]);
 
     const response = NextResponse.json({
       success: true,
       activeBatch,
       masterProducts,
+      masterProductsCount,
       demands,
+      employees,
+      schoolLists,
     });
 
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -467,12 +645,12 @@ export async function POST(request: Request) {
         }
       }
 
-      // 3. Bulk Safe Upsert Master Products (onConflict: 'name')
+      // 3. Bulk Safe Upsert Master Products with Categories (onConflict: 'name')
       const validItems = (Array.isArray(items) ? items : []).filter(
         (it: any) => it && it.product_name && it.product_name.trim()
       );
-      const productNames = validItems.map((it: any) => it.product_name.trim());
-      await ensureMasterProducts(productNames);
+      await ensureMasterProductsWithCategories(validItems);
+
 
       // 4. Bulk Insert Demand Items in a single network request
       if (validItems.length > 0) {
@@ -648,6 +826,20 @@ export async function POST(request: Request) {
             );
           }
         }
+      }
+
+      if (updates.is_in_stock || updates.is_delivered) {
+        try {
+          const { data: itData } = await supabaseAdmin
+            .from('demand_items')
+            .select('demand:client_demands (client_id)')
+            .eq('id', itemId)
+            .single();
+          const cliId = (itData?.demand as any)?.client_id;
+          if (cliId) {
+            await checkAndUpdateFulfilledSchoolLists([cliId]);
+          }
+        } catch {}
       }
 
       return NextResponse.json({ success: true });
@@ -881,6 +1073,17 @@ export async function POST(request: Request) {
         console.warn('Warning: Could not update rupture status after auto-allocation:', rErr);
       }
 
+      // Smart relational link: If client demands are 100% fulfilled, mark linked school_lists as 'done'
+      const allocatedClientIds = pendingItems
+        .map((it) => {
+          const cRaw = it.demand?.client;
+          const c = Array.isArray(cRaw) ? cRaw[0] : cRaw;
+          return c?.id;
+        })
+        .filter(Boolean);
+
+      await checkAndUpdateFulfilledSchoolLists(allocatedClientIds);
+
       return NextResponse.json({ success: true, allocatedClients, surplusQty: remainingStock });
     }
 
@@ -1008,6 +1211,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, product });
     }
 
+    if (action === 'update_product_category' || action === 'update_master_product') {
+      const { productId, productName, category } = body;
+      const cleanCategory = (category || 'others').trim();
+
+      let query = supabaseAdmin.from('master_products').update({ category: cleanCategory });
+      if (productId) {
+        query = query.eq('id', productId);
+      } else if (productName) {
+        query = query.eq('name', productName.trim());
+      } else {
+        return NextResponse.json({ success: false, message: 'productId or productName required' }, { status: 400 });
+      }
+
+      const product = unwrap(
+        await query.select().single(),
+        'Updating product category',
+      ) as MasterProduct;
+
+      return NextResponse.json({ success: true, product });
+    }
+
+
     if (action === 'archive_batch') {
       const { newBatchName } = body;
       const now = new Date().toISOString();
@@ -1030,6 +1255,369 @@ export async function POST(request: Request) {
       ) as PurchaseBatch;
 
       return NextResponse.json({ success: true, batch });
+    }
+
+    // --- EMPLOYEES CRUD ---
+    if (action === 'add_employee') {
+      const { name } = body;
+      const cleanName = (name || '').trim();
+      if (!cleanName) {
+        return NextResponse.json({ success: false, message: 'Employee name is required' }, { status: 400 });
+      }
+
+      const employee = unwrap(
+        await supabaseAdmin
+          .from('employees')
+          .insert({ name: cleanName })
+          .select()
+          .single(),
+        'Creating employee',
+      );
+
+      return NextResponse.json({ success: true, employee });
+    }
+
+    if (action === 'update_employee') {
+      const { id, name } = body;
+      const cleanName = (name || '').trim();
+      if (!cleanName) {
+        return NextResponse.json({ success: false, message: 'Employee name is required' }, { status: 400 });
+      }
+
+      const employee = unwrap(
+        await supabaseAdmin
+          .from('employees')
+          .update({ name: cleanName })
+          .eq('id', id)
+          .select()
+          .single(),
+        'Updating employee',
+      );
+
+      return NextResponse.json({ success: true, employee });
+    }
+
+    if (action === 'delete_employee') {
+      const { id } = body;
+      unwrap(
+        await supabaseAdmin
+          .from('employees')
+          .delete()
+          .eq('id', id),
+        'Deleting employee',
+      );
+
+      return NextResponse.json({ success: true });
+    }
+
+    // --- SCHOOL LISTS CRUD & LINKING ---
+    if (action === 'create_school_list') {
+      const { client_name, school_name, employee_id, status, client_id } = body;
+      const cleanClientName = (client_name || '').trim();
+      const cleanSchoolName = (school_name || '').trim();
+      const listStatus = status === 'done' ? 'done' : 'pending';
+
+      const schoolList = unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .insert({
+            client_name: cleanClientName,
+            school_name: cleanSchoolName,
+            employee_id: employee_id || null,
+            status: listStatus,
+            client_id: client_id || null,
+          })
+          .select(`
+            id,
+            client_name,
+            school_name,
+            employee_id,
+            status,
+            client_id,
+            created_at,
+            employee:employees (
+              id,
+              name
+            ),
+            client:clients (
+              id,
+              name,
+              phone
+            )
+          `)
+          .single(),
+        'Creating school list',
+      );
+
+      return NextResponse.json({
+        success: true,
+        schoolList: {
+          ...schoolList,
+          employee: Array.isArray(schoolList.employee) ? schoolList.employee[0] : schoolList.employee,
+          client: Array.isArray(schoolList.client) ? schoolList.client[0] : schoolList.client,
+        },
+      });
+    }
+
+    if (action === 'update_school_list') {
+      const { id, updates } = body;
+      const safeUpdates: DatabaseRow = {};
+      if (updates.client_name !== undefined) safeUpdates.client_name = updates.client_name.trim();
+      if (updates.school_name !== undefined) safeUpdates.school_name = updates.school_name.trim();
+      if (updates.employee_id !== undefined) safeUpdates.employee_id = updates.employee_id || null;
+      if (updates.status !== undefined) safeUpdates.status = updates.status;
+      if (updates.client_id !== undefined) safeUpdates.client_id = updates.client_id || null;
+
+      const schoolList = unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .update(safeUpdates)
+          .eq('id', id)
+          .select(`
+            id,
+            client_name,
+            school_name,
+            employee_id,
+            status,
+            client_id,
+            created_at,
+            employee:employees (
+              id,
+              name
+            ),
+            client:clients (
+              id,
+              name,
+              phone
+            )
+          `)
+          .single(),
+        'Updating school list',
+      );
+
+      return NextResponse.json({
+        success: true,
+        schoolList: {
+          ...schoolList,
+          employee: Array.isArray(schoolList.employee) ? schoolList.employee[0] : schoolList.employee,
+          client: Array.isArray(schoolList.client) ? schoolList.client[0] : schoolList.client,
+        },
+      });
+    }
+
+    if (action === 'delete_school_list') {
+      const { id } = body;
+      unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .delete()
+          .eq('id', id),
+        'Deleting school list',
+      );
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'link_school_list_client') {
+      const { listId, clientId } = body;
+      const targetClientId = clientId || null;
+      const updateData: DatabaseRow = { client_id: targetClientId };
+      if (targetClientId) {
+        updateData.status = 'pending';
+      }
+
+      const schoolList = unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .update(updateData)
+          .eq('id', listId)
+          .select(`
+            id,
+            client_name,
+            school_name,
+            employee_id,
+            status,
+            client_id,
+            created_at,
+            employee:employees (
+              id,
+              name
+            ),
+            client:clients (
+              id,
+              name,
+              phone
+            )
+          `)
+          .single(),
+        'Linking client to school list',
+      );
+
+      return NextResponse.json({
+        success: true,
+        schoolList: {
+          ...schoolList,
+          employee: Array.isArray(schoolList.employee) ? schoolList.employee[0] : schoolList.employee,
+          client: Array.isArray(schoolList.client) ? schoolList.client[0] : schoolList.client,
+        },
+      });
+    }
+
+    if (action === 'convert_school_list_to_client') {
+      const { listId } = body;
+
+      // 1. Fetch current school list record
+      const schoolList = unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .select('*')
+          .eq('id', listId)
+          .maybeSingle(),
+        'Loading school list for conversion',
+      ) as DatabaseRow | null;
+
+      if (!schoolList) {
+        return NextResponse.json({ success: false, message: 'School list not found' }, { status: 404 });
+      }
+
+      const cleanClientName = (schoolList.client_name || '').trim();
+      let targetClientId: string | null = schoolList.client_id || null;
+      let clientRow: DatabaseRow | null = null;
+
+      // Step A: Check if client exists in clients table (or create new if missing)
+      if (targetClientId) {
+        const existingClient = unwrap(
+          await supabaseAdmin
+            .from('clients')
+            .select('*')
+            .eq('id', targetClientId)
+            .maybeSingle(),
+          'Checking existing linked client',
+        ) as DatabaseRow | null;
+        if (existingClient) {
+          clientRow = existingClient;
+        }
+      }
+
+      if (!clientRow && cleanClientName) {
+        // Search by name (case-insensitive)
+        const { data: matchedClients } = await supabaseAdmin
+          .from('clients')
+          .select('*')
+          .ilike('name', cleanClientName)
+          .limit(1);
+
+        if (matchedClients && matchedClients.length > 0) {
+          clientRow = matchedClients[0];
+          targetClientId = clientRow.id;
+        } else {
+          // INSERT new client with list's client_name
+          clientRow = unwrap(
+            await supabaseAdmin
+              .from('clients')
+              .insert({ name: cleanClientName, phone: '' })
+              .select()
+              .single(),
+            'Inserting new client from school list',
+          ) as DatabaseRow;
+          targetClientId = clientRow.id;
+        }
+      }
+
+      if (!targetClientId || !clientRow) {
+        return NextResponse.json(
+          { success: false, message: 'Could not create or resolve client' },
+          { status: 400 },
+        );
+      }
+
+      // Step B: Update current school_lists record to link this client_id
+      const updatedList = unwrap(
+        await supabaseAdmin
+          .from('school_lists')
+          .update({
+            client_id: targetClientId,
+            status: 'pending',
+          })
+          .eq('id', listId)
+          .select(`
+            id,
+            client_name,
+            school_name,
+            employee_id,
+            status,
+            client_id,
+            created_at,
+            employee:employees (
+              id,
+              name
+            ),
+            client:clients (
+              id,
+              name,
+              phone
+            )
+          `)
+          .single(),
+        'Updating school list with client link',
+      );
+
+      // Step C Preparation: Ensure a client_demands record exists in the active batch
+      const activeBatch = await getActiveBatch();
+      const { data: existingDemands } = await supabaseAdmin
+        .from('client_demands')
+        .select('id')
+        .eq('client_id', targetClientId)
+        .eq('batch_id', activeBatch.id)
+        .limit(1);
+
+      let demandId = '';
+      if (existingDemands && existingDemands.length > 0) {
+        demandId = existingDemands[0].id;
+      } else {
+        let newDemand: DatabaseRow;
+        try {
+          newDemand = unwrap(
+            await supabaseAdmin
+              .from('client_demands')
+              .insert({
+                client_id: targetClientId,
+                batch_id: activeBatch.id,
+                status: 'pending',
+                avance_amount: 0,
+                total_amount: 0,
+              })
+              .select()
+              .single(),
+            'Creating initial client demand',
+          ) as DatabaseRow;
+        } catch {
+          newDemand = unwrap(
+            await supabaseAdmin
+              .from('client_demands')
+              .insert({
+                client_id: targetClientId,
+                batch_id: activeBatch.id,
+                status: 'pending',
+              })
+              .select()
+              .single(),
+            'Creating initial client demand fallback',
+          ) as DatabaseRow;
+        }
+        demandId = newDemand.id;
+      }
+
+      return NextResponse.json({
+        success: true,
+        clientId: targetClientId,
+        demandId: demandId,
+        schoolList: {
+          ...updatedList,
+          employee: Array.isArray(updatedList.employee) ? updatedList.employee[0] : updatedList.employee,
+          client: Array.isArray(updatedList.client) ? updatedList.client[0] : updatedList.client,
+        },
+      });
     }
 
     return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 });

@@ -247,8 +247,8 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
         />
       )}
 
-      {/* 2. Status Filter Pill Buttons */}
-      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+      {/* 2. Status Filter Segmented Control */}
+      <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 bg-neutral-100/90 p-1 sm:p-1.5 rounded-2xl border border-neutral-200/80 w-fit">
         {[
           { key: 'all', label: t('cust.filter_all') },
           { key: 'ready', label: t('cust.filter_ready') },
@@ -259,10 +259,10 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
             key={btn.key}
             type="button"
             onClick={() => setFilter(btn.key)}
-            className={`h-8 sm:h-10 px-3 sm:px-5 text-xs sm:text-sm font-bold rounded-full transition-all duration-300 whitespace-nowrap shadow-xs ${
+            className={`h-8 sm:h-9 px-3.5 sm:px-5 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 whitespace-nowrap ${
               filter === btn.key
-                ? 'bg-neutral-900 text-white shadow-md hover:bg-black'
-                : 'bg-white/80 backdrop-blur-sm text-neutral-700 border border-neutral-200/80 hover:bg-white hover:text-neutral-900 hover:-translate-y-0.5'
+                ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
+                : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
             {btn.label}

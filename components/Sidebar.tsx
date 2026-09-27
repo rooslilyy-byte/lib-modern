@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
   PackageCheck,
+  ClipboardList,
   FileSpreadsheet,
   Phone,
   Menu,
@@ -16,7 +17,13 @@ import {
   Settings,
   Search as LucideSearch,
   PanelRightClose,
+  KeyRound,
+  Package,
+  ChevronDown,
+  ListFilter,
+  Layers
 } from 'lucide-react';
+import ChangePasswordModal from './ChangePasswordModal';
 
 interface SidebarProps {
   isSupabaseActive: boolean;
@@ -34,8 +41,20 @@ function Sidebar({
   onToggleDesktopCollapse,
 }: SidebarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const isSearchPage = pathname?.startsWith('/search') || pathname?.startsWith('/products');
+  const [productsExpanded, setProductsExpanded] = useState(isSearchPage);
+
+  // Auto-expand when navigating to search/products page
+  useEffect(() => {
+    if (isSearchPage) {
+      setProductsExpanded(true);
+    }
+  }, [isSearchPage]);
 
   // Close profile popover on outside click / route change
   useEffect(() => {
@@ -52,14 +71,6 @@ function Sidebar({
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
-  const navItems = useMemo(() => [
-    { href: '/', label: 'الرئيسية', subtitle: 'Dashboard', icon: LayoutDashboard },
-    { href: '/customers', label: 'دليل الزبائن', subtitle: 'Clients', icon: Users },
-    { href: '/stock', label: 'استقبال وتوزيع السلع', subtitle: 'Stock & Dispatch', icon: PackageCheck },
-    { href: '/search', label: 'بحث عن منتج', subtitle: 'Search Catalog', icon: LucideSearch },
-    { href: '/reports', label: 'التقارير والمشتريات', subtitle: 'A4 Reports', icon: FileSpreadsheet },
-  ], []);
-
   const isActive = useCallback((href: string) =>
     href === '/' ? pathname === '/' : Boolean(pathname?.startsWith(href)), [pathname]);
 
@@ -67,6 +78,8 @@ function Sidebar({
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
   }, []);
+
+  const currentTab = searchParams?.get('tab') || 'catalog';
 
   const sidebarContent = (
     <div className="flex flex-col h-full w-64 bg-orange-700 text-white border-l border-orange-800 no-print transition-all duration-300 shadow-xl font-cairo">
@@ -117,7 +130,7 @@ function Sidebar({
         </div>
       </div>
 
-      {/* 2. Navigation List: Icon + Title */}
+      {/* 2. Navigation List: Icon + Title + Accordion for Products */}
       <nav className="flex-1 px-2.5 sm:px-3 py-2 sm:py-3.5 space-y-1 sm:space-y-1.5 overflow-y-auto">
         <div className="px-2.5 pb-1 flex items-center justify-between">
           <span className="text-[10px] sm:text-[11px] font-bold text-orange-100 uppercase tracking-wider">
@@ -126,27 +139,141 @@ function Sidebar({
           <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse"></span>
         </div>
 
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => onClose && onClose()}
-              className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
-                active
-                  ? 'bg-white text-orange-700 shadow-md font-black'
-                  : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
-              }`}
-            >
-              <Icon className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                active ? 'text-orange-700' : 'text-white'
+        {/* 1. الرئيسية */}
+        <Link
+          href="/"
+          onClick={() => onClose && onClose()}
+          className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+            pathname === '/'
+              ? 'bg-white text-orange-700 shadow-md font-black'
+              : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+          }`}
+        >
+          <LayoutDashboard className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+            pathname === '/' ? 'text-orange-700' : 'text-white'
+          }`} />
+          <span className="truncate leading-snug">الرئيسية</span>
+        </Link>
+
+        {/* 2. دليل الزبائن */}
+        <Link
+          href="/customers"
+          onClick={() => onClose && onClose()}
+          className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+            isActive('/customers')
+              ? 'bg-white text-orange-700 shadow-md font-black'
+              : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+          }`}
+        >
+          <Users className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+            isActive('/customers') ? 'text-orange-700' : 'text-white'
+          }`} />
+          <span className="truncate leading-snug">دليل الزبائن</span>
+        </Link>
+
+        {/* 3. استقبال وتوزيع السلع */}
+        <Link
+          href="/stock"
+          onClick={() => onClose && onClose()}
+          className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+            isActive('/stock')
+              ? 'bg-white text-orange-700 shadow-md font-black'
+              : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+          }`}
+        >
+          <PackageCheck className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+            isActive('/stock') ? 'text-orange-700' : 'text-white'
+          }`} />
+          <span className="truncate leading-snug">استقبال وتوزيع السلع</span>
+        </Link>
+
+        {/* 4. الموظفين واللوائح */}
+        <Link
+          href="/lists"
+          onClick={() => onClose && onClose()}
+          className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+            isActive('/lists')
+              ? 'bg-white text-orange-700 shadow-md font-black'
+              : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+          }`}
+        >
+          <ClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+            isActive('/lists') ? 'text-orange-700' : 'text-white'
+          }`} />
+          <span className="truncate leading-snug">الموظفين واللوائح</span>
+        </Link>
+
+        {/* 5. المنتجات (Nested Accordion) */}
+        <div className="space-y-1 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setProductsExpanded(prev => !prev)}
+            className={`w-full flex items-center justify-between px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+              isSearchPage
+                ? 'bg-orange-800/90 text-white font-black'
+                : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <Package className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                isSearchPage ? 'text-orange-200' : 'text-white'
               }`} />
-              <span className="truncate leading-snug">{item.label}</span>
-            </Link>
-          );
-        })}
+              <span className="truncate leading-snug">المنتجات</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-300 text-orange-200 group-hover:text-white ${
+              productsExpanded ? 'rotate-180' : ''
+            }`} />
+          </button>
+
+          {/* Sub-links with Indentation & High-contrast styles */}
+          {productsExpanded && (
+            <div className="mr-3 pr-3 pl-1 py-1 space-y-1 animate-in slide-in-from-top-2 fade-in duration-200 border-r-2 border-orange-400/40">
+              {/* a) بحث عن منتج */}
+              <Link
+                href="/search?tab=demands"
+                onClick={() => onClose && onClose()}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${
+                  isSearchPage && currentTab === 'demands'
+                    ? 'bg-white text-orange-700 shadow-md font-black'
+                    : 'text-orange-100 hover:text-white hover:bg-orange-800/70'
+                }`}
+              >
+                <LucideSearch className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">بحث عن منتج</span>
+              </Link>
+
+              {/* b) قائمة المنتجات */}
+              <Link
+                href="/search?tab=catalog"
+                onClick={() => onClose && onClose()}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-2xl text-xs font-bold transition-all ${
+                  isSearchPage && currentTab !== 'demands'
+                    ? 'bg-white text-orange-700 shadow-md font-black'
+                    : 'text-orange-100 hover:text-white hover:bg-orange-800/70'
+                }`}
+              >
+                <ListFilter className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">قائمة المنتجات</span>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* 6. التقارير والمشتريات */}
+        <Link
+          href="/reports"
+          onClick={() => onClose && onClose()}
+          className={`w-full flex items-center gap-2.5 sm:gap-3.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 min-h-[38px] sm:min-h-[44px] group ${
+            isActive('/reports')
+              ? 'bg-white text-orange-700 shadow-md font-black'
+              : 'text-white hover:bg-orange-800/80 hover:-translate-y-0.5'
+          }`}
+        >
+          <FileSpreadsheet className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+            isActive('/reports') ? 'text-orange-700' : 'text-white'
+          }`} />
+          <span className="truncate leading-snug">التقارير والمشتريات</span>
+        </Link>
       </nav>
 
       {/* 3. Phone Contacts Card (No Hyperlinks, Non-navigating compact buttons) */}
@@ -187,7 +314,7 @@ function Sidebar({
           type="button"
           onClick={() => setProfileOpen(!profileOpen)}
           className="w-full flex items-center justify-between px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl text-xs font-bold text-white bg-orange-800/60 hover:bg-orange-800 transition-colors border border-orange-600/30 min-h-[36px] sm:min-h-[40px]"
-          title="حساب المستخدم"
+          title="حساب المستخدم والإعدادات"
         >
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white text-orange-700 flex items-center justify-center font-black text-[10px] sm:text-xs shrink-0 shadow-2xs">
@@ -207,13 +334,27 @@ function Sidebar({
               <p className="text-xs font-bold text-neutral-900">المكتبة العصرية — Lib Moderne</p>
               <p dir="ltr" className="text-[10px] sm:text-[11px] font-mono text-neutral-500 text-right mt-0.5">06.60.56.33.71</p>
             </div>
-            <div className="py-1">
+            <div className="py-1 space-y-1">
+              {/* Change Password Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  setShowPasswordModal(true);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-neutral-700 hover:bg-orange-50 hover:text-orange-700 rounded-xl transition-colors min-h-[34px]"
+              >
+                <KeyRound className="w-4 h-4 sm:w-5 sm:h-5 text-orange-700 shrink-0" />
+                <span>تغيير الرمز السري</span>
+              </button>
+
+              {/* Logout Option */}
               <button
                 type="button"
                 onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors min-h-[34px]"
               >
-                <LogOut className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600" />
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 shrink-0" />
                 <span>تسجيل الخروج</span>
               </button>
             </div>
@@ -245,8 +386,15 @@ function Sidebar({
           <div className="flex-1" onClick={onClose}></div>
         </div>
       )}
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
     </>
   );
 }
 
 export default React.memo(Sidebar);
+

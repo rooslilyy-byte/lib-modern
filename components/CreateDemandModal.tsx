@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react';
 import { User, Phone, Plus, Trash2, X, CheckCircle2 } from 'lucide-react';
 import { MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
+import { PRODUCT_CATEGORIES, ProductCategoryKey, normalizeCategory } from '@/lib/categoryUtils';
 import ProductAutocomplete from './ProductAutocomplete';
 
 interface CreateDemandModalProps {
@@ -13,7 +14,7 @@ interface CreateDemandModalProps {
   onCreateDemand: (
     clientName: string, 
     clientPhone: string, 
-    items: { product_name: string; quantity: number }[],
+    items: { product_name: string; quantity: number; category?: ProductCategoryKey }[],
     avanceAmount?: number,
     totalAmount?: number
   ) => Promise<void>;
@@ -30,8 +31,8 @@ function CreateDemandModal({
   const [clientPhone, setClientPhone] = useState('');
   const [avanceAmount, setAvanceAmount] = useState<string>('');
   const [totalAmount, setTotalAmount] = useState<string>('');
-  const [items, setItems] = useState<{ product_name: string; quantity: number | string }[]>([
-    { product_name: '', quantity: 1 }
+  const [items, setItems] = useState<{ product_name: string; quantity: number | string; category: ProductCategoryKey }[]>([
+    { product_name: '', quantity: 1, category: 'books' }
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -42,7 +43,7 @@ function CreateDemandModal({
     }
   }, []);
 
-  const handleItemChange = React.useCallback((index: number, field: 'product_name' | 'quantity', value: any) => {
+  const handleItemChange = React.useCallback((index: number, field: 'product_name' | 'quantity' | 'category', value: any) => {
     if (field === 'product_name' && typeof value === 'string' && value.trim()) {
       const trimmedLower = value.trim().toLowerCase();
       setItems(prev => {
@@ -67,7 +68,7 @@ function CreateDemandModal({
   }, []);
 
   const handleAddItemRow = React.useCallback(() => {
-    setItems(prev => [...prev, { product_name: '', quantity: 1 }]);
+    setItems(prev => [...prev, { product_name: '', quantity: 1, category: 'books' }]);
   }, []);
 
   const handleRemoveItemRow = React.useCallback((index: number) => {
@@ -97,18 +98,20 @@ function CreateDemandModal({
     }
 
     // Deduplicate items
-    const itemMap: Record<string, number> = {};
+    const itemMap: Record<string, { product_name: string; quantity: number; category: ProductCategoryKey }> = {};
     for (const item of items) {
       const name = item.product_name.trim();
       if (!name) continue;
       const qty = Math.max(1, Number(item.quantity) || 1);
-      itemMap[name] = (itemMap[name] || 0) + qty;
+      const cat = item.category || 'books';
+      if (!itemMap[name]) {
+        itemMap[name] = { product_name: name, quantity: qty, category: cat };
+      } else {
+        itemMap[name].quantity += qty;
+      }
     }
 
-    const validItems = Object.entries(itemMap).map(([product_name, quantity]) => ({
-      product_name,
-      quantity,
-    }));
+    const validItems = Object.values(itemMap);
 
     if (validItems.length === 0) {
       alert('يرجى إضافة كتاب أو مستلزم واحداً على الأقل للطلب.');
@@ -129,7 +132,7 @@ function CreateDemandModal({
         setClientPhone('');
         setAvanceAmount('');
         setTotalAmount('');
-        setItems([{ product_name: '', quantity: 1 }]);
+        setItems([{ product_name: '', quantity: 1, category: 'books' }]);
         onClose();
       }, 1200);
     } catch (err) {
@@ -221,42 +224,71 @@ function CreateDemandModal({
             </label>
 
             {items.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 sm:gap-2">
-                <div className="flex-1">
-                  <ProductAutocomplete
-                    value={item.product_name}
-                    onChange={(val) => handleItemChange(idx, 'product_name', val)}
-                    masterProducts={masterProducts}
-                    placeholder="ابحث أو اكتب اسم الكتاب..."
-                    required
-                  />
+              <div key={idx} className="bg-neutral-50/70 border border-neutral-200/70 rounded-2xl p-2.5 sm:p-3 space-y-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex-1">
+                    <ProductAutocomplete
+                      value={item.product_name}
+                      onChange={(val) => handleItemChange(idx, 'product_name', val)}
+                      onSelectProduct={(prod) => {
+                        if (prod.category) {
+                          handleItemChange(idx, 'category', normalizeCategory(prod.category));
+                        }
+                      }}
+                      masterProducts={masterProducts}
+                      placeholder="ابحث أو اكتب اسم الكتاب..."
+                      required
+                    />
+                  </div>
+
+                  <div className="w-16 sm:w-20">
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      placeholder="1"
+                      value={item.quantity || ''}
+                      onKeyDown={handlePreventNegativeKey}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
+                      }}
+                      className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-10"
+                    />
+                  </div>
+
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItemRow(idx)}
+                      className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
 
-                <div className="w-16 sm:w-20">
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    placeholder="1"
-                    value={item.quantity || ''}
-                    onKeyDown={handlePreventNegativeKey}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleItemChange(idx, 'quantity', val === '' ? '' : Math.max(1, parseInt(val) || 1));
-                    }}
-                    className="w-full bg-white border border-neutral-200 rounded-xl px-1.5 sm:px-2 py-1.5 text-center text-xs font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 h-8 sm:h-9"
-                  />
+                {/* Category Pill Selector */}
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-1">
+                  <span className="text-[11px] sm:text-xs font-bold text-gray-700 ml-1">الصنف:</span>
+                  {PRODUCT_CATEGORIES.map(cat => {
+                    const isSelected = (item.category || 'books') === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => handleItemChange(idx, 'category', cat.key)}
+                        className={`px-3 py-1 sm:py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-700 text-white font-bold border border-transparent shadow-sm scale-105 ring-2 ring-orange-700/20'
+                            : 'bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItemRow(idx)}
-                    className="p-1.5 sm:p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                )}
               </div>
             ))}
 

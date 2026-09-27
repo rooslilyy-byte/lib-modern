@@ -221,3 +221,4 @@ function ThermalReceipt({ demand, onClose }: ThermalReceiptProps) {
 }
 
 export default React.memo(ThermalReceipt);
+

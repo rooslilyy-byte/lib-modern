@@ -17,10 +17,19 @@ import {
   deleteBulkCustomers,
   autoAllocateStock,
   markProductEnRupture,
-  restoreProductEnRupture
+  restoreProductEnRupture,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee,
+  createSchoolList,
+  updateSchoolList,
+  deleteSchoolList,
+  linkSchoolListClient,
+  convertSchoolListToClient,
+  updateProductCategory
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { PurchaseBatch, MasterProduct, ClientDemand } from '@/lib/types';
+import { PurchaseBatch, MasterProduct, ClientDemand, Employee, SchoolList, SchoolListStatus } from '@/lib/types';
 import { LanguageProvider, useLanguage } from '@/lib/languageContext';
 import { Menu, PanelRightOpen, Phone, Globe } from 'lucide-react';
 
@@ -29,17 +38,23 @@ let globalAppCache: {
   activeBatch: PurchaseBatch | null;
   masterProducts: MasterProduct[];
   demands: ClientDemand[];
+  employees: Employee[];
+  schoolLists: SchoolList[];
   isInitialized: boolean;
 } = {
   activeBatch: null,
   masterProducts: [],
   demands: [],
+  employees: [],
+  schoolLists: [],
   isInitialized: false,
 };
 
 export interface AppShellData {
   demands: ClientDemand[];
   masterProducts: MasterProduct[];
+  employees: Employee[];
+  schoolLists: SchoolList[];
   activeBatch: PurchaseBatch | null;
   isLoading: boolean;
   loadData: () => Promise<void>;
@@ -52,6 +67,15 @@ export interface AppShellData {
   handleDeleteDemand: (id: string) => Promise<void>;
   handleDeleteBulkCustomers: (clientIds: string[]) => Promise<void>;
   handleArchiveBatch: (name: string) => Promise<void>;
+  handleCreateEmployee: (name: string) => Promise<Employee>;
+  handleUpdateEmployee: (id: string, name: string) => Promise<Employee>;
+  handleDeleteEmployee: (id: string) => Promise<void>;
+  handleCreateSchoolList: (payload: { client_name: string; school_name: string; employee_id?: string | null; status?: SchoolListStatus; client_id?: string | null }) => Promise<SchoolList>;
+  handleUpdateSchoolList: (id: string, updates: Partial<SchoolList>) => Promise<SchoolList>;
+  handleDeleteSchoolList: (id: string) => Promise<void>;
+  handleLinkSchoolListClient: (listId: string, clientId: string | null) => Promise<SchoolList>;
+  handleConvertSchoolListToClient: (listId: string) => Promise<{ clientId: string; demandId: string; schoolList: SchoolList }>;
+  handleUpdateProductCategory: (productId: string, category: string, productName?: string) => Promise<MasterProduct>;
 }
 
 interface AppShellProps {
@@ -64,6 +88,8 @@ function AppShellContent({ children }: AppShellProps) {
   const [activeBatch, setActiveBatch] = useState<PurchaseBatch | null>(globalAppCache.activeBatch);
   const [masterProducts, setMasterProducts] = useState<MasterProduct[]>(globalAppCache.masterProducts);
   const [demands, setDemands] = useState<ClientDemand[]>(globalAppCache.demands);
+  const [employees, setEmployees] = useState<Employee[]>(globalAppCache.employees);
+  const [schoolLists, setSchoolLists] = useState<SchoolList[]>(globalAppCache.schoolLists);
   const [isLoading, setIsLoading] = useState<boolean>(!globalAppCache.isInitialized);
 
   // Sidebar controls
@@ -80,11 +106,15 @@ function AppShellContent({ children }: AppShellProps) {
       setActiveBatch(fullData.activeBatch);
       setMasterProducts(fullData.masterProducts);
       setDemands(fullData.demands);
+      setEmployees(fullData.employees || []);
+      setSchoolLists(fullData.schoolLists || []);
 
       globalAppCache = {
         activeBatch: fullData.activeBatch,
         masterProducts: fullData.masterProducts,
         demands: fullData.demands,
+        employees: fullData.employees || [],
+        schoolLists: fullData.schoolLists || [],
         isInitialized: true,
       };
     } catch (err) {
@@ -330,9 +360,209 @@ function AppShellContent({ children }: AppShellProps) {
     }
   }, [loadData]);
 
+  // --- EMPLOYEES HANDLERS ---
+  const handleCreateEmployee = useCallback(async (name: string) => {
+    const tempId = `emp-${Date.now()}`;
+    const optimisticEmp: Employee = { id: tempId, name: name.trim(), created_at: new Date().toISOString() };
+    setEmployees(prev => {
+      const next = [...prev, optimisticEmp];
+      globalAppCache.employees = next;
+      return next;
+    });
+
+    try {
+      const res = await createEmployee(name);
+      if (res && res.id) {
+        setEmployees(prev => {
+          const next = prev.map(e => e.id === tempId ? res : e);
+          globalAppCache.employees = next;
+          return next;
+        });
+      }
+      return res;
+    } catch (err) {
+      await loadData(true);
+      throw err;
+    }
+  }, [loadData]);
+
+  const handleUpdateEmployee = useCallback(async (id: string, name: string) => {
+    setEmployees(prev => {
+      const next = prev.map(e => e.id === id ? { ...e, name: name.trim() } : e);
+      globalAppCache.employees = next;
+      return next;
+    });
+
+    try {
+      const res = await updateEmployee(id, name);
+      return res;
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const handleDeleteEmployee = useCallback(async (id: string) => {
+    setEmployees(prev => {
+      const next = prev.filter(e => e.id !== id);
+      globalAppCache.employees = next;
+      return next;
+    });
+
+    try {
+      await deleteEmployee(id);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  // --- SCHOOL LISTS HANDLERS ---
+  const handleCreateSchoolList = useCallback(async (payload: {
+    client_name: string;
+    school_name: string;
+    employee_id?: string | null;
+    status?: SchoolListStatus;
+    client_id?: string | null;
+  }) => {
+    const tempId = `list-${Date.now()}`;
+    const assignedEmp = employees.find(e => e.id === payload.employee_id);
+    const linkedClient = demands.find(d => d.client?.id === payload.client_id)?.client;
+    const optimisticList: SchoolList = {
+      id: tempId,
+      client_name: payload.client_name.trim(),
+      school_name: payload.school_name.trim(),
+      employee_id: payload.employee_id || null,
+      status: payload.status || 'pending',
+      client_id: payload.client_id || null,
+      created_at: new Date().toISOString(),
+      employee: assignedEmp,
+      client: linkedClient,
+    };
+
+    setSchoolLists(prev => {
+      const next = [optimisticList, ...prev];
+      globalAppCache.schoolLists = next;
+      return next;
+    });
+
+    try {
+      const res = await createSchoolList(payload);
+      if (res && res.id) {
+        setSchoolLists(prev => {
+          const next = prev.map(l => l.id === tempId ? res : l);
+          globalAppCache.schoolLists = next;
+          return next;
+        });
+      }
+      return res;
+    } catch (err) {
+      await loadData(true);
+      throw err;
+    }
+  }, [employees, demands, loadData]);
+
+  const handleUpdateSchoolList = useCallback(async (id: string, updates: Partial<SchoolList>) => {
+    setSchoolLists(prev => {
+      const next = prev.map(l => l.id === id ? { ...l, ...updates } : l);
+      globalAppCache.schoolLists = next;
+      return next;
+    });
+
+    try {
+      const res = await updateSchoolList(id, updates);
+      return res;
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const handleDeleteSchoolList = useCallback(async (id: string) => {
+    setSchoolLists(prev => {
+      const next = prev.filter(l => l.id !== id);
+      globalAppCache.schoolLists = next;
+      return next;
+    });
+
+    try {
+      await deleteSchoolList(id);
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const handleLinkSchoolListClient = useCallback(async (listId: string, clientId: string | null) => {
+    const linkedClient = demands.find(d => d.client?.id === clientId)?.client;
+    setSchoolLists(prev => {
+      const next = prev.map(l => l.id === listId ? {
+        ...l,
+        client_id: clientId || null,
+        client: linkedClient,
+        status: clientId ? 'pending' : l.status,
+      } : l);
+      globalAppCache.schoolLists = next;
+      return next;
+    });
+
+    try {
+      const res = await linkSchoolListClient(listId, clientId);
+      return res;
+    } finally {
+      await loadData(true);
+    }
+  }, [demands, loadData]);
+
+  const handleConvertSchoolListToClient = useCallback(async (listId: string) => {
+    try {
+      const res = await convertSchoolListToClient(listId);
+      if (res && res.schoolList) {
+        setSchoolLists(prev => {
+          const next = prev.map(l => l.id === listId ? res.schoolList : l);
+          globalAppCache.schoolLists = next;
+          return next;
+        });
+      }
+      return res;
+    } finally {
+      await loadData(true);
+    }
+  }, [loadData]);
+
+  const handleUpdateProductCategory = useCallback(async (productId: string, category: string, productName?: string) => {
+    // Optimistic master product update
+    setMasterProducts(prev => {
+      const next = prev.map(p => {
+        if ((productId && p.id === productId) || (productName && p.name.trim().toLowerCase() === productName.trim().toLowerCase())) {
+          return { ...p, category };
+        }
+        return p;
+      });
+      globalAppCache.masterProducts = next;
+      return next;
+    });
+
+    try {
+      const updated = await updateProductCategory(productId, category, productName);
+      setMasterProducts(prev => {
+        const next = prev.map(p => {
+          if ((productId && p.id === productId) || (productName && p.name.trim().toLowerCase() === productName.trim().toLowerCase())) {
+            return { ...p, ...updated, category: updated.category || category };
+          }
+          return p;
+        });
+        globalAppCache.masterProducts = next;
+        return next;
+      });
+      return updated;
+    } catch (err) {
+      await loadData(true);
+      throw err;
+    }
+  }, [loadData]);
+
   const appShellData: AppShellData = useMemo(() => ({
     demands,
     masterProducts,
+    employees,
+    schoolLists,
     activeBatch,
     isLoading,
     loadData,
@@ -345,9 +575,20 @@ function AppShellContent({ children }: AppShellProps) {
     handleDeleteDemand,
     handleDeleteBulkCustomers,
     handleArchiveBatch,
+    handleCreateEmployee,
+    handleUpdateEmployee,
+    handleDeleteEmployee,
+    handleCreateSchoolList,
+    handleUpdateSchoolList,
+    handleDeleteSchoolList,
+    handleLinkSchoolListClient,
+    handleConvertSchoolListToClient,
+    handleUpdateProductCategory,
   }), [
     demands,
     masterProducts,
+    employees,
+    schoolLists,
     activeBatch,
     isLoading,
     loadData,
@@ -360,6 +601,15 @@ function AppShellContent({ children }: AppShellProps) {
     handleDeleteDemand,
     handleDeleteBulkCustomers,
     handleArchiveBatch,
+    handleCreateEmployee,
+    handleUpdateEmployee,
+    handleDeleteEmployee,
+    handleCreateSchoolList,
+    handleUpdateSchoolList,
+    handleDeleteSchoolList,
+    handleLinkSchoolListClient,
+    handleConvertSchoolListToClient,
+    handleUpdateProductCategory,
   ]);
 
   return (
