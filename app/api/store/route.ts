@@ -1520,8 +1520,9 @@ export async function POST(request: Request) {
           .limit(1);
 
         if (matchedClients && matchedClients.length > 0 && matchedClients[0]) {
-          clientRow = matchedClients[0];
-          targetClientId = clientRow.id;
+          const foundClient = matchedClients[0];
+          clientRow = foundClient;
+          targetClientId = foundClient.id;
         } else {
           // INSERT new client with list's client_name
           const insertedClient = unwrap(

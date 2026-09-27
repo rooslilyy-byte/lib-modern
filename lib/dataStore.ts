@@ -766,7 +766,14 @@ export async function createSchoolList(payload: {
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    if (data) return data as SchoolList;
+    if (data) {
+      const raw = data as any;
+      return {
+        ...raw,
+        employee: Array.isArray(raw.employee) ? raw.employee[0] : raw.employee,
+        client: Array.isArray(raw.client) ? raw.client[0] : raw.client,
+      } as unknown as SchoolList;
+    }
   }
   return {
     id: `list-${Date.now()}`,
@@ -793,7 +800,14 @@ export async function updateSchoolList(id: string, updates: Partial<SchoolList>)
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    if (data) return data as SchoolList;
+    if (data) {
+      const raw = data as any;
+      return {
+        ...raw,
+        employee: Array.isArray(raw.employee) ? raw.employee[0] : raw.employee,
+        client: Array.isArray(raw.client) ? raw.client[0] : raw.client,
+      } as unknown as SchoolList;
+    }
   }
   return { id, client_name: '', school_name: '', status: 'pending', ...updates };
 }
@@ -827,7 +841,14 @@ export async function linkSchoolListClient(listId: string, clientId: string | nu
       client:clients (id, name, phone)
     `).single();
     invalidateStoreCache();
-    if (data) return data as SchoolList;
+    if (data) {
+      const raw = data as any;
+      return {
+        ...raw,
+        employee: Array.isArray(raw.employee) ? raw.employee[0] : raw.employee,
+        client: Array.isArray(raw.client) ? raw.client[0] : raw.client,
+      } as unknown as SchoolList;
+    }
   }
   return { id: listId, client_name: '', school_name: '', status: clientId ? 'pending' : 'done', client_id: clientId };
 }
@@ -865,10 +886,17 @@ export async function convertSchoolListToClient(listId: string): Promise<{
       client:clients (id, name, phone)
     `).single();
 
+    const rawList = (updatedList || listData) as any;
+    const formattedList: SchoolList = rawList ? {
+      ...rawList,
+      employee: Array.isArray(rawList.employee) ? rawList.employee[0] : rawList.employee,
+      client: Array.isArray(rawList.client) ? rawList.client[0] : rawList.client,
+    } as unknown as SchoolList : { id: listId, client_name: '', school_name: '', status: 'pending' };
+
     return {
       clientId: clientId || '',
       demandId: '',
-      schoolList: (updatedList || listData) as SchoolList,
+      schoolList: formattedList,
     };
   }
 
