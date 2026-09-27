@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+export const dynamic = 'force-dynamic';
+
+import React, { Suspense } from 'react';
 import AppShell from '@/components/AppShell';
 import CustomersDirectory from '@/components/CustomersDirectory';
 import { useRouter } from 'next/navigation';
@@ -11,15 +13,17 @@ export default function CustomersPage() {
   return (
     <AppShell>
       {({ demands, masterProducts, handleCreateDemand, handleDeleteBulkCustomers }) => (
-        <CustomersDirectory
-          demands={demands}
-          masterProducts={masterProducts}
-          onCreateDemand={handleCreateDemand}
-          onDeleteBulkCustomers={handleDeleteBulkCustomers}
-          onSelectCustomer={(customerId) => {
-            router.push(`/customers/${encodeURIComponent(customerId)}`);
-          }}
-        />
+        <Suspense fallback={null}>
+          <CustomersDirectory
+            demands={demands}
+            masterProducts={masterProducts}
+            onCreateDemand={handleCreateDemand}
+            onDeleteBulkCustomers={handleDeleteBulkCustomers}
+            onSelectCustomer={(customerId) => {
+              router.push(`/customers/${encodeURIComponent(customerId)}`);
+            }}
+          />
+        </Suspense>
       )}
     </AppShell>
   );

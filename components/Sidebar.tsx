@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -33,7 +33,7 @@ interface SidebarProps {
   onToggleDesktopCollapse?: () => void;
 }
 
-function Sidebar({
+function SidebarInner({
   isSupabaseActive,
   isOpen = false,
   onClose,
@@ -393,6 +393,14 @@ function Sidebar({
         onClose={() => setShowPasswordModal(false)}
       />
     </>
+  );
+}
+
+function Sidebar(props: SidebarProps) {
+  return (
+    <Suspense fallback={null}>
+      <SidebarInner {...props} />
+    </Suspense>
   );
 }
 

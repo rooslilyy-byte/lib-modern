@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
