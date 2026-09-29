@@ -2,6 +2,7 @@ export interface Client {
   id: string;
   name: string;
   phone: string;
+  ticket_id?: string | null;
   created_at?: string;
 }
 
@@ -86,6 +87,7 @@ export interface SchoolList {
   id: string;
   client_name: string;
   school_name: string;
+  phone?: string | null;
   employee_id?: string | null;
   status: SchoolListStatus;
   client_id?: string | null;

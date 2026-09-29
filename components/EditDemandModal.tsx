@@ -5,6 +5,7 @@ import {
   X, 
   User, 
   Phone, 
+  Ticket,
   Plus, 
   Trash2, 
   Save, 
@@ -32,7 +33,8 @@ interface EditDemandModalProps {
       category?: ProductCategoryKey;
     }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
 }
 
@@ -45,6 +47,7 @@ function EditDemandModal({
   const { t } = useLanguage();
   const [clientName, setClientName] = useState(demand.client?.name || '');
   const [clientPhone, setClientPhone] = useState(demand.client?.phone || '');
+  const [clientTicketId, setClientTicketId] = useState(demand.client?.ticket_id || '');
   const [avanceAmount, setAvanceAmount] = useState<string>(
     demand.avance_amount !== undefined && demand.avance_amount > 0 ? String(demand.avance_amount) : ''
   );
@@ -83,6 +86,11 @@ function EditDemandModal({
           };
         })
       );
+    }
+    if (demand.client) {
+      setClientName(demand.client.name || '');
+      setClientPhone(demand.client.phone || '');
+      setClientTicketId(demand.client.ticket_id || '');
     }
     if (demand.avance_amount !== undefined && demand.avance_amount > 0) {
       setAvanceAmount(String(demand.avance_amount));
@@ -209,7 +217,8 @@ function EditDemandModal({
         clientPhone.trim(),
         validItems,
         numAvance,
-        numTotal
+        numTotal,
+        clientTicketId.trim() || undefined
       );
       onClose();
     } catch (err: any) {
@@ -218,7 +227,7 @@ function EditDemandModal({
     } finally {
       setIsSaving(false);
     }
-  }, [items, clientName, clientPhone, avanceAmount, totalAmount, demand.id, onSave, onClose]);
+  }, [items, clientName, clientPhone, clientTicketId, avanceAmount, totalAmount, demand.id, onSave, onClose]);
 
   return (
     <div className="fixed inset-0 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 font-cairo dir-rtl">
@@ -284,6 +293,20 @@ function EditDemandModal({
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
                 className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-orange-700" />
+                <span>رقم التذكرة / Bon N° (اختياري):</span>
+              </label>
+              <input
+                type="text"
+                placeholder="مثال: 1042 أو BON-88..."
+                value={clientTicketId}
+                onChange={(e) => setClientTicketId(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
           </div>

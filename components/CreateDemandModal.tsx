@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { User, Phone, Plus, Trash2, X, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Ticket, Plus, Trash2, X, CheckCircle2 } from 'lucide-react';
 import { MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
 import { PRODUCT_CATEGORIES, ProductCategoryKey, normalizeCategory } from '@/lib/categoryUtils';
@@ -16,7 +16,8 @@ interface CreateDemandModalProps {
     clientPhone: string, 
     items: { product_name: string; quantity: number; category?: ProductCategoryKey }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
 }
 
@@ -29,6 +30,7 @@ function CreateDemandModal({
   const { t } = useLanguage();
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientTicketId, setClientTicketId] = useState('');
   const [avanceAmount, setAvanceAmount] = useState<string>('');
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [items, setItems] = useState<{ product_name: string; quantity: number | string; category: ProductCategoryKey }[]>([
@@ -123,13 +125,14 @@ function CreateDemandModal({
 
     setIsSubmitting(true);
     try {
-      await onCreateDemand(clientName.trim(), clientPhone.trim(), validItems, numAvance, numTotal);
+      await onCreateDemand(clientName.trim(), clientPhone.trim(), validItems, numAvance, numTotal, clientTicketId.trim() || undefined);
 
       setToastMessage('تمت إضافة الزبون والطلب بنجاح');
       setTimeout(() => {
         setToastMessage(null);
         setClientName('');
         setClientPhone('');
+        setClientTicketId('');
         setAvanceAmount('');
         setTotalAmount('');
         setItems([{ product_name: '', quantity: 1, category: 'books' }]);
@@ -141,7 +144,7 @@ function CreateDemandModal({
     } finally {
       setIsSubmitting(false);
     }
-  }, [clientName, clientPhone, items, avanceAmount, totalAmount, onCreateDemand, onClose]);
+  }, [clientName, clientPhone, clientTicketId, items, avanceAmount, totalAmount, onCreateDemand, onClose]);
 
   if (!isOpen) return null;
 
@@ -213,6 +216,20 @@ function CreateDemandModal({
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
                 className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono dir-ltr text-right"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-neutral-700 mb-1 flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-orange-700" />
+                <span>رقم التذكرة / Bon N° (اختياري)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="مثال: 1042 أو BON-88..."
+                value={clientTicketId}
+                onChange={(e) => setClientTicketId(e.target.value)}
+                className="w-full bg-neutral-50/80 border border-neutral-200/80 focus:border-neutral-900 focus:bg-white text-neutral-900 font-medium text-xs sm:text-sm px-3.5 sm:px-4 h-9 sm:h-10 rounded-2xl outline-none transition-all shadow-xs font-mono"
               />
             </div>
           </div>

@@ -124,7 +124,8 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             client:clients!inner (
               id,
               name,
-              phone
+              phone,
+              ticket_id
             ),
             items:demand_items (
               id,
@@ -145,6 +146,7 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
               id: d.client.id,
               name: d.client.name,
               phone: d.client.phone,
+              ticket_id: d.client.ticket_id || null,
             },
             status: d.status,
             created_at: d.created_at,
@@ -156,9 +158,9 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
         if (empData) employees = empData;
 
         const { data: listData } = await supabase.from('school_lists').select(`
-          id, client_name, school_name, employee_id, status, client_id, created_at,
+          id, client_name, school_name, phone, employee_id, status, client_id, created_at,
           employee:employees (id, name),
-          client:clients (id, name, phone)
+          client:clients (id, name, phone, ticket_id)
         `).order('created_at', { ascending: false });
         if (listData) {
           schoolLists = listData.map((row: any) => ({
@@ -304,10 +306,11 @@ export async function createClientDemand(
   clientPhone: string,
   items: { product_name: string; quantity: number }[],
   avance_amount?: number,
-  total_amount?: number
+  total_amount?: number,
+  ticket_id?: string
 ): Promise<ClientDemand | any> {
   if (isBrowser) {
-    await fetchStoreApi('create_demand', { clientName, clientPhone, items, avance_amount, total_amount });
+    await fetchStoreApi('create_demand', { clientName, clientPhone, items, avance_amount, total_amount, ticket_id });
     return;
   }
 
@@ -315,6 +318,7 @@ export async function createClientDemand(
     const activeBatch = await getActiveBatch();
     const cleanPhone = clientPhone.trim();
     const cleanName = clientName.trim();
+    const cleanTicketId = (ticket_id || '').trim() || null;
     const validItems = items.filter(it => it.product_name?.trim());
 
     // Bulk Safe Upsert master products
@@ -324,7 +328,14 @@ export async function createClientDemand(
       await supabase.from('master_products').upsert(prodRows, { onConflict: 'name' });
     }
 
-    const { data: newCli } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone }).select().single();
+    let newCli: any = null;
+    try {
+      const { data } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone, ticket_id: cleanTicketId }).select().single();
+      newCli = data;
+    } catch {
+      const { data } = await supabase.from('clients').insert({ name: cleanName, phone: cleanPhone }).select().single();
+      newCli = data;
+    }
     const existingClient = newCli;
 
     if (existingClient) {
@@ -579,16 +590,18 @@ export async function updateClientDemand(
     is_delivered?: boolean;
   }[],
   avance_amount?: number,
-  total_amount?: number
+  total_amount?: number,
+  ticket_id?: string
 ): Promise<ClientDemand | any> {
   if (isBrowser) {
-    await fetchStoreApi('update_demand', { demandId, clientName, clientPhone, items, avance_amount, total_amount });
+    await fetchStoreApi('update_demand', { demandId, clientName, clientPhone, items, avance_amount, total_amount, ticket_id });
     return;
   }
 
   if (isSupabaseConfigured) {
     const cleanPhone = clientPhone.trim();
     const cleanName = clientName.trim();
+    const cleanTicketId = ticket_id !== undefined ? (ticket_id.trim() || null) : undefined;
     const validItems = items.filter(it => it.product_name?.trim());
 
     // Bulk Safe Upsert master products
@@ -600,7 +613,15 @@ export async function updateClientDemand(
 
     const { data: currentDemand } = await supabase.from('client_demands').select('*, items:demand_items(*)').eq('id', demandId).single();
     if (currentDemand) {
-      await supabase.from('clients').update({ name: cleanName, phone: cleanPhone }).eq('id', currentDemand.client_id);
+      const clientUpdates: any = { name: cleanName, phone: cleanPhone };
+      if (cleanTicketId !== undefined) {
+        clientUpdates.ticket_id = cleanTicketId;
+      }
+      try {
+        await supabase.from('clients').update(clientUpdates).eq('id', currentDemand.client_id);
+      } catch {
+        await supabase.from('clients').update({ name: cleanName, phone: cleanPhone }).eq('id', currentDemand.client_id);
+      }
       
       try {
         await supabase.from('client_demands').update({
@@ -743,6 +764,7 @@ export async function getSchoolLists(): Promise<SchoolList[]> {
 export async function createSchoolList(payload: {
   client_name: string;
   school_name: string;
+  phone?: string | null;
   employee_id?: string | null;
   status?: SchoolListStatus;
   client_id?: string | null;
@@ -754,17 +776,35 @@ export async function createSchoolList(payload: {
     return data.schoolList;
   }
   if (isSupabaseConfigured) {
-    const { data } = await supabase.from('school_lists').insert({
-      client_name: payload.client_name.trim(),
-      school_name: payload.school_name.trim(),
-      employee_id: payload.employee_id || null,
-      status: payload.status || 'pending',
-      client_id: payload.client_id || null,
-    }).select(`
-      id, client_name, school_name, employee_id, status, client_id, created_at,
-      employee:employees (id, name),
-      client:clients (id, name, phone)
-    `).single();
+    let data: any = null;
+    try {
+      const res = await supabase.from('school_lists').insert({
+        client_name: payload.client_name.trim(),
+        school_name: payload.school_name.trim(),
+        phone: (payload.phone || '').trim() || null,
+        employee_id: payload.employee_id || null,
+        status: payload.status || 'pending',
+        client_id: payload.client_id || null,
+      }).select(`
+        id, client_name, school_name, phone, employee_id, status, client_id, created_at,
+        employee:employees (id, name),
+        client:clients (id, name, phone, ticket_id)
+      `).single();
+      data = res.data;
+    } catch {
+      const res = await supabase.from('school_lists').insert({
+        client_name: payload.client_name.trim(),
+        school_name: payload.school_name.trim(),
+        employee_id: payload.employee_id || null,
+        status: payload.status || 'pending',
+        client_id: payload.client_id || null,
+      }).select(`
+        id, client_name, school_name, employee_id, status, client_id, created_at,
+        employee:employees (id, name),
+        client:clients (id, name, phone, ticket_id)
+      `).single();
+      data = res.data;
+    }
     invalidateStoreCache();
     if (data) {
       const raw = data as any;
@@ -779,6 +819,7 @@ export async function createSchoolList(payload: {
     id: `list-${Date.now()}`,
     client_name: payload.client_name,
     school_name: payload.school_name,
+    phone: payload.phone || null,
     employee_id: payload.employee_id || null,
     status: payload.status || 'pending',
     client_id: payload.client_id || null,
@@ -875,15 +916,15 @@ export async function convertSchoolListToClient(listId: string): Promise<{
       if (matched && matched.length > 0 && matched[0]) {
         clientId = matched[0].id;
       } else {
-        const { data: newC } = await supabase.from('clients').insert({ name: listData.client_name.trim(), phone: '' }).select().single();
+        const { data: newC } = await supabase.from('clients').insert({ name: listData.client_name.trim(), phone: listData.phone || '' }).select().single();
         clientId = newC?.id;
       }
     }
 
     const { data: updatedList } = await supabase.from('school_lists').update({ client_id: clientId, status: 'pending' }).eq('id', listId).select(`
-      id, client_name, school_name, employee_id, status, client_id, created_at,
+      id, client_name, school_name, phone, employee_id, status, client_id, created_at,
       employee:employees (id, name),
-      client:clients (id, name, phone)
+      client:clients (id, name, phone, ticket_id)
     `).single();
 
     const rawList = (updatedList || listData) as any;

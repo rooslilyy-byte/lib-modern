@@ -124,6 +124,10 @@ ALTER TABLE public.master_products ADD COLUMN IF NOT EXISTS available_stock INTE
 -- Add status column to demand_items if missing
 ALTER TABLE public.demand_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending';
 
+-- Add ticket_id column to clients if missing
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS ticket_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_clients_ticket_id ON public.clients(ticket_id);
+
 -- 6. EMPLOYEES TABLE (الموظفين)
 CREATE TABLE IF NOT EXISTS public.employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,12 +142,16 @@ CREATE TABLE IF NOT EXISTS public.school_lists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     client_name TEXT NOT NULL,
     school_name TEXT NOT NULL,
+    phone TEXT,
     employee_id UUID REFERENCES public.employees(id) ON DELETE SET NULL,
     status TEXT NOT NULL CHECK (status IN ('done', 'pending')) DEFAULT 'pending',
     client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Add phone column to school_lists if missing
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS phone TEXT;
+CREATE INDEX IF NOT EXISTS idx_school_lists_phone ON public.school_lists(phone);
 CREATE INDEX IF NOT EXISTS idx_school_lists_employee ON public.school_lists(employee_id);
 CREATE INDEX IF NOT EXISTS idx_school_lists_client ON public.school_lists(client_id);
 CREATE INDEX IF NOT EXISTS idx_school_lists_status ON public.school_lists(status);

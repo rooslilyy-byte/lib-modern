@@ -75,6 +75,12 @@ function ThermalReceipt({ demand, onClose }: ThermalReceiptProps) {
           <span className="font-extrabold">الزبون:</span>
           <span className="font-bold">{demand.client?.name || 'غير مسمى'}</span>
         </div>
+        {demand.client?.ticket_id && (
+          <div className="flex justify-between items-center">
+            <span className="font-extrabold">رقم التذكرة (Bon N°):</span>
+            <span className="font-mono dir-ltr font-black">#{demand.client.ticket_id}</span>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           <span className="font-extrabold">الهاتف:</span>
           <span className="font-mono dir-ltr font-bold">{demand.client?.phone}</span>

@@ -25,6 +25,7 @@ import {
   Filter,
   RefreshCw,
   ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import { Employee, SchoolList, SchoolListStatus, ClientDemand } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
@@ -46,6 +47,7 @@ interface EmployeesAndListsProps {
     employee_id?: string | null;
     status?: SchoolListStatus;
     client_id?: string | null;
+    phone?: string | null;
   }) => Promise<SchoolList>;
   onUpdateSchoolList: (id: string, updates: Partial<SchoolList>) => Promise<SchoolList>;
   onDeleteSchoolList: (id: string) => Promise<void>;
@@ -109,6 +111,7 @@ export default function EmployeesAndLists({
   const [editingList, setEditingList] = useState<SchoolList | null>(null);
   const [listClientName, setListClientName] = useState('');
   const [listSchoolName, setListSchoolName] = useState('');
+  const [listPhone, setListPhone] = useState('');
   const [listEmployeeId, setListEmployeeId] = useState('');
   const [listStatus, setListStatus] = useState<SchoolListStatus>('pending');
   const [listClientId, setListClientId] = useState<string>('');
@@ -173,8 +176,9 @@ export default function EmployeesAndLists({
         const clientMatch = item.client_name?.toLowerCase().includes(q);
         const schoolMatch = item.school_name?.toLowerCase().includes(q);
         const empMatch = item.employee?.name?.toLowerCase().includes(q);
+        const phoneMatch = item.phone?.includes(q);
         const linkedClientMatch = item.client?.name?.toLowerCase().includes(q) || item.client?.phone?.includes(q);
-        if (!clientMatch && !schoolMatch && !empMatch && !linkedClientMatch) return false;
+        if (!clientMatch && !schoolMatch && !empMatch && !linkedClientMatch && !phoneMatch) return false;
       }
 
       return true;
@@ -248,6 +252,7 @@ export default function EmployeesAndLists({
     setEditingList(null);
     setListClientName('');
     setListSchoolName('');
+    setListPhone('');
     setListEmployeeId(employees[0]?.id || '');
     setListStatus('pending');
     setListClientId('');
@@ -258,6 +263,7 @@ export default function EmployeesAndLists({
     setEditingList(list);
     setListClientName(list.client_name);
     setListSchoolName(list.school_name);
+    setListPhone(list.phone || list.client?.phone || '');
     setListEmployeeId(list.employee_id || '');
     setListStatus(list.status);
     setListClientId(list.client_id || '');
@@ -268,6 +274,7 @@ export default function EmployeesAndLists({
     e.preventDefault();
     const cleanClient = listClientName.trim();
     const cleanSchool = listSchoolName.trim();
+    const cleanPhone = listPhone.trim() || null;
     if (!cleanClient || !cleanSchool) return;
 
     if (editingList) {
@@ -279,6 +286,7 @@ export default function EmployeesAndLists({
         employee_id: listEmployeeId || null,
         status: listStatus,
         client_id: listClientId || null,
+        phone: cleanPhone,
       };
       setIsListModalOpen(false);
       showToast(`تم حفظ تعديل لائحة "${cleanClient}" بنجاح`, 'success');
@@ -296,11 +304,32 @@ export default function EmployeesAndLists({
         employee_id: listEmployeeId || null,
         status: listStatus,
         client_id: listClientId || null,
+        phone: cleanPhone,
       }).catch(err => {
         console.error('Error creating school list:', err);
         showToast('حدث خطأ أثناء إنشاء اللائحة في الخلفية', 'error');
       });
     }
+  };
+
+  // WhatsApp Action Handler
+  const handleWhatsAppClick = (list: SchoolList, phoneNum?: string | null) => {
+    if (!phoneNum) {
+      showToast('يرجى إضافة رقم هاتف للائحة لإرسال رسالة الواتساب', 'error');
+      handleOpenEditList(list);
+      return;
+    }
+    let clean = phoneNum.replace(/\D/g, '');
+    if (clean.startsWith('0')) {
+      clean = '212' + clean.slice(1);
+    } else if (!clean.startsWith('212')) {
+      clean = '212' + clean;
+    }
+    const message = list.status === 'done'
+      ? 'السلام عليكم زبوننا الكريم، نخبركم أن لائحتكم المدرسية لدى المكتبة العصرية أصبحت جاهزة للاستلام. مرحباً بكم.'
+      : 'السلام عليكم زبوننا الكريم، بخصوص لائحتكم المدرسية لدى المكتبة العصرية، جاري تجهيز الكتب والمستلزمات وسنوافيكم فور اكتمالها.';
+    const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // One-click Toggle Status
@@ -626,6 +655,7 @@ export default function EmployeesAndLists({
                 const assignedEmp = employees.find(e => e.id === list.employee_id) || list.employee;
                 const isLinked = Boolean(list.client_id);
                 const linkedClient = uniqueClientsList.find(c => c.id === list.client_id) || list.client;
+                const contactPhone = list.phone || linkedClient?.phone;
 
                 return (
                   <div key={list.id} className="py-4 first:pt-0 last:pb-0 group transition-colors">
@@ -642,6 +672,14 @@ export default function EmployeesAndLists({
                             <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
                               {list.client_name}
                             </h3>
+
+                            {/* Phone Badge if directly on list */}
+                            {list.phone && (
+                              <span dir="ltr" className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Phone className="w-3 h-3 text-emerald-600" />
+                                {list.phone}
+                              </span>
+                            )}
                             
                             {/* School Badge */}
                             <span className="bg-neutral-100 text-neutral-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-neutral-200/60">
@@ -724,13 +762,28 @@ export default function EmployeesAndLists({
 
                       {/* Right: Actions */}
                       <div className="flex items-center gap-1.5 sm:gap-2 self-end lg:self-center flex-wrap">
+                        {/* WhatsApp Direct Action Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppClick(list, contactPhone)}
+                          className={`h-8 px-3 py-1.5 text-xs font-medium rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 ${
+                            contactPhone
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
+                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-500 border border-neutral-200/60'
+                          }`}
+                          title={contactPhone ? `إرسال رسالة واتساب (${contactPhone})` : 'إضافة رقم هاتف لإرسال رسالة واتساب'}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>واتساب</span>
+                        </button>
+
                         {/* Magic Action Button: Add to Missing Demands */}
                         {list.status !== 'done' && (
                           <button
                             type="button"
                             disabled={convertingListId === list.id}
                             onClick={() => handleConvertToClient(list)}
-                            className="h-8 sm:h-9 px-3 sm:px-3.5 text-xs font-black rounded-full bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center gap-1.5 transition-all shadow-md shadow-orange-700/20 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                            className="h-8 px-3 py-1.5 text-xs font-medium rounded-xl bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                             title="إضافة للخصاص (تحويل الزبون لدليل الخصاصات وإضافة الكتب المطلوبة فوراً)"
                           >
                             {convertingListId === list.id ? (
@@ -751,7 +804,7 @@ export default function EmployeesAndLists({
                         <button
                           type="button"
                           onClick={() => handleToggleListStatus(list)}
-                          className={`h-8 sm:h-9 px-3 text-xs font-bold rounded-full flex items-center gap-1.5 transition-all shadow-xs ${
+                          className={`h-8 px-3 py-1.5 text-xs font-medium rounded-xl flex items-center gap-1.5 transition-all shadow-xs whitespace-nowrap shrink-0 ${
                             list.status === 'done'
                               ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
                               : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -775,7 +828,7 @@ export default function EmployeesAndLists({
                         <button
                           type="button"
                           onClick={() => handleOpenEditList(list)}
-                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors border border-neutral-200/60"
+                          className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors border border-neutral-200/60 shrink-0"
                           title="تعديل بيانات اللائحة"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -785,7 +838,7 @@ export default function EmployeesAndLists({
                         <button
                           type="button"
                           onClick={() => setDeleteConfirm({ type: 'list', id: list.id, name: list.client_name })}
-                          className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-neutral-100 hover:bg-rose-50 hover:text-rose-600 text-neutral-500 flex items-center justify-center transition-colors border border-neutral-200/60"
+                          className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-rose-50 hover:text-rose-600 text-neutral-500 flex items-center justify-center transition-colors border border-neutral-200/60 shrink-0"
                           title="حذف اللائحة"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1005,6 +1058,23 @@ export default function EmployeesAndLists({
                   onChange={(e) => setListSchoolName(e.target.value)}
                   className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                  رقم الهاتف / الواتساب (اختياري):
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-neutral-400 absolute right-3.5 top-2.5" />
+                  <input
+                    type="tel"
+                    dir="ltr"
+                    placeholder="06XXXXXXXX / 07XXXXXXXX"
+                    value={listPhone}
+                    onChange={(e) => setListPhone(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl pr-10 pl-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white text-left font-mono"
+                  />
+                </div>
               </div>
 
               <div>

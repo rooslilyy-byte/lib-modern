@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Phone, 
   Calendar, 
+  Ticket,
   ArrowRight, 
   Edit, 
   Printer, 
@@ -42,7 +43,8 @@ interface CustomerDetailsProps {
       is_delivered?: boolean;
     }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
   onUpdateItemState: (
     itemId: string, 
@@ -182,6 +184,14 @@ function CustomerDetails({
                 <h1 className="text-base sm:text-lg font-black text-neutral-900 leading-tight truncate">
                   {targetDemand.client?.name}
                 </h1>
+
+                {/* Ticket ID Badge */}
+                {targetDemand.client?.ticket_id && (
+                  <span className="bg-amber-50 text-amber-900 border border-amber-200/80 text-xs font-black px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <Ticket className="w-3.5 h-3.5 text-amber-700" />
+                    <span>رقم التذكرة: {targetDemand.client.ticket_id}</span>
+                  </span>
+                )}
 
                 {/* Overall Demand Status Pill Badge */}
                 <span className={`text-xs font-bold px-3 py-1 rounded-full border flex items-center gap-1.5 ${

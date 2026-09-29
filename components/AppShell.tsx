@@ -58,8 +58,8 @@ export interface AppShellData {
   activeBatch: PurchaseBatch | null;
   isLoading: boolean;
   loadData: () => Promise<void>;
-  handleCreateDemand: (name: string, phone: string, items: any[]) => Promise<void>;
-  handleUpdateDemand: (id: string, name: string, phone: string, items: any[]) => Promise<void>;
+  handleCreateDemand: (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => Promise<void>;
+  handleUpdateDemand: (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => Promise<void>;
   handleUpdateItemState: (id: string, updates: any) => Promise<void>;
   handleAutoAllocateStock: (productName: string, receivedQty: number) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
   handleMarkEnRupture: (productName: string) => Promise<void>;
@@ -70,7 +70,7 @@ export interface AppShellData {
   handleCreateEmployee: (name: string) => Promise<Employee>;
   handleUpdateEmployee: (id: string, name: string) => Promise<Employee>;
   handleDeleteEmployee: (id: string) => Promise<void>;
-  handleCreateSchoolList: (payload: { client_name: string; school_name: string; employee_id?: string | null; status?: SchoolListStatus; client_id?: string | null }) => Promise<SchoolList>;
+  handleCreateSchoolList: (payload: { client_name: string; school_name: string; phone?: string | null; employee_id?: string | null; status?: SchoolListStatus; client_id?: string | null }) => Promise<SchoolList>;
   handleUpdateSchoolList: (id: string, updates: Partial<SchoolList>) => Promise<SchoolList>;
   handleDeleteSchoolList: (id: string) => Promise<void>;
   handleLinkSchoolListClient: (listId: string, clientId: string | null) => Promise<SchoolList>;
@@ -128,9 +128,10 @@ function AppShellContent({ children }: AppShellProps) {
     loadData();
   }, [loadData]);
 
-  const handleCreateDemand = useCallback(async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+  const handleCreateDemand = useCallback(async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => {
     const cleanName = (name || '').trim();
     const cleanPhone = (phone || '').trim();
+    const cleanTicketId = (ticketId || '').trim() || null;
     const tempId = 'temp-' + Date.now();
     const validItems = (Array.isArray(items) ? items : []).filter(it => it && it.product_name && it.product_name.trim());
     
@@ -147,6 +148,7 @@ function AppShellContent({ children }: AppShellProps) {
         id: 'client-' + tempId,
         name: cleanName,
         phone: cleanPhone,
+        ticket_id: cleanTicketId,
         created_at: new Date().toISOString(),
       },
       items: validItems.map((it, idx) => ({
@@ -168,15 +170,16 @@ function AppShellContent({ children }: AppShellProps) {
     });
 
     try {
-      await createClientDemand(name, phone, validItems, avanceAmount, totalAmount);
+      await createClientDemand(name, phone, validItems, avanceAmount, totalAmount, ticketId);
     } finally {
       await loadData(true);
     }
   }, [activeBatch, loadData]);
 
-  const handleUpdateDemand = useCallback(async (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number) => {
+  const handleUpdateDemand = useCallback(async (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => {
     const cleanName = (name || '').trim();
     const cleanPhone = (phone || '').trim();
+    const cleanTicketId = ticketId !== undefined ? (ticketId.trim() || null) : undefined;
     const validItems = (Array.isArray(items) ? items : []).filter(it => it && it.product_name && it.product_name.trim());
 
     // Optimistic Demand Update
@@ -202,6 +205,7 @@ function AppShellContent({ children }: AppShellProps) {
             id: dem.client?.id || dem.client_id || ('client-' + dem.id),
             name: cleanName,
             phone: cleanPhone,
+            ticket_id: cleanTicketId !== undefined ? cleanTicketId : (dem.client?.ticket_id || null),
             created_at: dem.client?.created_at || new Date().toISOString(),
           },
           items: updatedItems,
@@ -212,7 +216,7 @@ function AppShellContent({ children }: AppShellProps) {
     });
 
     try {
-      await updateClientDemand(id, name, phone, validItems, avanceAmount, totalAmount);
+      await updateClientDemand(id, name, phone, validItems, avanceAmount, totalAmount, ticketId);
     } finally {
       await loadData(true);
     }
@@ -419,6 +423,7 @@ function AppShellContent({ children }: AppShellProps) {
   const handleCreateSchoolList = useCallback(async (payload: {
     client_name: string;
     school_name: string;
+    phone?: string | null;
     employee_id?: string | null;
     status?: SchoolListStatus;
     client_id?: string | null;
@@ -430,6 +435,7 @@ function AppShellContent({ children }: AppShellProps) {
       id: tempId,
       client_name: payload.client_name.trim(),
       school_name: payload.school_name.trim(),
+      phone: payload.phone || null,
       employee_id: payload.employee_id || null,
       status: payload.status || 'pending',
       client_id: payload.client_id || null,

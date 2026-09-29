@@ -15,8 +15,9 @@ import {
   ChevronUp, 
   User, 
   Phone, 
+  Ticket,
   BookOpen,
-  CheckSquare,
+  CheckSquare, 
   Square,
   Minus,
   Edit
@@ -34,7 +35,8 @@ interface DemandsListProps {
     clientPhone: string, 
     items: { product_name: string; quantity: number }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
   onUpdateDemand: (
     demandId: string,
@@ -48,7 +50,8 @@ interface DemandsListProps {
       is_delivered?: boolean;
     }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
   onUpdateItemState: (
     itemId: string, 
@@ -70,6 +73,7 @@ function DemandsList({
   // Form State
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientTicketId, setClientTicketId] = useState('');
   const [avanceAmount, setAvanceAmount] = useState<string>('');
   const [totalAmount, setTotalAmount] = useState<string>('');
   const [items, setItems] = useState<{ product_name: string; quantity: number | string }[]>([
@@ -142,16 +146,17 @@ function DemandsList({
 
     setIsSubmitting(true);
     try {
-      await onCreateDemand(clientName.trim(), clientPhone.trim(), validItems, numAvance, numTotal);
+      await onCreateDemand(clientName.trim(), clientPhone.trim(), validItems, numAvance, numTotal, clientTicketId.trim() || undefined);
       setClientName('');
       setClientPhone('');
+      setClientTicketId('');
       setAvanceAmount('');
       setTotalAmount('');
       setItems([{ product_name: '', quantity: 1 }]);
     } finally {
       setIsSubmitting(false);
     }
-  }, [items, clientName, clientPhone, avanceAmount, totalAmount, onCreateDemand]);
+  }, [items, clientName, clientPhone, clientTicketId, avanceAmount, totalAmount, onCreateDemand]);
 
   const filteredDemands = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -162,6 +167,7 @@ function DemandsList({
       return (
         dem.client?.name.toLowerCase().includes(q) ||
         dem.client?.phone.includes(q) ||
+        (dem.client?.ticket_id && dem.client.ticket_id.toLowerCase().includes(q)) ||
         dem.items?.some(i => i.product_name.toLowerCase().includes(q))
       );
     });
@@ -203,7 +209,7 @@ function DemandsList({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-orange-700" />
@@ -231,6 +237,20 @@ function DemandsList({
                 value={clientPhone}
                 onChange={(e) => setClientPhone(e.target.value)}
                 className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono dir-ltr text-right min-h-[38px] sm:min-h-[44px] transition-all shadow-xs"
+              />
+            </div>
+
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs font-bold text-neutral-700 mb-1.5 flex items-center gap-1.5">
+                <Ticket className="w-3.5 h-3.5 text-orange-700" />
+                <span>رقم التذكرة / Bon N° (اختياري):</span>
+              </label>
+              <input
+                type="text"
+                placeholder="مثال: 1042 أو BON-88..."
+                value={clientTicketId}
+                onChange={(e) => setClientTicketId(e.target.value)}
+                className="w-full bg-white/90 border border-neutral-200/80 rounded-2xl px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-neutral-900 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 font-mono min-h-[38px] sm:min-h-[44px] transition-all shadow-xs"
               />
             </div>
           </div>
@@ -409,13 +429,19 @@ function DemandsList({
                         {demand.client?.name.substring(0, 2)}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
                           <Link
                             href={`/customers/${encodeURIComponent(demand.id)}`}
                             className="font-bold text-xs sm:text-sm text-neutral-900 hover:text-orange-700 hover:underline transition-colors truncate"
                           >
                             {demand.client?.name}
                           </Link>
+                          {demand.client?.ticket_id && (
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200/60 font-mono shrink-0">
+                              <Ticket className="w-3 h-3 text-amber-700" />
+                              <span>Bon #{demand.client.ticket_id}</span>
+                            </span>
+                          )}
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                             demand.status === 'completed'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'

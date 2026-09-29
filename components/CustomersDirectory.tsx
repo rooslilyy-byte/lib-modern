@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Users, Search, Phone, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
+import { Users, Search, Phone, Ticket, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
 import CreateDemandModal from './CreateDemandModal';
@@ -16,7 +16,8 @@ interface CustomersDirectoryProps {
     clientPhone: string, 
     items: { product_name: string; quantity: number }[],
     avanceAmount?: number,
-    totalAmount?: number
+    totalAmount?: number,
+    ticketId?: string
   ) => Promise<void>;
   onDeleteBulkCustomers?: (clientIds: string[]) => Promise<void>;
   onSelectCustomer?: (demandOrClientId: string) => void;
@@ -68,6 +69,7 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
           clientId: dem.client.id,
           name: dem.client.name,
           phone: dem.client.phone,
+          ticket_id: dem.client.ticket_id || null,
           createdAt: dem.created_at || new Date().toISOString(),
           status: dem.status,
           totalItems,
@@ -88,7 +90,8 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
       const matchesSearch = 
         !q ||
         c.name.toLowerCase().includes(q) ||
-        c.phone.includes(q);
+        c.phone.includes(q) ||
+        (c.ticket_id && c.ticket_id.toLowerCase().includes(q));
       if (!matchesSearch) return false;
 
       if (filter === 'ready' || filter === 'completed') {
@@ -340,14 +343,23 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
                           #{idx + 1}
                         </span>
                         
-                        <Link
-                          href={`/customers/${encodeURIComponent(cli.id)}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="font-extrabold text-neutral-900 text-sm hover:text-orange-700 hover:underline transition-colors truncate dir-rtl text-right"
-                          title="انقر لعرض ملف هذه الطلبية بالكامل"
-                        >
-                          {cli.name}
-                        </Link>
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <Link
+                            href={`/customers/${encodeURIComponent(cli.id)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-extrabold text-neutral-900 text-sm hover:text-orange-700 hover:underline transition-colors truncate dir-rtl text-right"
+                            title="انقر لعرض ملف هذه الطلبية بالكامل"
+                          >
+                            {cli.name}
+                          </Link>
+
+                          {cli.ticket_id && (
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200/60 font-mono shrink-0">
+                              <Ticket className="w-3 h-3 text-amber-700" />
+                              <span>Bon #{cli.ticket_id}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Mobile Chevron */}

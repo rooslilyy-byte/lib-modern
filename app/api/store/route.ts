@@ -335,6 +335,7 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
           id,
           name,
           phone,
+          ticket_id,
           created_at
         ),
         items:demand_items (*)
@@ -393,6 +394,7 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
         id: relatedClient.id,
         name: relatedClient.name,
         phone: relatedClient.phone,
+        ticket_id: relatedClient.ticket_id || null,
         created_at: relatedClient.created_at,
       },
       items,
@@ -427,6 +429,7 @@ async function getSchoolListsFromDb(): Promise<SchoolList[]> {
         id,
         client_name,
         school_name,
+        phone,
         employee_id,
         status,
         client_id,
@@ -438,7 +441,8 @@ async function getSchoolListsFromDb(): Promise<SchoolList[]> {
         client:clients (
           id,
           name,
-          phone
+          phone,
+          ticket_id
         )
       `)
       .order('created_at', { ascending: false });
@@ -594,22 +598,36 @@ export async function POST(request: Request) {
     const { action } = body;
 
     if (action === 'create_demand') {
-      const { clientName, clientPhone, items, avance_amount, total_amount } = body;
+      const { clientName, clientPhone, items, avance_amount, total_amount, ticketId, ticket_id } = body;
       const cleanPhone = (clientPhone || '').trim();
       const cleanName = (clientName || '').trim();
+      const rawTicket = ticket_id !== undefined ? ticket_id : ticketId;
+      const cleanTicketId = rawTicket ? String(rawTicket).trim() : null;
       const activeBatch = await getActiveBatch();
       const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
       const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
       // 1. Create client
-      const client = unwrap(
-        await supabaseAdmin
-          .from('clients')
-          .insert({ name: cleanName, phone: cleanPhone })
-          .select()
-          .single(),
-        'Creating client',
-      ) as DatabaseRow;
+      let client: DatabaseRow;
+      try {
+        client = unwrap(
+          await supabaseAdmin
+            .from('clients')
+            .insert({ name: cleanName, phone: cleanPhone, ticket_id: cleanTicketId })
+            .select()
+            .single(),
+          'Creating client with ticket_id',
+        ) as DatabaseRow;
+      } catch {
+        client = unwrap(
+          await supabaseAdmin
+            .from('clients')
+            .insert({ name: cleanName, phone: cleanPhone })
+            .select()
+            .single(),
+          'Creating client fallback',
+        ) as DatabaseRow;
+      }
 
       // 2. Create client demand
       let demand: DatabaseRow;
@@ -688,9 +706,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'update_demand') {
-      const { demandId, clientName, clientPhone, items, avance_amount, total_amount } = body;
+      const { demandId, clientName, clientPhone, items, avance_amount, total_amount, ticketId, ticket_id } = body;
       const cleanPhone = (clientPhone || '').trim();
       const cleanName = (clientName || '').trim();
+      const rawTicket = ticket_id !== undefined ? ticket_id : ticketId;
+      const cleanTicketId = rawTicket !== undefined ? (String(rawTicket || '').trim() || null) : undefined;
       const numAvance = avance_amount !== undefined && avance_amount !== null && avance_amount !== '' ? Number(avance_amount) : 0;
       const numTotal = total_amount !== undefined && total_amount !== null && total_amount !== '' ? Number(total_amount) : 0;
 
@@ -708,13 +728,28 @@ export async function POST(request: Request) {
       }
 
       // 1. Update client details
-      unwrap(
-        await supabaseAdmin
-          .from('clients')
-          .update({ name: cleanName, phone: cleanPhone })
-          .eq('id', demand.client_id),
-        'Updating client',
-      );
+      const clientUpdates: DatabaseRow = { name: cleanName, phone: cleanPhone };
+      if (cleanTicketId !== undefined) {
+        clientUpdates.ticket_id = cleanTicketId;
+      }
+
+      try {
+        unwrap(
+          await supabaseAdmin
+            .from('clients')
+            .update(clientUpdates)
+            .eq('id', demand.client_id),
+          'Updating client with ticket_id',
+        );
+      } catch {
+        unwrap(
+          await supabaseAdmin
+            .from('clients')
+            .update({ name: cleanName, phone: cleanPhone })
+            .eq('id', demand.client_id),
+          'Updating client fallback',
+        );
+      }
 
       // 2. Update demand amounts
       try {
@@ -1312,42 +1347,82 @@ export async function POST(request: Request) {
 
     // --- SCHOOL LISTS CRUD & LINKING ---
     if (action === 'create_school_list') {
-      const { client_name, school_name, employee_id, status, client_id } = body;
+      const { client_name, school_name, phone, employee_id, status, client_id } = body;
       const cleanClientName = (client_name || '').trim();
       const cleanSchoolName = (school_name || '').trim();
+      const cleanPhone = (phone || '').trim() || null;
       const listStatus = status === 'done' ? 'done' : 'pending';
 
-      const schoolList = unwrap(
-        await supabaseAdmin
-          .from('school_lists')
-          .insert({
-            client_name: cleanClientName,
-            school_name: cleanSchoolName,
-            employee_id: employee_id || null,
-            status: listStatus,
-            client_id: client_id || null,
-          })
-          .select(`
-            id,
-            client_name,
-            school_name,
-            employee_id,
-            status,
-            client_id,
-            created_at,
-            employee:employees (
+      let schoolList: DatabaseRow | null = null;
+      try {
+        schoolList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .insert({
+              client_name: cleanClientName,
+              school_name: cleanSchoolName,
+              phone: cleanPhone,
+              employee_id: employee_id || null,
+              status: listStatus,
+              client_id: client_id || null,
+            })
+            .select(`
               id,
-              name
-            ),
-            client:clients (
+              client_name,
+              school_name,
+              phone,
+              employee_id,
+              status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone,
+                ticket_id
+              )
+            `)
+            .single(),
+          'Creating school list',
+        ) as DatabaseRow | null;
+      } catch {
+        schoolList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .insert({
+              client_name: cleanClientName,
+              school_name: cleanSchoolName,
+              employee_id: employee_id || null,
+              status: listStatus,
+              client_id: client_id || null,
+            })
+            .select(`
               id,
-              name,
-              phone
-            )
-          `)
-          .single(),
-        'Creating school list',
-      ) as DatabaseRow | null;
+              client_name,
+              school_name,
+              employee_id,
+              status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone,
+                ticket_id
+              )
+            `)
+            .single(),
+          'Creating school list fallback',
+        ) as DatabaseRow | null;
+      }
 
       if (!schoolList) {
         return NextResponse.json({ success: false, message: 'Failed to create school list' }, { status: 500 });
@@ -1368,36 +1443,72 @@ export async function POST(request: Request) {
       const safeUpdates: DatabaseRow = {};
       if (updates.client_name !== undefined) safeUpdates.client_name = updates.client_name.trim();
       if (updates.school_name !== undefined) safeUpdates.school_name = updates.school_name.trim();
+      if (updates.phone !== undefined) safeUpdates.phone = (updates.phone || '').trim() || null;
       if (updates.employee_id !== undefined) safeUpdates.employee_id = updates.employee_id || null;
       if (updates.status !== undefined) safeUpdates.status = updates.status;
       if (updates.client_id !== undefined) safeUpdates.client_id = updates.client_id || null;
 
-      const schoolList = unwrap(
-        await supabaseAdmin
-          .from('school_lists')
-          .update(safeUpdates)
-          .eq('id', id)
-          .select(`
-            id,
-            client_name,
-            school_name,
-            employee_id,
-            status,
-            client_id,
-            created_at,
-            employee:employees (
+      let schoolList: DatabaseRow | null = null;
+      try {
+        schoolList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .update(safeUpdates)
+            .eq('id', id)
+            .select(`
               id,
-              name
-            ),
-            client:clients (
+              client_name,
+              school_name,
+              phone,
+              employee_id,
+              status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone,
+                ticket_id
+              )
+            `)
+            .single(),
+          'Updating school list',
+        ) as DatabaseRow | null;
+      } catch {
+        const fallbackUpdates = { ...safeUpdates };
+        delete fallbackUpdates.phone;
+        schoolList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .update(fallbackUpdates)
+            .eq('id', id)
+            .select(`
               id,
-              name,
-              phone
-            )
-          `)
-          .single(),
-        'Updating school list',
-      ) as DatabaseRow | null;
+              client_name,
+              school_name,
+              employee_id,
+              status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone,
+                ticket_id
+              )
+            `)
+            .single(),
+          'Updating school list fallback',
+        ) as DatabaseRow | null;
+      }
 
       if (!schoolList) {
         return NextResponse.json({ success: false, message: 'School list not found' }, { status: 404 });
@@ -1524,11 +1635,11 @@ export async function POST(request: Request) {
           clientRow = foundClient;
           targetClientId = foundClient.id;
         } else {
-          // INSERT new client with list's client_name
+          // INSERT new client with list's client_name and phone
           const insertedClient = unwrap(
             await supabaseAdmin
               .from('clients')
-              .insert({ name: cleanClientName, phone: '' })
+              .insert({ name: cleanClientName, phone: schoolList.phone || '' })
               .select()
               .single(),
             'Inserting new client from school list',
