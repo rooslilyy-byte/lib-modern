@@ -16,17 +16,14 @@ function MasterProductsManager({
 }: MasterProductsManagerProps) {
   const { t } = useLanguage();
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('كتب الابتدائية');
+  const [category, setCategory] = useState('كتب');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = useMemo(() => [
-    'كتب الابتدائية',
-    'كتب الإعدادية',
-    'كتب التأهيلية',
-    'دفاتر وكراسات',
-    'أدوات ومستلزمات',
-    'معاجم وقصص',
+    'كتب',
+    'أدوات',
+    'أخرى',
   ], []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {

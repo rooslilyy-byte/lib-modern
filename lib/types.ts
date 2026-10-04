@@ -82,14 +82,21 @@ export interface Employee {
 }
 
 export type SchoolListStatus = 'done' | 'pending';
+export type ReadinessStatus = 'جاهزة بالكامل' | 'جاهزة جزئيا';
+export type DeliveryStatus = 'في انتظار التسليم' | 'طلبية مستلمة';
 
 export interface SchoolList {
   id: string;
   client_name: string;
   school_name: string;
   phone?: string | null;
+  ticket_id?: string | null;
+  avance_amount?: number | null;
+  total_amount?: number | null;
   employee_id?: string | null;
   status: SchoolListStatus;
+  readiness_status?: ReadinessStatus | string | null;
+  delivery_status?: DeliveryStatus | string | null;
   client_id?: string | null;
   created_at?: string;
 

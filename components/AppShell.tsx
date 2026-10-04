@@ -26,10 +26,12 @@ import {
   deleteSchoolList,
   linkSchoolListClient,
   convertSchoolListToClient,
-  updateProductCategory
+  updateProductCategory,
+  updateMasterProduct,
+  deleteMasterProduct
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { PurchaseBatch, MasterProduct, ClientDemand, Employee, SchoolList, SchoolListStatus } from '@/lib/types';
+import { PurchaseBatch, MasterProduct, ClientDemand, Employee, SchoolList, SchoolListStatus, ReadinessStatus, DeliveryStatus } from '@/lib/types';
 import { LanguageProvider, useLanguage } from '@/lib/languageContext';
 import { Menu, PanelRightOpen, Phone, Globe } from 'lucide-react';
 
@@ -76,6 +78,8 @@ export interface AppShellData {
   handleLinkSchoolListClient: (listId: string, clientId: string | null) => Promise<SchoolList>;
   handleConvertSchoolListToClient: (listId: string) => Promise<{ clientId: string; demandId: string; schoolList: SchoolList }>;
   handleUpdateProductCategory: (productId: string, category: string, productName?: string) => Promise<MasterProduct>;
+  handleUpdateMasterProduct: (productId: string, updates: { name?: string; category?: string }) => Promise<MasterProduct>;
+  handleDeleteMasterProduct: (productId: string, productName?: string) => Promise<void>;
 }
 
 interface AppShellProps {
@@ -424,8 +428,13 @@ function AppShellContent({ children }: AppShellProps) {
     client_name: string;
     school_name: string;
     phone?: string | null;
+    ticket_id?: string | null;
+    avance_amount?: number | null;
+    total_amount?: number | null;
     employee_id?: string | null;
     status?: SchoolListStatus;
+    readiness_status?: ReadinessStatus | string | null;
+    delivery_status?: DeliveryStatus | string | null;
     client_id?: string | null;
   }) => {
     const tempId = `list-${Date.now()}`;
@@ -436,8 +445,13 @@ function AppShellContent({ children }: AppShellProps) {
       client_name: payload.client_name.trim(),
       school_name: payload.school_name.trim(),
       phone: payload.phone || null,
+      ticket_id: payload.ticket_id || null,
+      avance_amount: payload.avance_amount || 0,
+      total_amount: payload.total_amount || 0,
       employee_id: payload.employee_id || null,
       status: payload.status || 'pending',
+      readiness_status: payload.readiness_status || 'جاهزة جزئيا',
+      delivery_status: payload.delivery_status || 'في انتظار التسليم',
       client_id: payload.client_id || null,
       created_at: new Date().toISOString(),
       employee: assignedEmp,
@@ -517,6 +531,13 @@ function AppShellContent({ children }: AppShellProps) {
   }, [demands, loadData]);
 
   const handleConvertSchoolListToClient = useCallback(async (listId: string) => {
+    // 1. Instant optimistic state update: mark list as linked so button disappears immediately (< 16ms)
+    setSchoolLists(prev => {
+      const next = prev.map(l => l.id === listId ? { ...l, client_id: l.client_id || 'optimistic-client-link' } : l);
+      globalAppCache.schoolLists = next;
+      return next;
+    });
+
     try {
       const res = await convertSchoolListToClient(listId);
       if (res && res.schoolList) {
@@ -527,10 +548,16 @@ function AppShellContent({ children }: AppShellProps) {
         });
       }
       return res;
-    } finally {
-      await loadData(true);
+    } catch (err) {
+      // Revert optimistic update on failure
+      setSchoolLists(prev => {
+        const next = prev.map(l => (l.id === listId && l.client_id === 'optimistic-client-link') ? { ...l, client_id: null } : l);
+        globalAppCache.schoolLists = next;
+        return next;
+      });
+      throw err;
     }
-  }, [loadData]);
+  }, []);
 
   const handleUpdateProductCategory = useCallback(async (productId: string, category: string, productName?: string) => {
     // Optimistic master product update
@@ -564,6 +591,62 @@ function AppShellContent({ children }: AppShellProps) {
     }
   }, [loadData]);
 
+  const handleUpdateMasterProduct = useCallback(async (productId: string, updates: { name?: string; category?: string }) => {
+    // Optimistic master product update
+    setMasterProducts(prev => {
+      const next = prev.map(p => {
+        if (productId && p.id === productId) {
+          return {
+            ...p,
+            name: updates.name !== undefined ? updates.name : p.name,
+            category: updates.category !== undefined ? updates.category : p.category,
+          };
+        }
+        return p;
+      });
+      globalAppCache.masterProducts = next;
+      return next;
+    });
+
+    try {
+      const updated = await updateMasterProduct(productId, updates);
+      setMasterProducts(prev => {
+        const next = prev.map(p => {
+          if (productId && p.id === productId) {
+            return { ...p, ...updated };
+          }
+          return p;
+        });
+        globalAppCache.masterProducts = next;
+        return next;
+      });
+      return updated;
+    } catch (err) {
+      await loadData(true);
+      throw err;
+    }
+  }, [loadData]);
+
+  const handleDeleteMasterProduct = useCallback(async (productId: string, productName?: string) => {
+    // Optimistic master product removal
+    setMasterProducts(prev => {
+      const next = prev.filter(p => {
+        if (productId && p.id === productId) return false;
+        if (productName && p.name.trim().toLowerCase() === productName.trim().toLowerCase()) return false;
+        return true;
+      });
+      globalAppCache.masterProducts = next;
+      return next;
+    });
+
+    try {
+      await deleteMasterProduct(productId, productName);
+    } catch (err) {
+      await loadData(true);
+      throw err;
+    }
+  }, [loadData]);
+
   const appShellData: AppShellData = useMemo(() => ({
     demands,
     masterProducts,
@@ -590,6 +673,8 @@ function AppShellContent({ children }: AppShellProps) {
     handleLinkSchoolListClient,
     handleConvertSchoolListToClient,
     handleUpdateProductCategory,
+    handleUpdateMasterProduct,
+    handleDeleteMasterProduct,
   }), [
     demands,
     masterProducts,
@@ -616,6 +701,8 @@ function AppShellContent({ children }: AppShellProps) {
     handleLinkSchoolListClient,
     handleConvertSchoolListToClient,
     handleUpdateProductCategory,
+    handleUpdateMasterProduct,
+    handleDeleteMasterProduct,
   ]);
 
   return (
@@ -735,19 +822,6 @@ function AppShellContent({ children }: AppShellProps) {
             children(appShellData)
           )}
         </main>
-
-        {/* Footer */}
-        <footer className="bg-white/80 backdrop-blur-md text-neutral-500 text-xs py-4 border-t border-neutral-200/80 mt-auto no-print">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-            <p className="font-bold text-neutral-800 flex items-center gap-2 flex-wrap justify-center sm:justify-start">
-              <span>{t('brand.full')}</span>
-              <span className="text-neutral-300">•</span>
-              <span className="text-neutral-600">الهاتف:</span>
-              <span dir="ltr" className="font-mono text-neutral-900 font-bold">06.60.56.33.71 / 06.60.31.98.68</span>
-            </p>
-            <p className="text-neutral-400 font-medium">© {new Date().getFullYear()} Lib Moderne POS.</p>
-          </div>
-        </footer>
       </div>
     </div>
   );

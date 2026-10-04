@@ -9,7 +9,6 @@ import {
   PackageCheck,
   ClipboardList,
   FileSpreadsheet,
-  Phone,
   Menu,
   X,
   LogOut,
@@ -276,38 +275,8 @@ function SidebarInner({
         </Link>
       </nav>
 
-      {/* 3. Phone Contacts Card (No Hyperlinks, Non-navigating compact buttons) */}
-      <div className="px-2.5 sm:px-3 pb-1.5 sm:pb-2">
-        <div className="bg-orange-800/70 border border-orange-600/40 rounded-xl sm:rounded-2xl p-2 sm:p-2.5 space-y-1.5 text-white shadow-inner">
-          <div className="flex items-center gap-1.5 text-orange-100 text-[10px] sm:text-xs font-bold">
-            <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
-            <span>أرقام هواتف المكتبة:</span>
-          </div>
-          <div className="space-y-1">
-            <button
-              type="button"
-              onClick={(e) => e.preventDefault()}
-              className="w-full flex items-center justify-between text-[11px] sm:text-xs font-mono font-bold text-orange-700 hover:bg-orange-50/90 active:bg-orange-100 bg-white px-2.5 py-1 rounded-full transition-colors dir-ltr shadow-2xs cursor-default"
-              title="هاتف المكتبة العصرية"
-            >
-              <span>06.60.56.33.71</span>
-              <span className="text-[9px] sm:text-[10px] font-cairo text-neutral-500 font-bold">هاتف</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => e.preventDefault()}
-              className="w-full flex items-center justify-between text-[11px] sm:text-xs font-mono font-bold text-orange-700 hover:bg-orange-50/90 active:bg-orange-100 bg-white px-2.5 py-1 rounded-full transition-colors dir-ltr shadow-2xs cursor-default"
-              title="هاتف المكتبة العصرية"
-            >
-              <span>06.60.31.98.68</span>
-              <span className="text-[9px] sm:text-[10px] font-cairo text-neutral-500 font-bold">هاتف</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. User profile & Logout */}
-      <div className="px-2.5 sm:px-3 pb-2 sm:pb-3 border-t border-orange-800/80 pt-2 sm:pt-2.5 relative space-y-1.5 sm:space-y-2" ref={profileRef}>
+      {/* 3. User profile & Logout */}
+      <div className="px-2.5 sm:px-3 pb-2 sm:pb-3 border-t border-orange-800/80 pt-2.5 sm:pt-3 relative space-y-1.5 sm:space-y-2 mt-auto" ref={profileRef}>
         
         {/* User Account Button */}
         <button

@@ -423,34 +423,70 @@ async function getEmployeesFromDb(): Promise<Employee[]> {
 
 async function getSchoolListsFromDb(): Promise<SchoolList[]> {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('school_lists')
-      .select(`
-        id,
-        client_name,
-        school_name,
-        phone,
-        employee_id,
-        status,
-        client_id,
-        created_at,
-        employee:employees (
+    let data: any = null;
+    try {
+      const res = await supabaseAdmin
+        .from('school_lists')
+        .select(`
           id,
-          name
-        ),
-        client:clients (
-          id,
-          name,
+          client_name,
+          school_name,
           phone,
-          ticket_id
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.warn('Error loading school lists from db:', error);
-      return [];
+          ticket_id,
+          avance_amount,
+          total_amount,
+          employee_id,
+          status,
+          readiness_status,
+          delivery_status,
+          client_id,
+          created_at,
+          employee:employees (
+            id,
+            name
+          ),
+          client:clients (
+            id,
+            name,
+            phone,
+            ticket_id
+          )
+        `)
+        .order('created_at', { ascending: false });
+      if (!res.error) {
+        data = res.data;
+      }
+    } catch {
+      // Fallback
     }
+
+    if (!data) {
+      const fallbackRes = await supabaseAdmin
+        .from('school_lists')
+        .select(`
+          id,
+          client_name,
+          school_name,
+          phone,
+          employee_id,
+          status,
+          client_id,
+          created_at,
+          employee:employees (
+            id,
+            name
+          ),
+          client:clients (
+            id,
+            name,
+            phone,
+            ticket_id
+          )
+        `)
+        .order('created_at', { ascending: false });
+      data = fallbackRes.data || [];
+    }
+
     return (data || []).map((row: any) => ({
       ...row,
       employee: Array.isArray(row.employee) ? row.employee[0] : row.employee,
@@ -1246,7 +1282,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, product });
     }
 
-    if (action === 'update_product_category' || action === 'update_master_product') {
+    if (action === 'update_product_category') {
       const { productId, productName, category } = body;
       const cleanCategory = (category || 'others').trim();
 
@@ -1265,6 +1301,48 @@ export async function POST(request: Request) {
       ) as MasterProduct;
 
       return NextResponse.json({ success: true, product });
+    }
+
+    if (action === 'update_master_product') {
+      const { productId, productName, name, category } = body;
+      const updates: any = {};
+      if (name !== undefined && (name || '').trim()) updates.name = name.trim();
+      if (category !== undefined) updates.category = category.trim();
+
+      let query = supabaseAdmin.from('master_products').update(updates);
+      if (productId) {
+        query = query.eq('id', productId);
+      } else if (productName) {
+        query = query.eq('name', productName.trim());
+      } else {
+        return NextResponse.json({ success: false, message: 'productId or productName required' }, { status: 400 });
+      }
+
+      const product = unwrap(
+        await query.select().single(),
+        'Updating master product',
+      ) as MasterProduct;
+
+      return NextResponse.json({ success: true, product });
+    }
+
+    if (action === 'delete_master_product') {
+      const { productId, productName } = body;
+      let query = supabaseAdmin.from('master_products').delete();
+      if (productId) {
+        query = query.eq('id', productId);
+      } else if (productName) {
+        query = query.eq('name', productName.trim());
+      } else {
+        return NextResponse.json({ success: false, message: 'productId or productName required' }, { status: 400 });
+      }
+
+      unwrap(
+        await query,
+        'Deleting master product',
+      );
+
+      return NextResponse.json({ success: true });
     }
 
 
@@ -1347,11 +1425,16 @@ export async function POST(request: Request) {
 
     // --- SCHOOL LISTS CRUD & LINKING ---
     if (action === 'create_school_list') {
-      const { client_name, school_name, phone, employee_id, status, client_id } = body;
+      const { client_name, school_name, phone, ticket_id, avance_amount, total_amount, employee_id, status, readiness_status, delivery_status, client_id } = body;
       const cleanClientName = (client_name || '').trim();
       const cleanSchoolName = (school_name || '').trim();
       const cleanPhone = (phone || '').trim() || null;
+      const cleanTicketId = (ticket_id || '').trim() || null;
+      const cleanAvance = Number(avance_amount) || 0;
+      const cleanTotal = Number(total_amount) || 0;
       const listStatus = status === 'done' ? 'done' : 'pending';
+      const cleanReadiness = readiness_status || 'جاهزة جزئيا';
+      const cleanDelivery = delivery_status || (listStatus === 'done' ? 'طلبية مستلمة' : 'في انتظار التسليم');
 
       let schoolList: DatabaseRow | null = null;
       try {
@@ -1362,8 +1445,13 @@ export async function POST(request: Request) {
               client_name: cleanClientName,
               school_name: cleanSchoolName,
               phone: cleanPhone,
+              ticket_id: cleanTicketId,
+              avance_amount: cleanAvance,
+              total_amount: cleanTotal,
               employee_id: employee_id || null,
               status: listStatus,
+              readiness_status: cleanReadiness,
+              delivery_status: cleanDelivery,
               client_id: client_id || null,
             })
             .select(`
@@ -1371,8 +1459,13 @@ export async function POST(request: Request) {
               client_name,
               school_name,
               phone,
+              ticket_id,
+              avance_amount,
+              total_amount,
               employee_id,
               status,
+              readiness_status,
+              delivery_status,
               client_id,
               created_at,
               employee:employees (
@@ -1390,38 +1483,75 @@ export async function POST(request: Request) {
           'Creating school list',
         ) as DatabaseRow | null;
       } catch {
-        schoolList = unwrap(
-          await supabaseAdmin
-            .from('school_lists')
-            .insert({
-              client_name: cleanClientName,
-              school_name: cleanSchoolName,
-              employee_id: employee_id || null,
-              status: listStatus,
-              client_id: client_id || null,
-            })
-            .select(`
-              id,
-              client_name,
-              school_name,
-              employee_id,
-              status,
-              client_id,
-              created_at,
-              employee:employees (
+        try {
+          schoolList = unwrap(
+            await supabaseAdmin
+              .from('school_lists')
+              .insert({
+                client_name: cleanClientName,
+                school_name: cleanSchoolName,
+                phone: cleanPhone,
+                employee_id: employee_id || null,
+                status: listStatus,
+                client_id: client_id || null,
+              })
+              .select(`
                 id,
-                name
-              ),
-              client:clients (
-                id,
-                name,
+                client_name,
+                school_name,
                 phone,
-                ticket_id
-              )
-            `)
-            .single(),
-          'Creating school list fallback',
-        ) as DatabaseRow | null;
+                employee_id,
+                status,
+                client_id,
+                created_at,
+                employee:employees (
+                  id,
+                  name
+                ),
+                client:clients (
+                  id,
+                  name,
+                  phone,
+                  ticket_id
+                )
+              `)
+              .single(),
+            'Creating school list fallback without pricing/readiness',
+          ) as DatabaseRow | null;
+        } catch {
+          schoolList = unwrap(
+            await supabaseAdmin
+              .from('school_lists')
+              .insert({
+                client_name: cleanClientName,
+                school_name: cleanSchoolName,
+                employee_id: employee_id || null,
+                status: listStatus,
+                client_id: client_id || null,
+              })
+              .select(`
+                id,
+                client_name,
+                school_name,
+                employee_id,
+                status,
+                client_id,
+                created_at,
+                employee:employees (
+                  id,
+                  name
+                ),
+                client:clients (
+                  id,
+                  name,
+                  phone,
+                  ticket_id
+                )
+              `)
+              .single(),
+            'Creating school list fallback',
+          ) as DatabaseRow | null;
+        }
       }
 
       if (!schoolList) {
@@ -1444,8 +1574,13 @@ export async function POST(request: Request) {
       if (updates.client_name !== undefined) safeUpdates.client_name = updates.client_name.trim();
       if (updates.school_name !== undefined) safeUpdates.school_name = updates.school_name.trim();
       if (updates.phone !== undefined) safeUpdates.phone = (updates.phone || '').trim() || null;
+      if (updates.ticket_id !== undefined) safeUpdates.ticket_id = (updates.ticket_id || '').trim() || null;
+      if (updates.avance_amount !== undefined) safeUpdates.avance_amount = Number(updates.avance_amount) || 0;
+      if (updates.total_amount !== undefined) safeUpdates.total_amount = Number(updates.total_amount) || 0;
       if (updates.employee_id !== undefined) safeUpdates.employee_id = updates.employee_id || null;
       if (updates.status !== undefined) safeUpdates.status = updates.status;
+      if (updates.readiness_status !== undefined) safeUpdates.readiness_status = updates.readiness_status;
+      if (updates.delivery_status !== undefined) safeUpdates.delivery_status = updates.delivery_status;
       if (updates.client_id !== undefined) safeUpdates.client_id = updates.client_id || null;
 
       let schoolList: DatabaseRow | null = null;
@@ -1460,8 +1595,13 @@ export async function POST(request: Request) {
               client_name,
               school_name,
               phone,
+              ticket_id,
+              avance_amount,
+              total_amount,
               employee_id,
               status,
+              readiness_status,
+              delivery_status,
               client_id,
               created_at,
               employee:employees (
@@ -1480,7 +1620,12 @@ export async function POST(request: Request) {
         ) as DatabaseRow | null;
       } catch {
         const fallbackUpdates = { ...safeUpdates };
+        delete fallbackUpdates.readiness_status;
+        delete fallbackUpdates.delivery_status;
         delete fallbackUpdates.phone;
+        delete fallbackUpdates.ticket_id;
+        delete fallbackUpdates.avance_amount;
+        delete fallbackUpdates.total_amount;
         schoolList = unwrap(
           await supabaseAdmin
             .from('school_lists')
@@ -1659,97 +1804,133 @@ export async function POST(request: Request) {
       }
 
       // Step B: Update current school_lists record to link this client_id
-      const updatedList = unwrap(
-        await supabaseAdmin
-          .from('school_lists')
-          .update({
-            client_id: targetClientId,
-            status: 'pending',
-          })
-          .eq('id', listId)
-          .select(`
-            id,
-            client_name,
-            school_name,
-            employee_id,
-            status,
-            client_id,
-            created_at,
-            employee:employees (
+      let updatedList: DatabaseRow | null = null;
+      try {
+        updatedList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .update({
+              client_id: targetClientId,
+            })
+            .eq('id', listId)
+            .select(`
               id,
-              name
-            ),
-            client:clients (
+              client_name,
+              school_name,
+              phone,
+              employee_id,
+              status,
+              readiness_status,
+              delivery_status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone,
+                ticket_id
+              )
+            `)
+            .single(),
+          'Updating school list with client link',
+        ) as DatabaseRow | null;
+      } catch {
+        updatedList = unwrap(
+          await supabaseAdmin
+            .from('school_lists')
+            .update({
+              client_id: targetClientId,
+            })
+            .eq('id', listId)
+            .select(`
               id,
-              name,
-              phone
-            )
-          `)
-          .single(),
-        'Updating school list with client link',
-      ) as DatabaseRow | null;
-
-      if (!updatedList) {
-        return NextResponse.json(
-          { success: false, message: 'Failed to update school list' },
-          { status: 500 },
-        );
+              client_name,
+              school_name,
+              employee_id,
+              status,
+              client_id,
+              created_at,
+              employee:employees (
+                id,
+                name
+              ),
+              client:clients (
+                id,
+                name,
+                phone
+              )
+            `)
+            .single(),
+          'Updating school list fallback with client link',
+        ) as DatabaseRow | null;
       }
 
-      // Step C Preparation: Ensure a client_demands record exists in the active batch
-      const activeBatch = await getActiveBatch();
-      const { data: existingDemands } = await supabaseAdmin
-        .from('client_demands')
-        .select('id')
-        .eq('client_id', targetClientId)
-        .eq('batch_id', activeBatch.id)
-        .limit(1);
-
+      // Step C: Ensure a client_demands record exists in the active batch
       let demandId = '';
-      if (existingDemands && existingDemands.length > 0 && existingDemands[0]) {
-        demandId = existingDemands[0].id;
-      } else {
-        let newDemand: DatabaseRow | null = null;
-        try {
-          newDemand = unwrap(
-            await supabaseAdmin
-              .from('client_demands')
-              .insert({
-                client_id: targetClientId,
-                batch_id: activeBatch.id,
-                status: 'pending',
-                avance_amount: 0,
-                total_amount: 0,
-              })
-              .select()
-              .single(),
-            'Creating initial client demand',
-          ) as DatabaseRow;
-        } catch {
-          newDemand = unwrap(
-            await supabaseAdmin
-              .from('client_demands')
-              .insert({
-                client_id: targetClientId,
-                batch_id: activeBatch.id,
-                status: 'pending',
-              })
-              .select()
-              .single(),
-            'Creating initial client demand fallback',
-          ) as DatabaseRow;
+      try {
+        const activeBatch = await getActiveBatch();
+        const { data: existingDemands } = await supabaseAdmin
+          .from('client_demands')
+          .select('id')
+          .eq('client_id', targetClientId)
+          .eq('batch_id', activeBatch.id)
+          .limit(1);
+
+        if (existingDemands && existingDemands.length > 0 && existingDemands[0]) {
+          demandId = existingDemands[0].id;
+        } else {
+          const listAvance = Number(schoolList.avance_amount) || 0;
+          const listTotal = Number(schoolList.total_amount) || 0;
+          let newDemand: DatabaseRow | null = null;
+          try {
+            newDemand = unwrap(
+              await supabaseAdmin
+                .from('client_demands')
+                .insert({
+                  client_id: targetClientId,
+                  batch_id: activeBatch.id,
+                  status: 'pending',
+                  avance_amount: listAvance,
+                  total_amount: listTotal,
+                })
+                .select()
+                .single(),
+              'Creating initial client demand',
+            ) as DatabaseRow;
+          } catch {
+            newDemand = unwrap(
+              await supabaseAdmin
+                .from('client_demands')
+                .insert({
+                  client_id: targetClientId,
+                  batch_id: activeBatch.id,
+                  status: 'pending',
+                })
+                .select()
+                .single(),
+              'Creating initial client demand fallback',
+            ) as DatabaseRow;
+          }
+          demandId = newDemand?.id || '';
         }
-        demandId = newDemand?.id || '';
+      } catch (err) {
+        console.warn('Non-blocking warning creating client demand during list conversion:', err);
       }
 
+      const rawResult = updatedList || schoolList;
       return NextResponse.json({
         success: true,
         clientId: targetClientId,
         demandId: demandId,
         schoolList: {
-          ...updatedList,
-          employee: Array.isArray(updatedList.employee) ? updatedList.employee[0] : updatedList.employee,
-          client: Array.isArray(updatedList.client) ? updatedList.client[0] : updatedList.client,
+          ...rawResult,
+          client_id: targetClientId,
+          employee: Array.isArray(rawResult?.employee) ? rawResult.employee[0] : rawResult?.employee,
+          client: Array.isArray(rawResult?.client) ? rawResult.client[0] : (rawResult?.client || clientRow),
         },
       });
     }

@@ -151,7 +151,15 @@ CREATE TABLE IF NOT EXISTS public.school_lists (
 
 -- Add phone column to school_lists if missing
 ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS ticket_id TEXT;
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS avance_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS total_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS readiness_status TEXT DEFAULT 'جاهزة بالكامل';
+ALTER TABLE public.school_lists ADD COLUMN IF NOT EXISTS delivery_status TEXT DEFAULT 'في انتظار التسليم';
 CREATE INDEX IF NOT EXISTS idx_school_lists_phone ON public.school_lists(phone);
+CREATE INDEX IF NOT EXISTS idx_school_lists_ticket_id ON public.school_lists(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_school_lists_readiness ON public.school_lists(readiness_status);
+CREATE INDEX IF NOT EXISTS idx_school_lists_delivery ON public.school_lists(delivery_status);
 CREATE INDEX IF NOT EXISTS idx_school_lists_employee ON public.school_lists(employee_id);
 CREATE INDEX IF NOT EXISTS idx_school_lists_client ON public.school_lists(client_id);
 CREATE INDEX IF NOT EXISTS idx_school_lists_status ON public.school_lists(status);

@@ -166,7 +166,6 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
                 {customerEntries.length} {t('common.items')}
               </span>
             </div>
-            <p className="text-xs text-neutral-500 font-medium mt-0.5 truncate">{t('cust.subtitle')}</p>
           </div>
         </div>
 

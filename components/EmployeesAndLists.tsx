@@ -19,15 +19,17 @@ import {
   Phone,
   Check,
   X,
-  Sparkles,
   UserCheck,
   Building,
   Filter,
   RefreshCw,
   ExternalLink,
-  MessageCircle,
+  ChevronDown,
+  Calendar,
+  Sparkles,
+  Ticket,
 } from 'lucide-react';
-import { Employee, SchoolList, SchoolListStatus, ClientDemand } from '@/lib/types';
+import { Employee, SchoolList, SchoolListStatus, ReadinessStatus, DeliveryStatus, ClientDemand } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
 import { convertSchoolListToClient } from '@/lib/dataStore';
 
@@ -44,10 +46,15 @@ interface EmployeesAndListsProps {
   onCreateSchoolList: (payload: {
     client_name: string;
     school_name: string;
+    phone?: string | null;
+    ticket_id?: string | null;
+    avance_amount?: number | null;
+    total_amount?: number | null;
     employee_id?: string | null;
     status?: SchoolListStatus;
+    readiness_status?: ReadinessStatus | string | null;
+    delivery_status?: DeliveryStatus | string | null;
     client_id?: string | null;
-    phone?: string | null;
   }) => Promise<SchoolList>;
   onUpdateSchoolList: (id: string, updates: Partial<SchoolList>) => Promise<SchoolList>;
   onDeleteSchoolList: (id: string) => Promise<void>;
@@ -112,8 +119,13 @@ export default function EmployeesAndLists({
   const [listClientName, setListClientName] = useState('');
   const [listSchoolName, setListSchoolName] = useState('');
   const [listPhone, setListPhone] = useState('');
+  const [listTicketId, setListTicketId] = useState('');
+  const [listAvanceAmount, setListAvanceAmount] = useState('');
+  const [listTotalAmount, setListTotalAmount] = useState('');
   const [listEmployeeId, setListEmployeeId] = useState('');
   const [listStatus, setListStatus] = useState<SchoolListStatus>('pending');
+  const [listReadinessStatus, setListReadinessStatus] = useState<ReadinessStatus>('جاهزة جزئيا');
+  const [listDeliveryStatus, setListDeliveryStatus] = useState<DeliveryStatus>('في انتظار التسليم');
   const [listClientId, setListClientId] = useState<string>('');
 
   // 3. Smart Link Modal (Link existing list to a Client)
@@ -126,6 +138,23 @@ export default function EmployeesAndLists({
     id: string;
     name: string;
   } | null>(null);
+
+  // 5. Dedicated School List Details Modal
+  const [viewingListDetails, setViewingListDetails] = useState<SchoolList | null>(null);
+
+  // 6. Compact Dropdown Trigger State & Click-outside Handler
+  const [activeDropdown, setActiveDropdown] = useState<{ listId: string; type: 'readiness' | 'delivery' } | null>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (activeDropdown && dropdownContainerRef.current && !dropdownContainerRef.current.contains(e.target as Node)) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [activeDropdown]);
 
   // --- Unique Clients from Demands Dictionary ---
   const uniqueClientsList = useMemo(() => {
@@ -152,17 +181,14 @@ export default function EmployeesAndLists({
     return Array.from(clientMap.values());
   }, [demands]);
 
-  // --- Filtering & Stats ---
-  const totalListsCount = schoolLists.length;
-  const doneListsCount = useMemo(() => schoolLists.filter(l => l.status === 'done').length, [schoolLists]);
-  const pendingListsCount = useMemo(() => schoolLists.filter(l => l.status === 'pending').length, [schoolLists]);
-  const totalEmployeesCount = employees.length;
-
-  // Filtered Lists
+  // --- Filtered Lists ---
   const filteredSchoolLists = useMemo(() => {
     return schoolLists.filter(item => {
+      const isDone = item.status === 'done' || item.delivery_status === 'طلبية مستلمة';
+
       // 1. Status Filter
-      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (statusFilter === 'done' && !isDone) return false;
+      if (statusFilter === 'pending' && isDone) return false;
 
       // 2. Employee Filter
       if (employeeFilter !== 'all') {
@@ -177,8 +203,11 @@ export default function EmployeesAndLists({
         const schoolMatch = item.school_name?.toLowerCase().includes(q);
         const empMatch = item.employee?.name?.toLowerCase().includes(q);
         const phoneMatch = item.phone?.includes(q);
+        const ticketMatch = item.ticket_id?.toLowerCase().includes(q);
+        const readinessMatch = item.readiness_status?.toLowerCase().includes(q);
+        const deliveryMatch = item.delivery_status?.toLowerCase().includes(q);
         const linkedClientMatch = item.client?.name?.toLowerCase().includes(q) || item.client?.phone?.includes(q);
-        if (!clientMatch && !schoolMatch && !empMatch && !linkedClientMatch && !phoneMatch) return false;
+        if (!clientMatch && !schoolMatch && !empMatch && !linkedClientMatch && !phoneMatch && !ticketMatch && !readinessMatch && !deliveryMatch) return false;
       }
 
       return true;
@@ -253,8 +282,13 @@ export default function EmployeesAndLists({
     setListClientName('');
     setListSchoolName('');
     setListPhone('');
+    setListTicketId('');
+    setListAvanceAmount('');
+    setListTotalAmount('');
     setListEmployeeId(employees[0]?.id || '');
     setListStatus('pending');
+    setListReadinessStatus('جاهزة جزئيا');
+    setListDeliveryStatus('في انتظار التسليم');
     setListClientId('');
     setIsListModalOpen(true);
   };
@@ -264,8 +298,13 @@ export default function EmployeesAndLists({
     setListClientName(list.client_name);
     setListSchoolName(list.school_name);
     setListPhone(list.phone || list.client?.phone || '');
+    setListTicketId(list.ticket_id || '');
+    setListAvanceAmount(list.avance_amount !== null && list.avance_amount !== undefined ? String(list.avance_amount) : '');
+    setListTotalAmount(list.total_amount !== null && list.total_amount !== undefined ? String(list.total_amount) : '');
     setListEmployeeId(list.employee_id || '');
-    setListStatus(list.status);
+    setListStatus(list.status || 'pending');
+    setListReadinessStatus((list.readiness_status as ReadinessStatus) || 'جاهزة جزئيا');
+    setListDeliveryStatus((list.delivery_status as DeliveryStatus) || (list.status === 'done' ? 'طلبية مستلمة' : 'في انتظار التسليم'));
     setListClientId(list.client_id || '');
     setIsListModalOpen(true);
   };
@@ -275,7 +314,12 @@ export default function EmployeesAndLists({
     const cleanClient = listClientName.trim();
     const cleanSchool = listSchoolName.trim();
     const cleanPhone = listPhone.trim() || null;
+    const cleanTicketId = listTicketId.trim() || null;
+    const cleanAvance = listAvanceAmount.trim() !== '' ? Number(listAvanceAmount) : 0;
+    const cleanTotal = listTotalAmount.trim() !== '' ? Number(listTotalAmount) : 0;
     if (!cleanClient || !cleanSchool) return;
+
+    const finalStatus: SchoolListStatus = listDeliveryStatus === 'طلبية مستلمة' ? 'done' : listStatus;
 
     if (editingList) {
       // Edit
@@ -283,10 +327,15 @@ export default function EmployeesAndLists({
       const updates: Partial<SchoolList> = {
         client_name: cleanClient,
         school_name: cleanSchool,
-        employee_id: listEmployeeId || null,
-        status: listStatus,
-        client_id: listClientId || null,
         phone: cleanPhone,
+        ticket_id: cleanTicketId,
+        avance_amount: cleanAvance,
+        total_amount: cleanTotal,
+        employee_id: listEmployeeId || null,
+        status: finalStatus,
+        readiness_status: listReadinessStatus,
+        delivery_status: listDeliveryStatus,
+        client_id: listClientId || null,
       };
       setIsListModalOpen(false);
       showToast(`تم حفظ تعديل لائحة "${cleanClient}" بنجاح`, 'success');
@@ -301,10 +350,15 @@ export default function EmployeesAndLists({
       onCreateSchoolList({
         client_name: cleanClient,
         school_name: cleanSchool,
-        employee_id: listEmployeeId || null,
-        status: listStatus,
-        client_id: listClientId || null,
         phone: cleanPhone,
+        ticket_id: cleanTicketId,
+        avance_amount: cleanAvance,
+        total_amount: cleanTotal,
+        employee_id: listEmployeeId || null,
+        status: 'pending',
+        readiness_status: 'جاهزة جزئيا',
+        delivery_status: 'في انتظار التسليم',
+        client_id: null,
       }).catch(err => {
         console.error('Error creating school list:', err);
         showToast('حدث خطأ أثناء إنشاء اللائحة في الخلفية', 'error');
@@ -314,35 +368,51 @@ export default function EmployeesAndLists({
 
   // WhatsApp Action Handler
   const handleWhatsAppClick = (list: SchoolList, phoneNum?: string | null) => {
-    if (!phoneNum) {
-      showToast('يرجى إضافة رقم هاتف للائحة لإرسال رسالة الواتساب', 'error');
-      handleOpenEditList(list);
+    const rawPhone = phoneNum || list.phone || list.client?.phone;
+    if (!rawPhone || !rawPhone.trim()) {
+      showToast('لا يوجد رقم هاتف لهذا الزبون', 'error');
       return;
     }
-    let clean = phoneNum.replace(/\D/g, '');
-    if (clean.startsWith('0')) {
-      clean = '212' + clean.slice(1);
-    } else if (!clean.startsWith('212')) {
-      clean = '212' + clean;
+
+    const cleanPhone = (rawPhone || '').replace(/[^0-9]/g, '').replace(/^0/, '212');
+    if (!cleanPhone) {
+      showToast('لا يوجد رقم هاتف لهذا الزبون', 'error');
+      return;
     }
-    const message = list.status === 'done'
-      ? 'السلام عليكم زبوننا الكريم، نخبركم أن لائحتكم المدرسية لدى المكتبة العصرية أصبحت جاهزة للاستلام. مرحباً بكم.'
-      : 'السلام عليكم زبوننا الكريم، بخصوص لائحتكم المدرسية لدى المكتبة العصرية، جاري تجهيز الكتب والمستلزمات وسنوافيكم فور اكتمالها.';
-    const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+
+    const message = `السلام عليكم ورحمة الله وبركاته
+يسرّنا إخباركم من المكتبة العصرية أيت ملول بأن طلبيتكم الخاصة باللوازم المدرسية التي قمتم بحجزها جاهزة للتسليم.
+
+المكان: المكتبة العصرية
+شارع المقاومة حي العهد الجديد أمام البريد بنك أيت ملول
+الهاتف: 06.60.56.33.71 / 06.60.31.98.68
+
+شكراً لثقتكم بنا، ومرحباً بكم.`;
+
+    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // One-click Toggle Status
-  const handleToggleListStatus = (list: SchoolList) => {
-    const nextStatus: SchoolListStatus = list.status === 'done' ? 'pending' : 'done';
-    const msg = nextStatus === 'done'
-      ? `تم وسم لائحة "${list.client_name}" كمكتملة بنجاح ✅`
-      : `تم تحويل لائحة "${list.client_name}" إلى قيد الانتظار ⏳`;
-    showToast(msg, 'success');
+  // Instant Readiness Dropdown Change
+  const handleReadinessChange = (list: SchoolList, readiness: string) => {
+    showToast(`تم تحديث الجاهزية إلى "${readiness}"`, 'success');
+    onUpdateSchoolList(list.id, { readiness_status: readiness as ReadinessStatus }).catch(err => {
+      console.error('Error updating readiness:', err);
+      showToast('حدث خطأ أثناء تحديث حالة الجاهزية', 'error');
+    });
+  };
 
-    onUpdateSchoolList(list.id, { status: nextStatus }).catch(err => {
-      console.error('Error toggling list status:', err);
-      showToast('حدث خطأ أثناء تغيير حالة اللائحة', 'error');
+  // Instant Delivery Dropdown Change
+  const handleDeliveryChange = (list: SchoolList, delivery: string) => {
+    const isReceived = delivery === 'طلبية مستلمة';
+    const nextStatus: SchoolListStatus = isReceived ? 'done' : 'pending';
+    showToast(`تم تحديث حالة التسليم إلى "${delivery}"`, 'success');
+    onUpdateSchoolList(list.id, {
+      delivery_status: delivery as DeliveryStatus,
+      status: nextStatus,
+    }).catch(err => {
+      console.error('Error updating delivery status:', err);
+      showToast('حدث خطأ أثناء تحديث حالة التسليم', 'error');
     });
   };
 
@@ -384,21 +454,18 @@ export default function EmployeesAndLists({
         res = await onConvertSchoolListToClient(list.id);
       } else {
         res = await convertSchoolListToClient(list.id);
+        if (onUpdateSchoolList && res?.clientId) {
+          await onUpdateSchoolList(list.id, { client_id: res.clientId });
+        }
       }
-      showToast(`تم تحويل "${list.client_name}" وإضافته للخصاص بنجاح ✨`, 'success', 2500);
-      if (onRefreshData) {
-        await onRefreshData();
-      }
-      const targetId = res.demandId || res.clientId;
-      if (targetId) {
-        router.push(`/customers/${encodeURIComponent(targetId)}?edit=true`);
-      }
+      showToast(`تمت إضافة "${list.client_name}" للخصاص بنجاح ✨`, 'success', 2500);
     } catch (err) {
       console.error('Error converting school list to client:', err);
       showToast('حدث خطأ أثناء تحويل اللائحة إلى زبون خصاص', 'error', 4000);
+    } finally {
       setConvertingListId(null);
     }
-  }, [convertingListId, onConvertSchoolListToClient, onRefreshData, router, showToast]);
+  }, [convertingListId, onConvertSchoolListToClient, onUpdateSchoolList, showToast]);
 
   // --- Delete Handler ---
   const handleConfirmDelete = () => {
@@ -448,63 +515,32 @@ export default function EmployeesAndLists({
       )}
 
       {/* 1. Header Floating Glass Card */}
-      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <img
-              src="/logo-lib-modern.jpg"
-              alt="Lib Moderne"
-              className="w-12 h-12 object-contain shrink-0"
-            />
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black text-neutral-900">
-                  الموظفين واللوائح المدرسية
-                </h2>
-                <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  ربط وتوزيع ذكي
-                </span>
-              </div>
-              <p className="text-xs text-neutral-500 font-medium mt-0.5">
-                متابعة لوائح الكتب المدرسية لكل موظف والربط التلقائي بخصاصات الزبناء
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Counter Badges */}
-          <div className="flex items-center gap-2 flex-wrap self-end md:self-center">
-            <div className="flex items-center gap-2 text-xs font-bold text-neutral-700 bg-white/90 border border-neutral-200/80 px-3.5 h-9 rounded-full shadow-xs">
-              <span className="text-neutral-400">إجمالي اللوائح:</span>
-              <strong className="text-neutral-900">{totalListsCount}</strong>
-              <span className="text-neutral-300">|</span>
-              <span className="text-emerald-600">مكتملة: {doneListsCount}</span>
-              <span className="text-neutral-300">|</span>
-              <span className="text-amber-600">في الانتظار: {pendingListsCount}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 bg-white/90 border border-neutral-200/80 px-3.5 h-9 rounded-full shadow-xs">
-              <Users className="w-3.5 h-3.5 text-orange-700" />
-              <span className="text-neutral-400">الموظفين:</span>
-              <strong className="text-orange-700">{totalEmployeesCount}</strong>
-            </div>
-          </div>
+      <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 space-y-3 sm:space-y-4">
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo-lib-modern.jpg"
+            alt="Lib Moderne"
+            className="w-10 h-10 sm:w-11 sm:h-11 object-contain shrink-0 rounded-xl"
+          />
+          <h2 className="text-base sm:text-lg font-black text-neutral-900">
+            الموظفين واللوائح المدرسية
+          </h2>
         </div>
 
-        {/* Tab Switcher: Brand Segmented Control */}
-        <div className="flex items-center gap-1 sm:gap-1.5 bg-neutral-100/90 p-1 sm:p-1.5 rounded-2xl border border-neutral-200/80 text-[11px] sm:text-xs font-bold">
+        {/* Tab Switcher: Compact Brand Segmented Control */}
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-neutral-100/90 p-1 rounded-xl sm:rounded-2xl border border-neutral-200/80 text-xs font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('lists')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-200 min-h-[34px] sm:min-h-[38px] text-xs sm:text-sm font-semibold group ${
               activeTab === 'lists'
                 ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
                 : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
             <ClipboardList className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'lists' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
-            <span>اللوائح المدرسية (School Lists)</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+            <span>اللوائح المدرسية</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold transition-colors ${
               activeTab === 'lists' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {schoolLists.length}
@@ -514,15 +550,15 @@ export default function EmployeesAndLists({
           <button
             type="button"
             onClick={() => setActiveTab('employees')}
-            className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-xl transition-all duration-200 min-h-[36px] sm:min-h-[40px] group ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-4 rounded-lg sm:rounded-xl transition-all duration-200 min-h-[34px] sm:min-h-[38px] text-xs sm:text-sm font-semibold group ${
               activeTab === 'employees'
                 ? 'bg-orange-700 text-white shadow-md shadow-orange-700/20 font-black'
                 : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200/70'
             }`}
           >
             <Users className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'employees' ? 'text-white' : 'text-neutral-500 group-hover:text-neutral-900'}`} />
-            <span>طاقم الموظفين (Employees)</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold transition-colors ${
+            <span>طاقم الموظفين</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold transition-colors ${
               activeTab === 'employees' ? 'bg-white text-orange-700 shadow-2xs font-black' : 'bg-neutral-200/80 text-neutral-800'
             }`}>
               {employees.length}
@@ -650,140 +686,240 @@ export default function EmployeesAndLists({
               )}
             </div>
           ) : (
-            <div className="divide-y divide-neutral-100">
+            <div className="divide-y divide-neutral-100" ref={dropdownContainerRef}>
               {filteredSchoolLists.map((list, idx) => {
-                const assignedEmp = employees.find(e => e.id === list.employee_id) || list.employee;
-                const isLinked = Boolean(list.client_id);
-                const linkedClient = uniqueClientsList.find(c => c.id === list.client_id) || list.client;
-                const contactPhone = list.phone || linkedClient?.phone;
+                const contactPhone = list.phone || list.client?.phone;
+                const currentReadiness = (list.readiness_status as string) || 'جاهزة بالكامل';
+                const currentDelivery = (list.delivery_status as string) || (list.status === 'done' ? 'طلبية مستلمة' : 'في انتظار التسليم');
+                const isDelivered = currentDelivery === 'طلبية مستلمة' || list.status === 'done';
 
                 return (
-                  <div key={list.id} className="py-4 first:pt-0 last:pb-0 group transition-colors">
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3.5">
+                  <div key={list.id} className="py-3 first:pt-0 last:pb-0 group transition-colors">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3.5 w-full">
                       
-                      {/* Left: Info */}
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <span className="w-8 h-8 rounded-xl bg-neutral-100 text-neutral-800 font-black text-xs flex items-center justify-center shrink-0 border border-neutral-200/60 mt-0.5">
+                      {/* Left/Right (RTL): Row Number, Clickable Client Name & Status Badges */}
+                      <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1 flex-wrap sm:flex-nowrap">
+                        <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-neutral-100 text-neutral-800 font-black text-xs flex items-center justify-center shrink-0 border border-neutral-200/60">
                           #{idx + 1}
                         </span>
 
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-extrabold text-sm sm:text-base text-neutral-900">
-                              {list.client_name}
-                            </h3>
+                        {/* Client Name: Opens dedicated School List Details Modal */}
+                        <button
+                          type="button"
+                          onClick={() => setViewingListDetails(list)}
+                          className="text-right font-extrabold text-sm sm:text-base text-neutral-900 hover:text-orange-700 hover:underline transition-colors cursor-pointer truncate max-w-[200px] sm:max-w-none shrink-0"
+                          title="انقر لعرض كافة تفاصيل هذه اللائحة المدرسية"
+                        >
+                          {list.client_name}
+                        </button>
 
-                            {/* Phone Badge if directly on list */}
-                            {list.phone && (
-                              <span dir="ltr" className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-emerald-600" />
-                                {list.phone}
-                              </span>
-                            )}
-                            
-                            {/* School Badge */}
-                            <span className="bg-neutral-100 text-neutral-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-neutral-200/60">
-                              <GraduationCap className="w-3 h-3 text-orange-700" />
-                              {list.school_name}
+                        {/* Ticket / Bon Badge if available */}
+                        {list.ticket_id && (
+                          <span className="bg-neutral-900 text-white text-[10px] sm:text-[11px] font-mono font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shrink-0 shadow-2xs">
+                            <Ticket className="w-3 h-3 text-orange-400 shrink-0" />
+                            <span>#{list.ticket_id}</span>
+                          </span>
+                        )}
+
+                        {/* Status Badges Display beside Client Name */}
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                          {/* 1. Readiness Badge */}
+                          {currentReadiness === 'جاهزة بالكامل' ? (
+                            <span className="bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/60 inline-flex items-center gap-1 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>جاهزة بالكامل</span>
                             </span>
-
-                            {/* Status Badge */}
-                            <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border ${
-                              list.status === 'done'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
-                                : 'bg-amber-50 text-amber-700 border-amber-200/80'
-                            }`}>
-                              {list.status === 'done' ? (
-                                <>
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  <span>مكتملة (Done)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Clock className="w-3 h-3 text-amber-600" />
-                                  <span>في الانتظار (Pending)</span>
-                                </>
-                              )}
+                          ) : (
+                            <span className="bg-amber-50 text-amber-800 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200/60 inline-flex items-center gap-1 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                              <span>جاهزة جزئيا</span>
                             </span>
-                          </div>
+                          )}
 
-                          {/* Sub-info: Assigned Employee & Smart Link Info */}
-                          <div className="flex items-center gap-2 sm:gap-3 text-xs text-neutral-500 flex-wrap pt-0.5">
-                            {/* Assigned Employee */}
-                            <span className="flex items-center gap-1 font-medium">
-                              <span className="text-neutral-400">الموظف المكلف:</span>
-                              <strong className="text-neutral-800 bg-neutral-50 px-2 py-0.5 rounded-md border border-neutral-200/60">
-                                {assignedEmp ? assignedEmp.name : 'غير معيّن'}
-                              </strong>
+                          {/* 2. Delivery Badge */}
+                          {isDelivered ? (
+                            <span className="bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/60 inline-flex items-center gap-1 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>طلبية مستلمة</span>
                             </span>
-
-                            <span className="text-neutral-300">•</span>
-
-                            {/* Linked Client Info */}
-                            {isLinked ? (
-                              <div className="flex items-center gap-1.5 bg-orange-50/80 border border-orange-200/60 text-orange-950 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                                <Link2 className="w-3 h-3 text-orange-700 shrink-0" />
-                                <button
-                                  type="button"
-                                  onClick={() => router.push(`/customers/${encodeURIComponent(linkedClient?.id || list.client_id!)}`)}
-                                  className="hover:underline flex items-center gap-1 text-orange-900"
-                                  title="فتح ملف الزبون في دليل الخصاص"
-                                >
-                                  <span>زبون الخصاص: {linkedClient?.name || 'مرتبط'}</span>
-                                  <ExternalLink className="w-3 h-3 text-orange-700" />
-                                </button>
-                                {linkedClient?.phone && (
-                                  <span dir="ltr" className="text-[11px] font-mono text-neutral-600">
-                                    ({linkedClient.phone})
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleUnlinkClient(list)}
-                                  className="text-neutral-400 hover:text-rose-600 mr-1"
-                                  title="إلغاء الربط بالزبون"
-                                >
-                                  <Unlink className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenSmartLink(list)}
-                                className="text-orange-700 hover:text-orange-800 font-bold hover:underline flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200/50"
-                              >
-                                <Link2 className="w-3 h-3" />
-                                <span>ربط بزبون في الدليل (Smart Link)</span>
-                              </button>
-                            )}
-                          </div>
+                          ) : (
+                            <span className="bg-orange-50 text-orange-700 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-orange-200/60 inline-flex items-center gap-1 shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
+                              <span>في انتظار التسليم</span>
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Right: Actions */}
-                      <div className="flex items-center gap-1.5 sm:gap-2 self-end lg:self-center flex-wrap">
-                        {/* WhatsApp Direct Action Button */}
+                      {/* Right: Actions Container */}
+                      {/* Responsive Action controls order: [Trash] [Edit] [WhatsApp Icon] [Dropdown 1: الجاهزية] [Dropdown 2: الحالة] [زر إضافة للخصاص] */}
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-start pt-1.5 sm:pt-0 border-t sm:border-t-0 border-neutral-100/80">
+                        
+                        {/* 1. Delete Button */}
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirm({ type: 'list', id: list.id, name: list.client_name })}
+                          className="h-[32px] sm:h-[34px] w-[32px] sm:w-[34px] min-h-[32px] min-w-[32px] p-1.5 rounded-lg border border-neutral-200 bg-white hover:border-rose-300 hover:bg-rose-50 text-neutral-400 hover:text-rose-600 flex items-center justify-center transition-colors shrink-0 shadow-2xs"
+                          title="حذف اللائحة"
+                          aria-label="حذف اللائحة"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+
+                        {/* 2. Edit Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditList(list)}
+                          className="h-[32px] sm:h-[34px] w-[32px] sm:w-[34px] min-h-[32px] min-w-[32px] p-1.5 rounded-lg border border-neutral-200 bg-white hover:border-amber-300 hover:bg-amber-50 text-neutral-600 hover:text-amber-700 flex items-center justify-center transition-colors shrink-0 shadow-2xs"
+                          title="تعديل بيانات اللائحة"
+                          aria-label="تعديل بيانات اللائحة"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        </button>
+
+                        {/* 3. Official WhatsApp SVG Icon Button */}
                         <button
                           type="button"
                           onClick={() => handleWhatsAppClick(list, contactPhone)}
-                          className={`h-8 px-3 py-1.5 text-xs font-medium rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0 ${
+                          className={`h-[32px] sm:h-[34px] w-[32px] sm:w-[34px] min-h-[32px] min-w-[32px] p-1.5 rounded-lg border transition-all flex items-center justify-center shrink-0 shadow-2xs ${
                             contactPhone
-                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95'
-                              : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-500 border border-neutral-200/60'
+                              ? 'border-emerald-200 text-emerald-600 hover:text-white hover:bg-emerald-600 hover:border-emerald-600 active:scale-95 bg-emerald-50/40'
+                              : 'border-neutral-200 text-neutral-300 bg-neutral-50 cursor-not-allowed'
                           }`}
-                          title={contactPhone ? `إرسال رسالة واتساب (${contactPhone})` : 'إضافة رقم هاتف لإرسال رسالة واتساب'}
+                          title={contactPhone ? `إرسال عبر واتساب (${contactPhone})` : 'لا يوجد رقم هاتف مسجل'}
+                          aria-label="إرسال عبر واتساب"
+                          disabled={!contactPhone}
                         >
-                          <MessageCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>واتساب</span>
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" viewBox="0 0 448 512">
+                            <path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z" />
+                          </svg>
                         </button>
 
-                        {/* Magic Action Button: Add to Missing Demands */}
-                        {list.status !== 'done' && (
+                        {/* 4. Dropdown Trigger: الجاهزية */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdown(activeDropdown?.listId === list.id && activeDropdown?.type === 'readiness' ? null : { listId: list.id, type: 'readiness' });
+                            }}
+                            className="h-[32px] sm:h-[34px] min-h-[32px] text-xs py-1 px-2.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 font-bold hover:border-amber-400 hover:bg-amber-50/40 focus:ring-1 focus:ring-amber-500 focus:outline-none cursor-pointer transition-all shadow-2xs shrink-0 flex items-center gap-1.5"
+                            title="تعديل حالة الجاهزية"
+                          >
+                            <span>الجاهزية</span>
+                            <ChevronDown className="w-3 h-3 text-neutral-400 shrink-0" />
+                          </button>
+
+                          {activeDropdown?.listId === list.id && activeDropdown?.type === 'readiness' && (
+                            <div className="absolute top-full mt-1.5 left-0 sm:left-auto sm:right-0 z-50 bg-white border border-neutral-200/90 rounded-2xl shadow-xl p-1.5 min-w-[145px] text-right space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReadinessChange(list, 'جاهزة بالكامل');
+                                  setActiveDropdown(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-colors ${
+                                  currentReadiness === 'جاهزة بالكامل'
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : 'text-neutral-700 hover:bg-neutral-100'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                  جاهزة بالكامل
+                                </span>
+                                {currentReadiness === 'جاهزة بالكامل' && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleReadinessChange(list, 'جاهزة جزئيا');
+                                  setActiveDropdown(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-colors ${
+                                  currentReadiness === 'جاهزة جزئيا'
+                                    ? 'bg-amber-50 text-amber-800'
+                                    : 'text-neutral-700 hover:bg-neutral-100'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                  جاهزة جزئيا
+                                </span>
+                                {currentReadiness === 'جاهزة جزئيا' && <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 5. Dropdown Trigger: الحالة */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdown(activeDropdown?.listId === list.id && activeDropdown?.type === 'delivery' ? null : { listId: list.id, type: 'delivery' });
+                            }}
+                            className="h-[32px] sm:h-[34px] min-h-[32px] text-xs py-1 px-2.5 rounded-lg border border-neutral-200/90 bg-white text-neutral-800 font-bold hover:border-amber-400 hover:bg-amber-50/40 focus:ring-1 focus:ring-amber-500 focus:outline-none cursor-pointer transition-all shadow-2xs shrink-0 flex items-center gap-1.5"
+                            title="تعديل حالة التسليم"
+                          >
+                            <span>الحالة</span>
+                            <ChevronDown className="w-3 h-3 text-neutral-400 shrink-0" />
+                          </button>
+
+                          {activeDropdown?.listId === list.id && activeDropdown?.type === 'delivery' && (
+                            <div className="absolute top-full mt-1.5 left-0 sm:left-auto sm:right-0 z-50 bg-white border border-neutral-200/90 rounded-2xl shadow-xl p-1.5 min-w-[155px] text-right space-y-1 animate-in fade-in zoom-in-95 duration-100">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeliveryChange(list, 'في انتظار التسليم');
+                                  setActiveDropdown(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-colors ${
+                                  currentDelivery === 'في انتظار التسليم'
+                                    ? 'bg-orange-50 text-orange-800'
+                                    : 'text-neutral-700 hover:bg-neutral-100'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                                  في انتظار التسليم
+                                </span>
+                                {currentDelivery === 'في انتظار التسليم' && <Check className="w-3.5 h-3.5 text-orange-600 shrink-0" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeliveryChange(list, 'طلبية مستلمة');
+                                  setActiveDropdown(null);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-xl transition-colors ${
+                                  currentDelivery === 'طلبية مستلمة'
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : 'text-neutral-700 hover:bg-neutral-100'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                  طلبية مستلمة
+                                </span>
+                                {currentDelivery === 'طلبية مستلمة' && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 6. Compact Demand Button: إضافة للخصاص (renders ONLY if !list.client_id) */}
+                        {!list.client_id && (
                           <button
                             type="button"
                             disabled={convertingListId === list.id}
                             onClick={() => handleConvertToClient(list)}
-                            className="h-8 px-3 py-1.5 text-xs font-medium rounded-xl bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                            className="h-[32px] sm:h-[34px] min-h-[32px] px-2.5 py-1 text-xs font-medium rounded-lg bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center justify-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed flex-1 sm:flex-initial"
                             title="إضافة للخصاص (تحويل الزبون لدليل الخصاصات وإضافة الكتب المطلوبة فوراً)"
                           >
                             {convertingListId === list.id ? (
@@ -800,49 +936,6 @@ export default function EmployeesAndLists({
                           </button>
                         )}
 
-                        {/* Toggle Status Quick Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleListStatus(list)}
-                          className={`h-8 px-3 py-1.5 text-xs font-medium rounded-xl flex items-center gap-1.5 transition-all shadow-xs whitespace-nowrap shrink-0 ${
-                            list.status === 'done'
-                              ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                          }`}
-                          title={list.status === 'done' ? 'تغيير إلى قيد الانتظار' : 'وسم كمكتملة'}
-                        >
-                          {list.status === 'done' ? (
-                            <>
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>إرجاع كـ قيد الانتظار</span>
-                            </>
-                          ) : (
-                            <>
-                              <Check className="w-3.5 h-3.5" />
-                              <span>تعيين كمكتملة (Done)</span>
-                            </>
-                          )}
-                        </button>
-
-                        {/* Edit Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditList(list)}
-                          className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition-colors border border-neutral-200/60 shrink-0"
-                          title="تعديل بيانات اللائحة"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Delete Button */}
-                        <button
-                          type="button"
-                          onClick={() => setDeleteConfirm({ type: 'list', id: list.id, name: list.client_name })}
-                          className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-rose-50 hover:text-rose-600 text-neutral-500 flex items-center justify-center transition-colors border border-neutral-200/60 shrink-0"
-                          title="حذف اللائحة"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
 
                     </div>
@@ -1093,59 +1186,58 @@ export default function EmployeesAndLists({
                 </select>
               </div>
 
+              {/* Row A (Full Width): رقم التيكيت */}
               <div>
                 <label className="block text-xs font-bold text-neutral-700 mb-1">
-                  حالة اللائحة:
+                  رقم التيكيت:
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setListStatus('pending')}
-                    className={`py-2 px-3 rounded-2xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
-                      listStatus === 'pending'
-                        ? 'bg-amber-50 border-amber-400 text-amber-800 font-extrabold shadow-2xs'
-                        : 'bg-neutral-50 border-neutral-200 text-neutral-600'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>في الانتظار (Pending)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setListStatus('done')}
-                    className={`py-2 px-3 rounded-2xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all ${
-                      listStatus === 'done'
-                        ? 'bg-emerald-50 border-emerald-400 text-emerald-800 font-extrabold shadow-2xs'
-                        : 'bg-neutral-50 border-neutral-200 text-neutral-600'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>مكتملة (Done)</span>
-                  </button>
+                <div className="relative">
+                  <Ticket className="w-4 h-4 text-neutral-400 absolute right-3.5 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="مثال: D125"
+                    value={listTicketId}
+                    onChange={(e) => setListTicketId(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl pr-10 pl-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white font-mono"
+                  />
                 </div>
               </div>
 
-              {/* Optional Link to Existing Client in Demand Directory */}
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 mb-1">
-                  ربط بزبون من دليل الخصاصات (اختياري):
-                </label>
-                <select
-                  value={listClientId}
-                  onChange={(e) => setListClientId(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white cursor-pointer"
-                >
-                  <option value="">-- بدون ربط بزبون خصاص --</option>
-                  {uniqueClientsList.map(cli => (
-                    <option key={cli.id} value={cli.id}>
-                      {cli.name} ({cli.phone})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-neutral-400 mt-1">
-                  عند ربط الزبون، سيتم تفعيل التحديث التلقائي لحالة اللائحة إلى &apos;مكتملة&apos; عند وصول كامل خصاصاته للمخزن.
-                </p>
+              {/* Row B (2 Columns - 50% / 50%): التسبيق & المبلغ الإجمالي */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Column 1: التسبيق */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">
+                    التسبيق (د.م):
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="0.00"
+                    value={listAvanceAmount}
+                    onChange={(e) => setListAvanceAmount(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white font-mono text-left"
+                    dir="ltr"
+                  />
+                </div>
+
+                {/* Column 2: المبلغ الإجمالي */}
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 mb-1">
+                    المبلغ الإجمالي (د.م):
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder="0.00"
+                    value={listTotalAmount}
+                    onChange={(e) => setListTotalAmount(e.target.value)}
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl px-3.5 py-2 text-xs sm:text-sm font-bold text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white font-mono text-left"
+                    dir="ltr"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100">
@@ -1298,6 +1390,232 @@ export default function EmployeesAndLists({
                 className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-md transition-all"
               >
                 تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 5: Dedicated School List Details Modal --- */}
+      {viewingListDetails && (
+        <div className="fixed inset-0 z-50 bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" dir="rtl">
+          <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-2xl max-w-lg w-full space-y-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-700 text-white flex items-center justify-center font-bold shadow-md shadow-orange-700/20">
+                  <ClipboardList className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-neutral-900">
+                    تفاصيل اللائحة المدرسية
+                  </h3>
+                  <p className="text-xs text-neutral-500 font-medium">
+                    {viewingListDetails.client_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingListDetails(null)}
+                className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-full hover:bg-neutral-100 transition-colors"
+                title="إغلاق"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Info Grid Cards */}
+            <div className="space-y-3">
+              {/* Card 1: Client & School */}
+              <div className="bg-neutral-50/90 border border-neutral-200/80 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[11px] font-bold text-neutral-400 block">صاحب اللائحة</span>
+                    <strong className="text-sm sm:text-base font-extrabold text-neutral-900 block">
+                      {viewingListDetails.client_name}
+                    </strong>
+                  </div>
+                  {viewingListDetails.client_id ? (
+                    <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200/60 inline-flex items-center gap-1">
+                      <UserCheck className="w-3 h-3" />
+                      مرتبط بدليل الزبائن
+                    </span>
+                  ) : (
+                    <span className="bg-neutral-200/70 text-neutral-700 text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      غير مسجل في الخصاص
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-neutral-200/60">
+                  <div className="flex items-center gap-2">
+                    <Building className="w-4 h-4 text-orange-700 shrink-0" />
+                    <div>
+                      <span className="text-[10px] font-bold text-neutral-400 block">المؤسسة / المدرسة</span>
+                      <strong className="text-xs font-bold text-neutral-800">
+                        {viewingListDetails.school_name || 'غير محدد'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="text-[10px] font-bold text-neutral-400 block">رقم الهاتف</span>
+                      {viewingListDetails.phone || viewingListDetails.client?.phone ? (
+                        <a
+                          href={`tel:${viewingListDetails.phone || viewingListDetails.client?.phone}`}
+                          className="text-xs font-bold font-mono text-emerald-700 hover:underline dir-ltr block"
+                        >
+                          {viewingListDetails.phone || viewingListDetails.client?.phone}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-neutral-400 font-medium">غير متوفر</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Status & Readiness */}
+              <div className="bg-neutral-50/90 border border-neutral-200/80 rounded-2xl p-4 grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">حالة الجاهزية</span>
+                  {((viewingListDetails.readiness_status as string) || 'جاهزة بالكامل') === 'جاهزة بالكامل' ? (
+                    <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200/60 inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      جاهزة بالكامل
+                    </span>
+                  ) : (
+                    <span className="bg-amber-50 text-amber-800 text-xs font-bold px-3 py-1 rounded-full border border-amber-200/60 inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      جاهزة جزئيا
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold text-neutral-400 block mb-1.5">حالة التسليم</span>
+                  {(((viewingListDetails.delivery_status as string) || (viewingListDetails.status === 'done' ? 'طلبية مستلمة' : 'في انتظار التسليم')) === 'طلبية مستلمة') ? (
+                    <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full border border-emerald-200/60 inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      طلبية مستلمة
+                    </span>
+                  ) : (
+                    <span className="bg-orange-50 text-orange-700 text-xs font-bold px-3 py-1 rounded-full border border-orange-200/60 inline-flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-orange-500" />
+                      في انتظار التسليم
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Card 2.5: Ticket & Financial Pricing Details */}
+              <div className="bg-neutral-50/90 border border-neutral-200/80 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 block mb-1">رقم التيكيت</span>
+                  {viewingListDetails.ticket_id ? (
+                    <span className="bg-neutral-900 text-white font-mono text-xs font-bold px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 shadow-2xs">
+                      <Ticket className="w-3.5 h-3.5 text-orange-400" />
+                      <span>{viewingListDetails.ticket_id}</span>
+                    </span>
+                  ) : (
+                    <span className="text-xs text-neutral-400 font-medium">غير محدد</span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 block mb-1">التسبيق</span>
+                  <strong className="text-xs sm:text-sm font-extrabold text-emerald-700 font-mono">
+                    {viewingListDetails.avance_amount != null ? `${Number(viewingListDetails.avance_amount).toFixed(2)} د.م` : '0.00 د.م'}
+                  </strong>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-400 block mb-1">المبلغ الإجمالي</span>
+                  <strong className="text-xs sm:text-sm font-extrabold text-neutral-900 font-mono">
+                    {viewingListDetails.total_amount != null ? `${Number(viewingListDetails.total_amount).toFixed(2)} د.م` : '0.00 د.م'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Card 3: Employee & Creation Date */}
+              <div className="bg-neutral-50/90 border border-neutral-200/80 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-900 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    <Users className="w-4 h-4 text-orange-700" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-neutral-400 block">الموظف المكلف</span>
+                    <strong className="text-xs font-bold text-neutral-900">
+                      {viewingListDetails.employee?.name || employees.find(e => e.id === viewingListDetails.employee_id)?.name || 'غير معين'}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-neutral-200 text-neutral-700 flex items-center justify-center font-bold text-xs shrink-0">
+                    <Calendar className="w-4 h-4 text-neutral-600" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-neutral-400 block">تاريخ التسجيل</span>
+                    <strong className="text-xs font-bold text-neutral-800">
+                      {viewingListDetails.created_at ? new Date(viewingListDetails.created_at).toLocaleDateString('ar-MA', { year: 'numeric', month: 'numeric', day: 'numeric' }) : 'غير محدد'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-neutral-100">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const listToEdit = viewingListDetails;
+                    setViewingListDetails(null);
+                    handleOpenEditList(listToEdit);
+                  }}
+                  className="px-4 py-2 text-xs font-bold bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-full transition-colors inline-flex items-center gap-1.5"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>تعديل اللائحة</span>
+                </button>
+
+                {(viewingListDetails.phone || viewingListDetails.client?.phone) && (
+                  <button
+                    type="button"
+                    onClick={() => handleWhatsAppClick(viewingListDetails, viewingListDetails.phone || viewingListDetails.client?.phone)}
+                    className="px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-full transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                  >
+                    <span>إرسال واتساب</span>
+                  </button>
+                )}
+
+                {!viewingListDetails.client_id && (
+                  <button
+                    type="button"
+                    disabled={convertingListId === viewingListDetails.id}
+                    onClick={() => {
+                      const target = viewingListDetails;
+                      handleConvertToClient(target);
+                    }}
+                    className="px-4 py-2 text-xs font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>إضافة للخصاص</span>
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingListDetails(null)}
+                className="px-4 py-2 text-xs font-bold text-neutral-600 hover:text-neutral-900 rounded-full hover:bg-neutral-100 transition-colors"
+              >
+                {t('common.cancel')}
               </button>
             </div>
           </div>

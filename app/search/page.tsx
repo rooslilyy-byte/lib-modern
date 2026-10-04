@@ -19,7 +19,9 @@ import {
   ArrowUpZA,
   ListFilter,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { useLanguage } from '@/lib/languageContext';
 import { MasterProduct } from '@/lib/types';
@@ -39,7 +41,7 @@ interface SearchPageContentProps {
 }
 
 function SearchPageContent({ appData }: SearchPageContentProps) {
-  const { masterProducts, handleUpdateProductCategory } = appData;
+  const { masterProducts, handleUpdateProductCategory, handleUpdateMasterProduct, handleDeleteMasterProduct } = appData;
   const { t } = useLanguage();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -68,6 +70,16 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
   const [catalogSearch, setCatalogSearch] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Edit Product Modal State
+  const [editingProduct, setEditingProduct] = useState<MasterProduct | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState<ProductCategoryKey>('books');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Delete Product Confirmation State
+  const [deletingProduct, setDeletingProduct] = useState<MasterProduct | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -98,12 +110,11 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
     };
   }, []);
 
-  // Category counts calculation across all master products
+  // Category counts calculation across all master products (Strictly 3 categories)
   const categoryCounts = useMemo(() => {
-    const counts = {
+    const counts: Record<'all' | ProductCategoryKey, number> = {
       all: masterProducts.length,
       books: 0,
-      cahiers: 0,
       fournitures: 0,
       others: 0,
     };
@@ -165,8 +176,8 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
 
     setUpdatingProductId(product.id);
     try {
-      await handleUpdateProductCategory(product.id, newCat, product.name);
       const catConfig = getCategoryConfig(newCat);
+      await handleUpdateProductCategory(product.id, catConfig.label, product.name);
       showToast(`تم تغيير صنف "${product.name}" إلى ${catConfig.label}`);
     } catch (err) {
       console.error('Failed to update category:', err);
@@ -175,6 +186,53 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
       setUpdatingProductId(null);
     }
   }, [handleUpdateProductCategory, showToast]);
+
+  // Open Edit Product Modal
+  const handleOpenEditModal = useCallback((product: MasterProduct) => {
+    setEditingProduct(product);
+    setEditName(product.name || '');
+    setEditCategory(normalizeCategory(product.category));
+  }, []);
+
+  // Submit Edit Product
+  const handleSaveEdit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct || !editName.trim()) return;
+
+    setIsSavingEdit(true);
+    try {
+      const categoryLabel = getCategoryLabel(editCategory);
+      await handleUpdateMasterProduct(editingProduct.id, {
+        name: editName.trim(),
+        category: categoryLabel,
+      });
+      showToast(`تم تحديث المنتج "${editName.trim()}" بنجاح`);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error('Failed to update product:', err);
+      showToast(`حدث خطأ أثناء تحديث المنتج`);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }, [editingProduct, editName, editCategory, handleUpdateMasterProduct, showToast]);
+
+  // Confirm Delete Product
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletingProduct) return;
+
+    setIsDeleting(true);
+    const prodName = deletingProduct.name;
+    try {
+      await handleDeleteMasterProduct(deletingProduct.id, deletingProduct.name);
+      showToast(`تم حذف المنتج "${prodName}" بنجاح`);
+      setDeletingProduct(null);
+    } catch (err) {
+      console.error('Failed to delete product:', err);
+      showToast(`حدث خطأ أثناء حذف المنتج`);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deletingProduct, handleDeleteMasterProduct, showToast]);
 
   // Debounced Demands Search API
   useEffect(() => {
@@ -210,7 +268,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-neutral-900 text-white font-bold text-xs sm:text-sm px-5 sm:px-6 py-2.5 sm:py-3 rounded-full shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 border border-neutral-700">
-          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 shrink-0" />
+          <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -228,7 +286,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
               <h2 className="text-base sm:text-lg font-black text-neutral-900">
                 {activeTab === 'catalog' ? 'دليل وقائمة المنتجات' : 'البحث عن خصاصات الزبناء'}
               </h2>
-              <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+              <span className="bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                 {masterProducts.length} منتج مسجل
               </span>
             </div>
@@ -251,7 +309,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                 : 'text-neutral-600 hover:text-neutral-900'
             }`}
           >
-            <ListFilter className="w-3.5 h-3.5 text-orange-700" />
+            <ListFilter className="w-3.5 h-3.5 text-amber-700" />
             <span>قائمة المنتجات والتصنيف</span>
           </button>
 
@@ -264,7 +322,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                 : 'text-neutral-600 hover:text-neutral-900'
             }`}
           >
-            <Search className="w-3.5 h-3.5 text-orange-700" />
+            <Search className="w-3.5 h-3.5 text-amber-700" />
             <span>بحث عن منتج (الزبناء)</span>
           </button>
         </div>
@@ -279,7 +337,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
           {/* Controls Card: Category Tabs + Search + E-Commerce Sorting */}
           <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-5 space-y-3.5">
             
-            {/* 1. Category Filter Tabs */}
+            {/* 1. Category Filter Tabs (High contrast: Amber active vs White/Gray inactive) */}
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar">
               {/* All */}
               <button
@@ -287,17 +345,17 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                 onClick={() => setSelectedCategory('all')}
                 className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
                   selectedCategory === 'all'
-                    ? 'bg-neutral-900 text-white shadow-md font-black'
-                    : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                    ? 'bg-amber-600 text-white shadow-sm font-black'
+                    : 'bg-white text-gray-700 hover:bg-amber-50 hover:text-amber-700 border border-gray-200'
                 }`}
               >
                 <span>الكل</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedCategory === 'all' ? 'bg-neutral-800 text-neutral-200' : 'bg-neutral-200/80 text-neutral-600'}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${selectedCategory === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'}`}>
                   {categoryCounts.all}
                 </span>
               </button>
 
-              {/* Specific Categories */}
+              {/* Specific 3 Categories (كتب / أدوات / أخرى) */}
               {PRODUCT_CATEGORIES.map((cat) => {
                 const isSelected = selectedCategory === cat.key;
                 const count = categoryCounts[cat.key] || 0;
@@ -308,12 +366,12 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                     onClick={() => setSelectedCategory(cat.key)}
                     className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 cursor-pointer ${
                       isSelected
-                        ? `${cat.activeBg} font-black ring-1 ring-black/10`
-                        : `${cat.badgeBg}`
+                        ? 'bg-amber-600 text-white shadow-sm font-black'
+                        : 'bg-white text-gray-700 hover:bg-amber-50 hover:text-amber-700 border border-gray-200'
                     }`}
                   >
                     <span>{cat.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-white/80 text-neutral-700'}`}>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'}`}>
                       {count}
                     </span>
                   </button>
@@ -352,12 +410,12 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                   onClick={() => setSortOrder('asc')}
                   className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     sortOrder === 'asc'
-                      ? 'bg-white text-orange-700 shadow-xs font-black'
+                      ? 'bg-white text-amber-700 shadow-xs font-black'
                       : 'text-neutral-600 hover:text-neutral-900'
                   }`}
                   title="ترتيب أبجدي تصاعدي"
                 >
-                  <ArrowDownAZ className="w-3.5 h-3.5 text-orange-700 shrink-0" />
+                  <ArrowDownAZ className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                   <span>ترتيب أبجدي (أ - ي / A - Z)</span>
                 </button>
 
@@ -366,12 +424,12 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                   onClick={() => setSortOrder('desc')}
                   className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     sortOrder === 'desc'
-                      ? 'bg-white text-orange-700 shadow-xs font-black'
+                      ? 'bg-white text-amber-700 shadow-xs font-black'
                       : 'text-neutral-600 hover:text-neutral-900'
                   }`}
                   title="ترتيب أبجدي تنازلي"
                 >
-                  <ArrowUpZA className="w-3.5 h-3.5 text-orange-700 shrink-0" />
+                  <ArrowUpZA className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                   <span>ترتيب أبجدي عكسي (ي - أ / Z - A)</span>
                 </button>
               </div>
@@ -386,7 +444,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
               <span>
                 عرض <span className="font-mono font-black text-neutral-900">{totalFiltered > 0 ? fromIndex + 1 : 0}</span> إلى{' '}
                 <span className="font-mono font-black text-neutral-900">{toIndex}</span> من أصل{' '}
-                <span className="font-mono font-black text-orange-700">{totalFiltered}</span> منتج
+                <span className="font-mono font-black text-amber-700">{totalFiltered}</span> منتج
               </span>
               {selectedCategory !== 'all' && (
                 <span className="bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-full text-[11px]">
@@ -412,7 +470,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                   setSortOrder('asc');
                   setCurrentPage(1);
                 }}
-                className="text-orange-700 hover:text-orange-800 hover:underline font-bold text-xs shrink-0 cursor-pointer"
+                className="text-amber-700 hover:text-amber-800 hover:underline font-bold text-xs shrink-0 cursor-pointer"
               >
                 إعادة ضبط الفلاتر
               </button>
@@ -438,7 +496,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                         <th className="px-6 py-3.5 w-16">#</th>
                         <th className="px-6 py-3.5">اسم المنتج</th>
                         <th className="px-6 py-3.5 text-center w-36">الصنف الحالي</th>
-                        <th className="px-6 py-3.5 text-center w-[360px]">تغيير الصنف بنقرة واحدة (FAST CATEGORIZE)</th>
+                        <th className="px-6 py-3.5 text-center w-[400px]">تغيير الصنف والإجراءات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100">
@@ -456,7 +514,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                               <div className="flex items-center gap-2">
                                 <span>{product.name}</span>
                                 {isSavingThis && (
-                                  <span className="w-3.5 h-3.5 border-2 border-orange-700 border-t-transparent rounded-full animate-spin"></span>
+                                  <span className="w-3.5 h-3.5 border-2 border-amber-700 border-t-transparent rounded-full animate-spin"></span>
                                 )}
                               </div>
                             </td>
@@ -466,25 +524,50 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                               </span>
                             </td>
                             <td className="px-6 py-3.5">
-                              <div className="flex items-center justify-center gap-1.5">
-                                {PRODUCT_CATEGORIES.map((cat) => {
-                                  const isCurrent = currentCatKey === cat.key;
-                                  return (
-                                    <button
-                                      key={cat.key}
-                                      type="button"
-                                      disabled={isSavingThis}
-                                      onClick={() => handleChangeCategory(product, cat.key)}
-                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        isCurrent
-                                          ? 'bg-orange-600 text-white font-bold border border-transparent shadow-xs scale-105 ring-2 ring-orange-600/20'
-                                          : 'bg-white text-gray-900 border border-gray-200 hover:bg-orange-600 hover:text-white hover:border-transparent'
-                                      }`}
-                                    >
-                                      {cat.label}
-                                    </button>
-                                  );
-                                })}
+                              <div className="flex items-center justify-center gap-2">
+                                {/* Fast Categorize Pills (Strictly 3 categories) */}
+                                <div className="flex items-center gap-1.5">
+                                  {PRODUCT_CATEGORIES.map((cat) => {
+                                    const isCurrent = currentCatKey === cat.key;
+                                    return (
+                                      <button
+                                        key={cat.key}
+                                        type="button"
+                                        disabled={isSavingThis}
+                                        onClick={() => handleChangeCategory(product, cat.key)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                          isCurrent
+                                            ? 'bg-amber-600 text-white font-bold border border-transparent shadow-xs scale-105 ring-2 ring-amber-600/20'
+                                            : 'bg-white text-gray-700 border border-gray-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'
+                                        }`}
+                                      >
+                                        {cat.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="h-4 w-px bg-gray-200 mx-0.5"></div>
+
+                                {/* Edit & Delete Action Buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditModal(product)}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                                    title="تعديل المنتج"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeletingProduct(product)}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="حذف المنتج"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               </div>
                             </td>
                           </tr>
@@ -512,7 +595,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                               {product.name}
                             </h4>
                             {isSavingThis && (
-                              <span className="w-3 h-3 border-2 border-orange-700 border-t-transparent rounded-full animate-spin shrink-0"></span>
+                              <span className="w-3 h-3 border-2 border-amber-700 border-t-transparent rounded-full animate-spin shrink-0"></span>
                             )}
                           </div>
                           <span className={`shrink-0 text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${currentConfig.badgeBg}`}>
@@ -520,27 +603,48 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                           </span>
                         </div>
 
-                        {/* Fast Category Toggle Buttons */}
-                        <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap pt-1">
-                          <span className="text-[10px] font-bold text-neutral-500 ml-1">تحديد الصنف:</span>
-                          {PRODUCT_CATEGORIES.map((cat) => {
-                            const isCurrent = currentCatKey === cat.key;
-                            return (
-                              <button
-                                key={cat.key}
-                                type="button"
-                                disabled={isSavingThis}
-                                onClick={() => handleChangeCategory(product, cat.key)}
-                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
-                                  isCurrent
-                                    ? 'bg-orange-600 text-white font-bold border border-transparent shadow-xs ring-1 ring-orange-600/20'
-                                    : 'bg-white text-gray-900 border border-gray-200 hover:bg-orange-600 hover:text-white hover:border-transparent'
-                                }`}
-                              >
-                                {cat.label}
-                              </button>
-                            );
-                          })}
+                        {/* Fast Category Toggle Buttons & Actions */}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-neutral-100/80">
+                          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-bold text-neutral-500 ml-1">تحديد الصنف:</span>
+                            {PRODUCT_CATEGORIES.map((cat) => {
+                              const isCurrent = currentCatKey === cat.key;
+                              return (
+                                <button
+                                  key={cat.key}
+                                  type="button"
+                                  disabled={isSavingThis}
+                                  onClick={() => handleChangeCategory(product, cat.key)}
+                                  className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                                    isCurrent
+                                      ? 'bg-amber-600 text-white font-bold border border-transparent shadow-xs ring-1 ring-amber-600/20'
+                                      : 'bg-white text-gray-700 border border-gray-200 hover:bg-amber-50 hover:text-amber-700'
+                                  }`}
+                                >
+                                  {cat.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(product)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
+                              title="تعديل المنتج"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingProduct(product)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              title="حذف المنتج"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -555,7 +659,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                   <div className="text-xs font-bold text-neutral-600">
                     عرض <span className="font-mono font-black text-neutral-900">{fromIndex + 1}</span> إلى{' '}
                     <span className="font-mono font-black text-neutral-900">{toIndex}</span> من أصل{' '}
-                    <span className="font-mono font-black text-orange-700">{totalFiltered}</span> منتج
+                    <span className="font-mono font-black text-amber-700">{totalFiltered}</span> منتج
                   </div>
 
                   <div className="flex items-center gap-1.5 sm:gap-2">
@@ -567,7 +671,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                         setCurrentPage(prev => Math.max(1, prev - 1));
                         window.scrollTo({ top: 180, behavior: 'smooth' });
                       }}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold bg-white text-gray-900 border border-gray-300 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold bg-white text-gray-900 border border-gray-300 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
                     >
                       <ChevronRight className="w-4 h-4 rtl:rotate-0 ltr:rotate-180 shrink-0" />
                       <span>السابق</span>
@@ -576,7 +680,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                     {/* Page Indicator */}
                     <div className="flex items-center gap-1.5 bg-neutral-100 px-3.5 py-1.5 sm:py-2 rounded-xl border border-neutral-200/80 text-xs font-bold">
                       <span className="text-neutral-500">الصفحة</span>
-                      <span className="font-mono font-black text-orange-700">{currentPage}</span>
+                      <span className="font-mono font-black text-amber-700">{currentPage}</span>
                       <span className="text-neutral-400">من</span>
                       <span className="font-mono font-black text-neutral-800">{totalPages}</span>
                     </div>
@@ -589,7 +693,7 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                         setCurrentPage(prev => Math.min(totalPages, prev + 1));
                         window.scrollTo({ top: 180, behavior: 'smooth' });
                       }}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold bg-white text-gray-900 border border-gray-300 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs font-bold bg-white text-gray-900 border border-gray-300 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
                     >
                       <span>التالي</span>
                       <ChevronLeft className="w-4 h-4 rtl:rotate-0 ltr:rotate-180 shrink-0" />
@@ -597,6 +701,151 @@ function SearchPageContent({ appData }: SearchPageContentProps) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Edit Product Modal */}
+          {editingProduct && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+              <div 
+                className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-md p-5 sm:p-6 space-y-5 animate-in zoom-in-95 duration-150 text-right"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shrink-0">
+                      <Pencil className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-gray-900">تعديل بيانات المنتج</h3>
+                      <p className="text-xs text-gray-500">تحديث اسم وتصنيف السلعة</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Form */}
+                <form onSubmit={handleSaveEdit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      اسم المنتج / الكتاب:
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="اسم المنتج..."
+                      className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-gray-900 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all shadow-2xs"
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      الفئة / الصنف:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {PRODUCT_CATEGORIES.map((cat) => {
+                        const isSelected = editCategory === cat.key;
+                        return (
+                          <button
+                            key={cat.key}
+                            type="button"
+                            onClick={() => setEditCategory(cat.key)}
+                            className={`py-2.5 px-3 rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-600 text-white border-amber-600 shadow-sm font-black'
+                                : 'bg-white text-gray-700 border-gray-200 hover:bg-amber-50 hover:text-amber-700'
+                            }`}
+                          >
+                            <span>{cat.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                    <button
+                      type="button"
+                      disabled={isSavingEdit}
+                      onClick={() => setEditingProduct(null)}
+                      className="px-4 py-2.5 rounded-2xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingEdit || !editName.trim()}
+                      className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                      {isSavingEdit && (
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      )}
+                      <span>{isSavingEdit ? 'جاري الحفظ...' : 'حفظ التعديلات'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Product Confirmation Modal */}
+          {deletingProduct && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+              <div 
+                className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-sm p-5 sm:p-6 space-y-4 animate-in zoom-in-95 duration-150 text-right"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 border border-red-100">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-gray-900">حذف منتج</h3>
+                    <p className="text-xs text-gray-500">حذف نهائي من دليل المنتجات</p>
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">
+                  هل أنت متأكد من حذف هذا المنتج؟
+                </p>
+
+                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs font-bold text-gray-900 break-words">
+                  {deletingProduct.name}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => setDeletingProduct(null)}
+                    className="px-4 py-2.5 rounded-2xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={handleConfirmDelete}
+                    className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shadow-sm flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {isDeleting && (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    )}
+                    <span>{isDeleting ? 'جاري الحذف...' : 'حذف'}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

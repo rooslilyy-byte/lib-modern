@@ -71,18 +71,10 @@ function DashboardOverview({
             alt="Lib Moderne - المكتبة العصرية"
             className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0"
           />
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-base sm:text-xl font-black text-neutral-900 tracking-tight">
-                {t('dash.title')}
-              </h2>
-              <span className="bg-orange-50 text-orange-700 border border-orange-200/80 text-[10px] sm:text-xs font-bold px-2.5 sm:px-3 py-0.5 rounded-full">
-                {t('dash.season')}
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500 font-medium mt-0.5">
-              {t('brand.tagline')}
-            </p>
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-xl font-black text-neutral-900 tracking-tight truncate">
+              {t('dash.title')}
+            </h2>
           </div>
         </div>
 

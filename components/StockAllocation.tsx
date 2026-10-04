@@ -308,9 +308,6 @@ function StockAllocation({
                   توزيع فوري
                 </span>
               </div>
-              <p className="text-xs text-neutral-500 font-medium mt-0.5">
-                {t('stock.subtitle')}
-              </p>
             </div>
           </div>
 

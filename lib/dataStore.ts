@@ -158,7 +158,7 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
         if (empData) employees = empData;
 
         const { data: listData } = await supabase.from('school_lists').select(`
-          id, client_name, school_name, phone, employee_id, status, client_id, created_at,
+          id, client_name, school_name, phone, ticket_id, avance_amount, total_amount, employee_id, status, readiness_status, delivery_status, client_id, created_at,
           employee:employees (id, name),
           client:clients (id, name, phone, ticket_id)
         `).order('created_at', { ascending: false });
@@ -249,6 +249,50 @@ export async function updateProductCategory(productId: string, category: string,
 
   return { id: productId || 'mp-' + Date.now(), name: productName || '', category: cleanCategory };
 }
+
+export async function updateMasterProduct(productId: string, updates: { name?: string; category?: string }): Promise<MasterProduct> {
+  const payload: any = {};
+  if (updates.name !== undefined && updates.name.trim()) payload.name = updates.name.trim();
+  if (updates.category !== undefined) payload.category = updates.category.trim();
+
+  if (isBrowser) {
+    const data = await fetchStoreApi('update_master_product', { productId, ...payload });
+    invalidateStoreCache();
+    return data.product;
+  }
+
+  if (isSupabaseConfigured) {
+    let query = supabase.from('master_products').update(payload);
+    if (productId) {
+      query = query.eq('id', productId);
+    }
+    const { data } = await query.select().single();
+    invalidateStoreCache();
+    if (data) return data;
+  }
+
+  return { id: productId || 'mp-' + Date.now(), name: payload.name || '', category: payload.category || 'others' };
+}
+
+export async function deleteMasterProduct(productId: string, productName?: string): Promise<void> {
+  if (isBrowser) {
+    await fetchStoreApi('delete_master_product', { productId, productName });
+    invalidateStoreCache();
+    return;
+  }
+
+  if (isSupabaseConfigured) {
+    let query = supabase.from('master_products').delete();
+    if (productId) {
+      query = query.eq('id', productId);
+    } else if (productName) {
+      query = query.eq('name', productName.trim());
+    }
+    await query;
+    invalidateStoreCache();
+  }
+}
+
 
 
 export async function updateMasterProductStock(productName: string, deltaQty: number): Promise<void> {
@@ -765,8 +809,13 @@ export async function createSchoolList(payload: {
   client_name: string;
   school_name: string;
   phone?: string | null;
+  ticket_id?: string | null;
+  avance_amount?: number | null;
+  total_amount?: number | null;
   employee_id?: string | null;
   status?: SchoolListStatus;
+  readiness_status?: string | null;
+  delivery_status?: string | null;
   client_id?: string | null;
 }): Promise<SchoolList> {
   invalidateStoreCache();
@@ -782,28 +831,49 @@ export async function createSchoolList(payload: {
         client_name: payload.client_name.trim(),
         school_name: payload.school_name.trim(),
         phone: (payload.phone || '').trim() || null,
+        ticket_id: (payload.ticket_id || '').trim() || null,
+        avance_amount: Number(payload.avance_amount) || 0,
+        total_amount: Number(payload.total_amount) || 0,
         employee_id: payload.employee_id || null,
         status: payload.status || 'pending',
+        readiness_status: payload.readiness_status || 'جاهزة جزئيا',
+        delivery_status: payload.delivery_status || 'في انتظار التسليم',
         client_id: payload.client_id || null,
       }).select(`
-        id, client_name, school_name, phone, employee_id, status, client_id, created_at,
+        id, client_name, school_name, phone, ticket_id, avance_amount, total_amount, employee_id, status, readiness_status, delivery_status, client_id, created_at,
         employee:employees (id, name),
         client:clients (id, name, phone, ticket_id)
       `).single();
       data = res.data;
     } catch {
-      const res = await supabase.from('school_lists').insert({
-        client_name: payload.client_name.trim(),
-        school_name: payload.school_name.trim(),
-        employee_id: payload.employee_id || null,
-        status: payload.status || 'pending',
-        client_id: payload.client_id || null,
-      }).select(`
-        id, client_name, school_name, employee_id, status, client_id, created_at,
-        employee:employees (id, name),
-        client:clients (id, name, phone, ticket_id)
-      `).single();
-      data = res.data;
+      try {
+        const res = await supabase.from('school_lists').insert({
+          client_name: payload.client_name.trim(),
+          school_name: payload.school_name.trim(),
+          phone: (payload.phone || '').trim() || null,
+          employee_id: payload.employee_id || null,
+          status: payload.status || 'pending',
+          client_id: payload.client_id || null,
+        }).select(`
+          id, client_name, school_name, phone, employee_id, status, client_id, created_at,
+          employee:employees (id, name),
+          client:clients (id, name, phone, ticket_id)
+        `).single();
+        data = res.data;
+      } catch {
+        const res = await supabase.from('school_lists').insert({
+          client_name: payload.client_name.trim(),
+          school_name: payload.school_name.trim(),
+          employee_id: payload.employee_id || null,
+          status: payload.status || 'pending',
+          client_id: payload.client_id || null,
+        }).select(`
+          id, client_name, school_name, employee_id, status, client_id, created_at,
+          employee:employees (id, name),
+          client:clients (id, name, phone, ticket_id)
+        `).single();
+        data = res.data;
+      }
     }
     invalidateStoreCache();
     if (data) {
@@ -820,8 +890,13 @@ export async function createSchoolList(payload: {
     client_name: payload.client_name,
     school_name: payload.school_name,
     phone: payload.phone || null,
+    ticket_id: payload.ticket_id || null,
+    avance_amount: payload.avance_amount || 0,
+    total_amount: payload.total_amount || 0,
     employee_id: payload.employee_id || null,
     status: payload.status || 'pending',
+    readiness_status: payload.readiness_status || 'جاهزة جزئيا',
+    delivery_status: payload.delivery_status || 'في انتظار التسليم',
     client_id: payload.client_id || null,
     created_at: new Date().toISOString(),
   };
@@ -835,11 +910,22 @@ export async function updateSchoolList(id: string, updates: Partial<SchoolList>)
     return data.schoolList;
   }
   if (isSupabaseConfigured) {
-    const { data } = await supabase.from('school_lists').update(updates).eq('id', id).select(`
-      id, client_name, school_name, employee_id, status, client_id, created_at,
-      employee:employees (id, name),
-      client:clients (id, name, phone)
-    `).single();
+    let data: any = null;
+    try {
+      const res = await supabase.from('school_lists').update(updates).eq('id', id).select(`
+        id, client_name, school_name, phone, ticket_id, avance_amount, total_amount, employee_id, status, readiness_status, delivery_status, client_id, created_at,
+        employee:employees (id, name),
+        client:clients (id, name, phone, ticket_id)
+      `).single();
+      data = res.data;
+    } catch {
+      const { data: fallbackData } = await supabase.from('school_lists').update(updates).eq('id', id).select(`
+        id, client_name, school_name, employee_id, status, client_id, created_at,
+        employee:employees (id, name),
+        client:clients (id, name, phone)
+      `).single();
+      data = fallbackData;
+    }
     invalidateStoreCache();
     if (data) {
       const raw = data as any;
