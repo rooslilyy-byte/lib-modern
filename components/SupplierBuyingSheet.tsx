@@ -3,26 +3,31 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, ShoppingCart, CheckCircle2, AlertCircle, Package } from 'lucide-react';
-import { SupplierAggregatedItem, PurchaseBatch, ClientDemand } from '@/lib/types';
+import { SupplierAggregatedItem, PurchaseBatch, ClientDemand, MasterProduct } from '@/lib/types';
 import { getSupplierAggregatedReport } from '@/lib/dataStore';
 import { compareProductNames } from '@/lib/sortUtils';
 import { useLanguage } from '@/lib/languageContext';
 import { printIsolated, preloadPrintAssets } from '@/lib/printUtils';
+import { normalizeCategory, ProductCategoryKey } from '@/lib/categoryUtils';
 
 type ReportTab = 'normal' | 'rupture';
+export type CategoryFilter = 'all' | 'books' | 'fournitures' | 'others';
 
 interface SupplierBuyingSheetProps {
   activeBatch: PurchaseBatch | null;
   demands?: ClientDemand[];
+  masterProducts?: MasterProduct[];
   onArchiveBatch?: (newBatchName: string) => void;
 }
 
 function SupplierBuyingSheet({
   activeBatch,
   demands,
+  masterProducts = [],
 }: SupplierBuyingSheetProps) {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<ReportTab>('normal');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [fetchedReport, setFetchedReport] = useState<SupplierAggregatedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -51,6 +56,16 @@ function SupplierBuyingSheet({
     }
   }, [activeBatch, demands, activeTab, fetchReport]);
 
+  // Master product dictionary for O(1) lookup
+  const masterProductMap = useMemo(() => {
+    const map = new Map<string, MasterProduct>();
+    for (let i = 0; i < masterProducts.length; i++) {
+      const mp = masterProducts[i];
+      map.set(mp.name.trim().toLowerCase(), mp);
+    }
+    return map;
+  }, [masterProducts]);
+
   const { normalReport, ruptureReport } = useMemo(() => {
     if (!demands) return { normalReport: [], ruptureReport: [] };
     const normalMap: Record<string, SupplierAggregatedItem> = {};
@@ -72,8 +87,11 @@ function SupplierBuyingSheet({
 
         const pName = item.product_name.trim();
         if (!targetMap[pName]) {
+          const mp = masterProductMap.get(pName.toLowerCase());
+          const cat = mp?.category || item.category || 'كتب';
           targetMap[pName] = {
             productName: pName,
+            category: cat,
             totalQuantity: 0,
             clients: [],
           };
@@ -93,7 +111,7 @@ function SupplierBuyingSheet({
       normalReport: Object.values(normalMap),
       ruptureReport: Object.values(ruptureMap),
     };
-  }, [demands]);
+  }, [demands, masterProductMap]);
 
   const rawReport = demands 
     ? (activeTab === 'normal' ? normalReport : ruptureReport) 
@@ -103,6 +121,24 @@ function SupplierBuyingSheet({
   const report = useMemo(() => {
     return [...rawReport].sort((a, b) => compareProductNames(a.productName, b.productName));
   }, [rawReport]);
+
+  // Category counts based on current activeTab report
+  const categoryCounts = useMemo(() => {
+    const counts = { all: report.length, books: 0, fournitures: 0, others: 0 };
+    for (const item of report) {
+      const catKey = normalizeCategory(item.category);
+      if (catKey === 'books') counts.books++;
+      else if (catKey === 'fournitures') counts.fournitures++;
+      else counts.others++;
+    }
+    return counts;
+  }, [report]);
+
+  // Filtered report by selected category tab
+  const filteredReport = useMemo(() => {
+    if (selectedCategory === 'all') return report;
+    return report.filter(item => normalizeCategory(item.category) === selectedCategory);
+  }, [report, selectedCategory]);
 
   const handlePrint = useCallback(() => {
     const el = document.getElementById('printable-a4-report');
@@ -116,10 +152,11 @@ function SupplierBuyingSheet({
     }
   }, [activeTab]);
 
-  const totalItemTypes = report.length;
+  // Summary badges dynamically reflect the filtered view
+  const totalItemTypes = filteredReport.length;
   const totalPiecesCount = useMemo(() => {
-    return report.reduce((acc, curr) => acc + curr.totalQuantity, 0);
-  }, [report]);
+    return filteredReport.reduce((acc, curr) => acc + curr.totalQuantity, 0);
+  }, [filteredReport]);
 
   const formattedDate = new Date().toLocaleDateString('ar-MA', {
     year: 'numeric',
@@ -220,27 +257,62 @@ function SupplierBuyingSheet({
             </span>
           </button>
         </div>
+
+        {/* Responsive Category Filter Tabs Bar */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2 border-t border-neutral-100">
+          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 ml-1">تصفية حسب الصنف:</span>
+          {[
+            { key: 'all', label: 'الكل' },
+            { key: 'books', label: 'كتب' },
+            { key: 'fournitures', label: 'أدوات' },
+            { key: 'others', label: 'أخرى' },
+          ].map((cat) => {
+            const isSelected = selectedCategory === cat.key;
+            const count = categoryCounts[cat.key as CategoryFilter] || 0;
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setSelectedCategory(cat.key as CategoryFilter)}
+                className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                  isSelected
+                    ? 'bg-neutral-900 text-white shadow-sm ring-2 ring-neutral-900/10'
+                    : 'bg-white text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 border border-neutral-200/80 shadow-2xs'
+                }`}
+              >
+                <span>{cat.label}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  isSelected ? 'bg-orange-700 text-white' : 'bg-neutral-100 text-neutral-600'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 2. Screen UI Web View Floating Glass Card (NO-PRINT) */}
       <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 sm:p-6 no-print">
         {isLoading ? (
           <div className="text-center py-12 text-neutral-400 font-bold text-xs">جاري تحميل التقرير...</div>
-        ) : report.length === 0 ? (
+        ) : filteredReport.length === 0 ? (
           <div className="text-center py-16 px-4">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <p className="text-base font-extrabold text-neutral-900">
-              {activeTab === 'normal' ? 'جميع الكتب متوفرة في المخزون' : 'لا توجد سلع مسجلة كغير متوفرة حالياً'}
+              {report.length === 0 
+                ? (activeTab === 'normal' ? 'جميع الكتب متوفرة في المخزون' : 'لا توجد سلع مسجلة كغير متوفرة حالياً')
+                : 'لا توجد سلع مطابقة للصنف المحدد'}
             </p>
             <p className="text-xs text-neutral-400 mt-1">
-              {activeTab === 'normal' 
-                ? 'لا توجد خصاصات معلقة للموردين في الوقت الحالي'
-                : 'جميع السلع المطلوبة متوفرة أو مسجلة في قائمة المشتريات العادية'}
+              {report.length === 0
+                ? (activeTab === 'normal' ? 'لا توجد خصاصات معلقة للموردين في الوقت الحالي' : 'جميع السلع المطلوبة متوفرة')
+                : 'اختر تصنيفاً آخر أو انقر على "الكل" لعرض جميع المشتريات'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-neutral-100">
-            {report.map((item, idx) => (
+            {filteredReport.map((item, idx) => (
               <div key={idx} className="py-3.5 first:pt-0 last:pb-0 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-7 h-7 rounded-xl bg-neutral-100 text-neutral-800 font-extrabold text-xs flex items-center justify-center shrink-0 border border-neutral-200/60">
@@ -293,6 +365,7 @@ function SupplierBuyingSheet({
                     {activeTab === 'normal'
                       ? 'متابعة خصاصات الدخول المدرسي — قائمة المشتريات المعلقة للموردين'
                       : 'متابعة خصاصات الدخول المدرسي — قائمة السلع المقطوعة (En Rupture)'}
+                    {selectedCategory !== 'all' ? ` (صنف: ${selectedCategory === 'books' ? 'كتب' : selectedCategory === 'fournitures' ? 'أدوات' : 'أخرى'})` : ''}
                   </p>
                   <p className="text-xs font-mono text-neutral-800 mt-1 text-right">
                     الهاتف: <span dir="ltr" className="font-bold">06.60.56.33.71 / 06.60.31.98.68</span>
@@ -318,7 +391,7 @@ function SupplierBuyingSheet({
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-300">
-                {report.map((item, idx) => (
+                {filteredReport.map((item, idx) => (
                   <tr key={idx}>
                     <td className="py-3 px-3 text-center font-bold">{idx + 1}</td>
                     <td className="py-3 px-3 font-extrabold text-sm">{item.productName}</td>

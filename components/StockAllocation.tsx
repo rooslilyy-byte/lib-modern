@@ -16,9 +16,11 @@ import {
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { compareProductNames } from '@/lib/sortUtils';
 import { useLanguage } from '@/lib/languageContext';
+import { normalizeCategory, ProductCategoryKey } from '@/lib/categoryUtils';
 
 type ViewTab = 'normal' | 'rupture';
 type SortOption = 'alphabetical' | 'oldest' | 'newest';
+export type CategoryFilter = 'all' | 'books' | 'fournitures' | 'others';
 
 interface AggregatedProduct {
   productName: string;
@@ -56,6 +58,7 @@ function StockAllocation({
 }: StockAllocationProps) {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<ViewTab>('normal');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('alphabetical');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -124,7 +127,7 @@ function StockAllocation({
             const masterProd = masterProductMap.get(key);
             targetMap[key] = {
               productName: pName,
-              category: masterProd?.category || 'كتاب مدرسي',
+              category: masterProd?.category || item.category || 'كتب',
               totalDemanded: 0,
               totalFulfilled: 0,
               totalMissingQty: 0,
@@ -200,19 +203,36 @@ function StockAllocation({
     });
   }, []);
 
+  const currentBaseList = activeTab === 'normal' ? normalProductsList : ruptureProductsList;
+
+  // Category counts based on current active tab
+  const categoryCounts = useMemo(() => {
+    const counts = { all: currentBaseList.length, books: 0, fournitures: 0, others: 0 };
+    for (const p of currentBaseList) {
+      const catKey = normalizeCategory(p.category);
+      if (catKey === 'books') counts.books++;
+      else if (catKey === 'fournitures') counts.fournitures++;
+      else counts.others++;
+    }
+    return counts;
+  }, [currentBaseList]);
+
   const displayedProducts = useMemo(() => {
     const baseList = activeTab === 'normal' ? normalProductsList : ruptureProductsList;
 
     let filtered = baseList;
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => normalizeCategory(p.category) === selectedCategory);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      filtered = baseList.filter(
+      filtered = filtered.filter(
         p => p.productName.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
       );
     }
 
     return sortAggregatedProducts(filtered, sortBy);
-  }, [activeTab, normalProductsList, ruptureProductsList, searchQuery, sortBy, sortAggregatedProducts]);
+  }, [activeTab, normalProductsList, ruptureProductsList, selectedCategory, searchQuery, sortBy, sortAggregatedProducts]);
 
   const currentTotalItems = displayedProducts.length;
   const currentTotalPieces = useMemo(() => {
@@ -359,6 +379,39 @@ function StockAllocation({
               {ruptureProductsList.length}
             </span>
           </button>
+        </div>
+
+        {/* Responsive Category Filter Tabs Bar */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2 border-t border-neutral-100">
+          <span className="text-[11px] sm:text-xs font-bold text-neutral-500 ml-1">تصفية حسب الصنف:</span>
+          {[
+            { key: 'all', label: 'الكل' },
+            { key: 'books', label: 'كتب' },
+            { key: 'fournitures', label: 'أدوات' },
+            { key: 'others', label: 'أخرى' },
+          ].map((cat) => {
+            const isSelected = selectedCategory === cat.key;
+            const count = categoryCounts[cat.key as CategoryFilter] || 0;
+            return (
+              <button
+                key={cat.key}
+                type="button"
+                onClick={() => setSelectedCategory(cat.key as CategoryFilter)}
+                className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                  isSelected
+                    ? 'bg-neutral-900 text-white shadow-sm ring-2 ring-neutral-900/10'
+                    : 'bg-white text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 border border-neutral-200/80 shadow-2xs'
+                }`}
+              >
+                <span>{cat.label}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  isSelected ? 'bg-orange-700 text-white' : 'bg-neutral-100 text-neutral-600'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search & Sort Filters */}

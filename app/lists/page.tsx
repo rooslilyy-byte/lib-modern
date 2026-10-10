@@ -13,6 +13,7 @@ export default function ListsPage() {
         demands,
         employees,
         schoolLists,
+        masterProducts,
         handleCreateEmployee,
         handleUpdateEmployee,
         handleDeleteEmployee,
@@ -21,12 +22,14 @@ export default function ListsPage() {
         handleDeleteSchoolList,
         handleLinkSchoolListClient,
         handleConvertSchoolListToClient,
+        handleCreateDemand,
         loadData,
       }) => (
         <EmployeesAndLists
           demands={demands}
           employees={employees}
           schoolLists={schoolLists}
+          masterProducts={masterProducts}
           onCreateEmployee={handleCreateEmployee}
           onUpdateEmployee={handleUpdateEmployee}
           onDeleteEmployee={handleDeleteEmployee}
@@ -35,6 +38,7 @@ export default function ListsPage() {
           onDeleteSchoolList={handleDeleteSchoolList}
           onLinkSchoolListClient={handleLinkSchoolListClient}
           onConvertSchoolListToClient={handleConvertSchoolListToClient}
+          onCreateDemand={handleCreateDemand}
           onRefreshData={loadData}
         />
       )}

@@ -34,6 +34,7 @@ export interface DemandItem {
   is_in_stock: boolean;
   is_delivered: boolean;
   status?: string;
+  category?: string;
   created_at?: string;
 }
 
@@ -67,6 +68,7 @@ export interface StockAllocationItem {
 export interface SupplierAggregatedItem {
   productName: string;
   totalQuantity: number;
+  category?: string;
   clients: {
     clientName: string;
     phone: string;

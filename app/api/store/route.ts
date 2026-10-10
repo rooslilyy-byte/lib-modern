@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db';
 import type { ClientDemand, MasterProduct, PurchaseBatch, Employee, SchoolList } from '@/lib/types';
+import { getCategoryLabel } from '@/lib/categoryUtils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const DEFAULT_BATCH_NAME =
   '\u062f\u0641\u0639\u0629 \u0627\u0644\u062f\u062e\u0648\u0644 \u0627\u0644\u0645\u062f\u0631\u0633\u064a \u0627\u0644\u0631\u0626\u064a\u0633\u064a';
-const DEFAULT_PRODUCT_CATEGORY = '\u0643\u062a\u0627\u0628 \u0645\u062f\u0631\u0633\u064a';
+const DEFAULT_PRODUCT_CATEGORY = 'كتب';
 
 type DatabaseRow = Record<string, any>;
 
@@ -102,7 +103,7 @@ async function ensureMasterProductsWithCategories(
   for (const item of items) {
     const name = (item.product_name || '').trim();
     if (!name) continue;
-    const cat = item.category ? item.category.trim() : DEFAULT_PRODUCT_CATEGORY;
+    const cat = item.category ? getCategoryLabel(item.category) : DEFAULT_PRODUCT_CATEGORY;
     map.set(name, cat);
   }
 
@@ -634,7 +635,7 @@ export async function POST(request: Request) {
     const { action } = body;
 
     if (action === 'create_demand') {
-      const { clientName, clientPhone, items, avance_amount, total_amount, ticketId, ticket_id } = body;
+      const { clientName, clientPhone, items, avance_amount, total_amount, ticketId, ticket_id, linkedSchoolListId, schoolListId } = body;
       const cleanPhone = (clientPhone || '').trim();
       const cleanName = (clientName || '').trim();
       const rawTicket = ticket_id !== undefined ? ticket_id : ticketId;
@@ -738,7 +739,19 @@ export async function POST(request: Request) {
         }
       }
 
-      return NextResponse.json({ success: true, demandId: demand.id });
+      const targetSchoolListId = linkedSchoolListId || schoolListId;
+      if (targetSchoolListId) {
+        try {
+          await supabaseAdmin
+            .from('school_lists')
+            .update({ client_id: client.id, status: 'pending' })
+            .eq('id', targetSchoolListId);
+        } catch (e) {
+          console.error('Error linking school list in create_demand:', e);
+        }
+      }
+
+      return NextResponse.json({ success: true, demandId: demand.id, clientId: client.id });
     }
 
     if (action === 'update_demand') {
@@ -799,12 +812,11 @@ export async function POST(request: Request) {
         await saveAvancePaymentsToDb(avMap, avId);
       }
 
-      // 3. Bulk Safe Upsert Master Products (onConflict: 'name')
+      // 3. Bulk Safe Upsert Master Products with Categories (onConflict: 'name')
       const validItems = (Array.isArray(items) ? items : []).filter(
         (it: any) => it && it.product_name && it.product_name.trim()
       );
-      const productNames = validItems.map((it: any) => it.product_name.trim());
-      await ensureMasterProducts(productNames);
+      await ensureMasterProductsWithCategories(validItems);
 
       // 4. Clean update: Delete all existing demand items for this demand/client
       unwrap(

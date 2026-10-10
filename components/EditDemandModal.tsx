@@ -192,6 +192,9 @@ function EditDemandModal({
         itemMap[name].quantity += qty;
         itemMap[name].is_in_stock = itemMap[name].is_in_stock || item.is_in_stock;
         itemMap[name].is_delivered = itemMap[name].is_delivered || item.is_delivered;
+        if (cat !== 'books') {
+          itemMap[name].category = cat;
+        }
       }
     }
     const validItems = Object.values(itemMap);
@@ -208,25 +211,25 @@ function EditDemandModal({
 
     const numAvance = avanceAmount !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : undefined;
     const numTotal = totalAmount !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : undefined;
+    const cleanName = clientName.trim();
+    const cleanPhone = clientPhone.trim();
+    const cleanTicket = clientTicketId.trim() || undefined;
 
-    setIsSaving(true);
-    try {
-      await onSave(
-        demand.id,
-        clientName.trim(),
-        clientPhone.trim(),
-        validItems,
-        numAvance,
-        numTotal,
-        clientTicketId.trim() || undefined
-      );
-      onClose();
-    } catch (err: any) {
-      console.error('Error saving demand:', err);
-      setErrorMessage(err.message || 'حدث خطأ أثناء حفظ التعديلات');
-    } finally {
-      setIsSaving(false);
-    }
+    // 1. Instantly close the modal for immediate, responsive user experience (< 16ms)
+    onClose();
+
+    // 2. Continue database save in background asynchronously
+    onSave(
+      demand.id,
+      cleanName,
+      cleanPhone,
+      validItems,
+      numAvance,
+      numTotal,
+      cleanTicket
+    ).catch((err: any) => {
+      console.error('Error saving demand in background:', err);
+    });
   }, [items, clientName, clientPhone, clientTicketId, avanceAmount, totalAmount, demand.id, onSave, onClose]);
 
   return (
@@ -336,7 +339,7 @@ function EditDemandModal({
                         value={item.product_name}
                         onChange={(val) => handleItemChange(idx, 'product_name', val)}
                         onSelectProduct={(prod) => {
-                          if (prod.category) {
+                          if (prod.category && !(prod as any).isCustom) {
                             handleItemChange(idx, 'category', normalizeCategory(prod.category));
                           }
                         }}

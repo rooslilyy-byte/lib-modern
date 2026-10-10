@@ -32,6 +32,7 @@ import {
 } from '@/lib/dataStore';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { PurchaseBatch, MasterProduct, ClientDemand, Employee, SchoolList, SchoolListStatus, ReadinessStatus, DeliveryStatus } from '@/lib/types';
+import { getCategoryLabel } from '@/lib/categoryUtils';
 import { LanguageProvider, useLanguage } from '@/lib/languageContext';
 import { Menu, PanelRightOpen, Phone, Globe } from 'lucide-react';
 
@@ -60,7 +61,7 @@ export interface AppShellData {
   activeBatch: PurchaseBatch | null;
   isLoading: boolean;
   loadData: () => Promise<void>;
-  handleCreateDemand: (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => Promise<void>;
+  handleCreateDemand: (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string, linkedSchoolListId?: string) => Promise<{ clientId?: string; demandId?: string } | any>;
   handleUpdateDemand: (id: string, name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => Promise<void>;
   handleUpdateItemState: (id: string, updates: any) => Promise<void>;
   handleAutoAllocateStock: (productName: string, receivedQty: number) => Promise<{ clientName: string; phone: string; fulfilledQty: number; link: string }[]>;
@@ -132,24 +133,33 @@ function AppShellContent({ children }: AppShellProps) {
     loadData();
   }, [loadData]);
 
-  const handleCreateDemand = useCallback(async (name: string, phone: string, items: any[], avanceAmount?: number, totalAmount?: number, ticketId?: string) => {
+  const handleCreateDemand = useCallback(async (
+    name: string, 
+    phone: string, 
+    items: any[], 
+    avanceAmount?: number, 
+    totalAmount?: number, 
+    ticketId?: string,
+    linkedSchoolListId?: string
+  ) => {
     const cleanName = (name || '').trim();
     const cleanPhone = (phone || '').trim();
     const cleanTicketId = (ticketId || '').trim() || null;
     const tempId = 'temp-' + Date.now();
+    const tempClientId = 'client-' + tempId;
     const validItems = (Array.isArray(items) ? items : []).filter(it => it && it.product_name && it.product_name.trim());
     
     // Optimistic Demand Insertion
     const optimisticDemand: ClientDemand = {
       id: tempId,
-      client_id: 'client-' + tempId,
+      client_id: tempClientId,
       batch_id: activeBatch?.id || 'batch-001',
       status: 'pending',
       created_at: new Date().toISOString(),
       avance_amount: avanceAmount || 0,
       total_amount: totalAmount || 0,
       client: {
-        id: 'client-' + tempId,
+        id: tempClientId,
         name: cleanName,
         phone: cleanPhone,
         ticket_id: cleanTicketId,
@@ -164,6 +174,7 @@ function AppShellContent({ children }: AppShellProps) {
         is_in_stock: false,
         is_delivered: false,
         status: 'pending',
+        category: it.category ? getCategoryLabel(it.category) : 'كتب',
       })),
     };
 
@@ -173,8 +184,65 @@ function AppShellContent({ children }: AppShellProps) {
       return next;
     });
 
+    // Optimistic Master Products Category Update (< 16ms instant sync for search & stock)
+    setMasterProducts(prev => {
+      const updated = [...prev];
+      for (const it of validItems) {
+        const pName = it.product_name.trim();
+        const normKey = pName.toLowerCase();
+        const catLabel = getCategoryLabel(it.category || 'books');
+        const idx = updated.findIndex(p => p.name.trim().toLowerCase() === normKey);
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], category: catLabel };
+        } else {
+          updated.push({
+            id: 'mp-opt-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+            name: pName,
+            category: catLabel,
+            available_stock: 0,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+      globalAppCache.masterProducts = updated;
+      return updated;
+    });
+
+    // Optimistically link school list if linkedSchoolListId is provided (< 16ms instant switch)
+    if (linkedSchoolListId) {
+      setSchoolLists(prev => {
+        const next = prev.map(l => l.id === linkedSchoolListId ? {
+          ...l,
+          client_id: tempClientId,
+          status: 'pending' as const,
+          client: optimisticDemand.client,
+        } : l);
+        globalAppCache.schoolLists = next;
+        return next;
+      });
+    }
+
     try {
-      await createClientDemand(name, phone, validItems, avanceAmount, totalAmount, ticketId);
+      const res = await createClientDemand(name, phone, validItems, avanceAmount, totalAmount, ticketId, linkedSchoolListId);
+      const actualClientId = res?.clientId || res?.demand?.client_id || res?.client?.id;
+      if (linkedSchoolListId && actualClientId) {
+        setSchoolLists(prev => {
+          const next = prev.map(l => l.id === linkedSchoolListId ? {
+            ...l,
+            client_id: actualClientId,
+            status: 'pending' as const,
+            client: {
+              id: actualClientId,
+              name: cleanName,
+              phone: cleanPhone,
+              ticket_id: cleanTicketId,
+            }
+          } : l);
+          globalAppCache.schoolLists = next;
+          return next;
+        });
+      }
+      return res || { success: true, clientId: actualClientId || tempClientId, demandId: res?.demandId || tempId };
     } finally {
       await loadData(true);
     }
@@ -199,6 +267,7 @@ function AppShellContent({ children }: AppShellProps) {
           is_in_stock: Boolean(it.is_in_stock),
           is_delivered: Boolean(it.is_delivered),
           status: it.status || (it.is_in_stock ? 'ready' : 'pending'),
+          category: it.category ? getCategoryLabel(it.category) : 'كتب',
         }));
 
         return {
@@ -217,6 +286,30 @@ function AppShellContent({ children }: AppShellProps) {
       });
       globalAppCache.demands = next;
       return next;
+    });
+
+    // Optimistic Master Products Category Update (< 16ms instant sync for search & stock)
+    setMasterProducts(prev => {
+      const updated = [...prev];
+      for (const it of validItems) {
+        const pName = it.product_name.trim();
+        const normKey = pName.toLowerCase();
+        const catLabel = getCategoryLabel(it.category || 'books');
+        const idx = updated.findIndex(p => p.name.trim().toLowerCase() === normKey);
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], category: catLabel };
+        } else {
+          updated.push({
+            id: 'mp-opt-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+            name: pName,
+            category: catLabel,
+            available_stock: 0,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+      globalAppCache.masterProducts = updated;
+      return updated;
     });
 
     try {

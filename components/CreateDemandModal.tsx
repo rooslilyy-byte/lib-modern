@@ -7,6 +7,14 @@ import { useLanguage } from '@/lib/languageContext';
 import { PRODUCT_CATEGORIES, ProductCategoryKey, normalizeCategory } from '@/lib/categoryUtils';
 import ProductAutocomplete from './ProductAutocomplete';
 
+export interface DemandModalInitialData {
+  name?: string;
+  phone?: string;
+  avance_amount?: number;
+  ticket_id?: string;
+  linkedSchoolListId?: string;
+}
+
 interface CreateDemandModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -17,8 +25,10 @@ interface CreateDemandModalProps {
     items: { product_name: string; quantity: number; category?: ProductCategoryKey }[],
     avanceAmount?: number,
     totalAmount?: number,
-    ticketId?: string
-  ) => Promise<void>;
+    ticketId?: string,
+    linkedSchoolListId?: string
+  ) => Promise<any>;
+  initialData?: DemandModalInitialData | null;
 }
 
 function CreateDemandModal({
@@ -26,6 +36,7 @@ function CreateDemandModal({
   onClose,
   masterProducts = [],
   onCreateDemand,
+  initialData,
 }: CreateDemandModalProps) {
   const { t } = useLanguage();
   const [clientName, setClientName] = useState('');
@@ -38,6 +49,32 @@ function CreateDemandModal({
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Sync initialData when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setClientName(initialData.name || '');
+        setClientPhone(initialData.phone || '');
+        // KEEP ticket_id EMPTY / BLANK: Do NOT pre-fill the ticket ID from the school list
+        setClientTicketId(initialData.ticket_id || '');
+        setAvanceAmount(
+          initialData.avance_amount !== undefined && initialData.avance_amount !== null && initialData.avance_amount > 0
+            ? String(initialData.avance_amount)
+            : (initialData.avance_amount === 0 ? '0' : '')
+        );
+        setTotalAmount('');
+        setItems([{ product_name: '', quantity: 1, category: 'books' }]);
+      } else {
+        setClientName('');
+        setClientPhone('');
+        setClientTicketId('');
+        setAvanceAmount('');
+        setTotalAmount('');
+        setItems([{ product_name: '', quantity: 1, category: 'books' }]);
+      }
+    }
+  }, [isOpen, initialData]);
 
   const handlePreventNegativeKey = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') {
@@ -110,6 +147,9 @@ function CreateDemandModal({
         itemMap[name] = { product_name: name, quantity: qty, category: cat };
       } else {
         itemMap[name].quantity += qty;
+        if (cat !== 'books') {
+          itemMap[name].category = cat;
+        }
       }
     }
 
@@ -122,29 +162,35 @@ function CreateDemandModal({
 
     const numAvance = avanceAmount !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : undefined;
     const numTotal = totalAmount !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : undefined;
+    const cleanName = clientName.trim();
+    const cleanPhone = clientPhone.trim();
+    const cleanTicket = clientTicketId.trim() || undefined;
+    const targetLinkedSchoolListId = initialData?.linkedSchoolListId;
 
-    setIsSubmitting(true);
-    try {
-      await onCreateDemand(clientName.trim(), clientPhone.trim(), validItems, numAvance, numTotal, clientTicketId.trim() || undefined);
+    // 1. Instantly close the modal for immediate, responsive user experience (< 16ms)
+    onClose();
 
-      setToastMessage('تمت إضافة الزبون والطلب بنجاح');
-      setTimeout(() => {
-        setToastMessage(null);
-        setClientName('');
-        setClientPhone('');
-        setClientTicketId('');
-        setAvanceAmount('');
-        setTotalAmount('');
-        setItems([{ product_name: '', quantity: 1, category: 'books' }]);
-        onClose();
-      }, 1200);
-    } catch (err) {
-      console.error('Error creating demand:', err);
-      alert('حدث خطأ أثناء حفظ الطلب.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [clientName, clientPhone, clientTicketId, items, avanceAmount, totalAmount, onCreateDemand, onClose]);
+    // 2. Clear modal form state
+    setClientName('');
+    setClientPhone('');
+    setClientTicketId('');
+    setAvanceAmount('');
+    setTotalAmount('');
+    setItems([{ product_name: '', quantity: 1, category: 'books' }]);
+
+    // 3. Continue database save & background sync asynchronously
+    onCreateDemand(
+      cleanName, 
+      cleanPhone, 
+      validItems, 
+      numAvance, 
+      numTotal, 
+      cleanTicket,
+      targetLinkedSchoolListId
+    ).catch(err => {
+      console.error('Error creating demand in background:', err);
+    });
+  }, [clientName, clientPhone, clientTicketId, items, avanceAmount, totalAmount, initialData, onCreateDemand, onClose]);
 
   if (!isOpen) return null;
 
@@ -170,7 +216,14 @@ function CreateDemandModal({
               className="w-11 h-11 object-contain shrink-0"
             />
             <div>
-              <h2 className="font-black text-neutral-900 text-sm sm:text-base">إضافة زبون وطلب جديد</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-black text-neutral-900 text-sm sm:text-base">إضافة زبون وطلب جديد</h2>
+                {initialData?.linkedSchoolListId && (
+                  <span className="text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200/80 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                    <span>مرتبط باللائحة المدرسية</span>
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-neutral-400 font-medium">تسجيل تفاصيل الزبون والخصاص المدرسي</p>
             </div>
           </div>
@@ -248,7 +301,7 @@ function CreateDemandModal({
                       value={item.product_name}
                       onChange={(val) => handleItemChange(idx, 'product_name', val)}
                       onSelectProduct={(prod) => {
-                        if (prod.category) {
+                        if (prod.category && !(prod as any).isCustom) {
                           handleItemChange(idx, 'category', normalizeCategory(prod.category));
                         }
                       }}

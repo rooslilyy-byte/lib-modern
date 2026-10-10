@@ -29,9 +29,10 @@ import {
   Sparkles,
   Ticket,
 } from 'lucide-react';
-import { Employee, SchoolList, SchoolListStatus, ReadinessStatus, DeliveryStatus, ClientDemand } from '@/lib/types';
+import { Employee, SchoolList, SchoolListStatus, ReadinessStatus, DeliveryStatus, ClientDemand, MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
-import { convertSchoolListToClient } from '@/lib/dataStore';
+import { convertSchoolListToClient, createClientDemand } from '@/lib/dataStore';
+import CreateDemandModal, { DemandModalInitialData } from './CreateDemandModal';
 
 type ActiveTab = 'lists' | 'employees';
 type StatusFilter = 'all' | 'pending' | 'done';
@@ -40,6 +41,7 @@ interface EmployeesAndListsProps {
   demands: ClientDemand[];
   employees: Employee[];
   schoolLists: SchoolList[];
+  masterProducts?: MasterProduct[];
   onCreateEmployee: (name: string) => Promise<Employee>;
   onUpdateEmployee: (id: string, name: string) => Promise<Employee>;
   onDeleteEmployee: (id: string) => Promise<void>;
@@ -60,6 +62,15 @@ interface EmployeesAndListsProps {
   onDeleteSchoolList: (id: string) => Promise<void>;
   onLinkSchoolListClient: (listId: string, clientId: string | null) => Promise<SchoolList>;
   onConvertSchoolListToClient?: (listId: string) => Promise<{ clientId: string; demandId: string; schoolList: SchoolList }>;
+  onCreateDemand?: (
+    clientName: string,
+    clientPhone: string,
+    items: { product_name: string; quantity: number; category?: any }[],
+    avanceAmount?: number,
+    totalAmount?: number,
+    ticketId?: string,
+    linkedSchoolListId?: string
+  ) => Promise<any>;
   onRefreshData?: () => Promise<void>;
 }
 
@@ -67,6 +78,7 @@ export default function EmployeesAndLists({
   demands,
   employees,
   schoolLists,
+  masterProducts = [],
   onCreateEmployee,
   onUpdateEmployee,
   onDeleteEmployee,
@@ -75,6 +87,7 @@ export default function EmployeesAndLists({
   onDeleteSchoolList,
   onLinkSchoolListClient,
   onConvertSchoolListToClient,
+  onCreateDemand,
   onRefreshData,
 }: EmployeesAndListsProps) {
   const router = useRouter();
@@ -86,8 +99,9 @@ export default function EmployeesAndLists({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
 
-  // Converting to Client Action State
-  const [convertingListId, setConvertingListId] = useState<string | null>(null);
+  // Missing Items / Client Demand Modal State
+  const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
+  const [demandModalInitialData, setDemandModalInitialData] = useState<DemandModalInitialData | null>(null);
 
   // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -444,28 +458,76 @@ export default function EmployeesAndLists({
     });
   };
 
-  // --- Magic Action Handler: Convert School List to Client / Missing Demands ---
-  const handleConvertToClient = useCallback(async (list: SchoolList) => {
-    if (convertingListId) return;
-    setConvertingListId(list.id);
+  // --- Action Handler: Intercept "إضافة للخصاص" to open Missing Items modal pre-filled ---
+  const handleOpenDemandModalForList = useCallback((list: SchoolList) => {
+    setDemandModalInitialData({
+      name: list.client_name || '',
+      phone: list.phone || '',
+      avance_amount: list.avance_amount || 0,
+      ticket_id: '', // KEEP ticket_id EMPTY / BLANK: user enters new ticket ID for pickup bill
+      linkedSchoolListId: list.id,
+    });
+    setIsDemandModalOpen(true);
+    if (viewingListDetails) {
+      setViewingListDetails(null);
+    }
+  }, [viewingListDetails]);
+
+  // Modal Submission Handler: Create client & missing demands, then update school list client_id
+  const handleDemandModalSubmit = useCallback(async (
+    clientName: string,
+    clientPhone: string,
+    items: { product_name: string; quantity: number; category?: any }[],
+    avanceAmount?: number,
+    totalAmount?: number,
+    ticketId?: string,
+    linkedSchoolListId?: string
+  ) => {
     try {
-      let res: { clientId: string; demandId: string; schoolList: SchoolList };
-      if (onConvertSchoolListToClient) {
-        res = await onConvertSchoolListToClient(list.id);
+      let createdClientId: string | null = null;
+      if (onCreateDemand) {
+        const res = await onCreateDemand(
+          clientName,
+          clientPhone,
+          items,
+          avanceAmount,
+          totalAmount,
+          ticketId,
+          linkedSchoolListId
+        );
+        createdClientId = res?.clientId || res?.demand?.client_id || res?.client?.id || null;
       } else {
-        res = await convertSchoolListToClient(list.id);
-        if (onUpdateSchoolList && res?.clientId) {
-          await onUpdateSchoolList(list.id, { client_id: res.clientId });
+        const res = await createClientDemand(
+          clientName,
+          clientPhone,
+          items,
+          avanceAmount,
+          totalAmount,
+          ticketId,
+          linkedSchoolListId
+        );
+        createdClientId = res?.clientId || null;
+      }
+
+      // Link originating school list if not already linked by the backend
+      if (linkedSchoolListId && createdClientId) {
+        if (onLinkSchoolListClient) {
+          await onLinkSchoolListClient(linkedSchoolListId, createdClientId);
+        } else if (onUpdateSchoolList) {
+          await onUpdateSchoolList(linkedSchoolListId, { client_id: createdClientId, status: 'pending' });
         }
       }
-      showToast(`تمت إضافة "${list.client_name}" للخصاص بنجاح ✨`, 'success', 2500);
+
+      showToast(`تمت إضافة "${clientName}" للخصاص بنجاح ✨`, 'success', 3000);
+      if (onRefreshData) {
+        await onRefreshData();
+      }
     } catch (err) {
-      console.error('Error converting school list to client:', err);
-      showToast('حدث خطأ أثناء تحويل اللائحة إلى زبون خصاص', 'error', 4000);
-    } finally {
-      setConvertingListId(null);
+      console.error('Error adding list to demands/client:', err);
+      showToast('حدث خطأ أثناء إضافة اللائحة للخصاص', 'error', 4000);
+      throw err;
     }
-  }, [convertingListId, onConvertSchoolListToClient, onUpdateSchoolList, showToast]);
+  }, [onCreateDemand, onLinkSchoolListClient, onUpdateSchoolList, onRefreshData, showToast]);
 
   // --- Delete Handler ---
   const handleConfirmDelete = () => {
@@ -917,22 +979,12 @@ export default function EmployeesAndLists({
                         {!list.client_id && (
                           <button
                             type="button"
-                            disabled={convertingListId === list.id}
-                            onClick={() => handleConvertToClient(list)}
-                            className="h-[32px] sm:h-[34px] min-h-[32px] px-2.5 py-1 text-xs font-medium rounded-lg bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center justify-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed flex-1 sm:flex-initial"
-                            title="إضافة للخصاص (تحويل الزبون لدليل الخصاصات وإضافة الكتب المطلوبة فوراً)"
+                            onClick={() => handleOpenDemandModalForList(list)}
+                            className="h-[32px] sm:h-[34px] min-h-[32px] px-2.5 py-1 text-xs font-medium rounded-lg bg-orange-700 hover:bg-orange-800 active:scale-95 text-white flex items-center justify-center gap-1.5 transition-all shadow-2xs shrink-0 whitespace-nowrap flex-1 sm:flex-initial"
+                            title="إضافة للخصاص (تسجيل تفاصيل الزبون والكتب المطلوبة)"
                           >
-                            {convertingListId === list.id ? (
-                              <>
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                                <span>جاري التحويل...</span>
-                              </>
-                            ) : (
-                              <>
-                                <UserPlus className="w-3.5 h-3.5 shrink-0" />
-                                <span>إضافة للخصاص</span>
-                              </>
-                            )}
+                            <UserPlus className="w-3.5 h-3.5 shrink-0" />
+                            <span>إضافة للخصاص</span>
                           </button>
                         )}
 
@@ -1597,11 +1649,7 @@ export default function EmployeesAndLists({
                 {!viewingListDetails.client_id && (
                   <button
                     type="button"
-                    disabled={convertingListId === viewingListDetails.id}
-                    onClick={() => {
-                      const target = viewingListDetails;
-                      handleConvertToClient(target);
-                    }}
+                    onClick={() => handleOpenDemandModalForList(viewingListDetails)}
                     className="px-4 py-2 text-xs font-bold bg-orange-700 hover:bg-orange-800 text-white rounded-full transition-colors inline-flex items-center gap-1.5 shadow-sm"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
@@ -1621,6 +1669,18 @@ export default function EmployeesAndLists({
           </div>
         </div>
       )}
+
+      {/* Add Missing Items / Client Modal triggered from "إضافة للخصاص" */}
+      <CreateDemandModal
+        isOpen={isDemandModalOpen}
+        onClose={() => {
+          setIsDemandModalOpen(false);
+          setDemandModalInitialData(null);
+        }}
+        masterProducts={masterProducts}
+        onCreateDemand={handleDemandModalSubmit}
+        initialData={demandModalInitialData}
+      />
 
     </div>
   );

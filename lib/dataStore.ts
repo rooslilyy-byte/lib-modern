@@ -10,6 +10,7 @@ import {
   SchoolList,
   SchoolListStatus
 } from './types';
+import { getCategoryLabel } from './categoryUtils';
 
 // Helper to determine if we are running in browser context to fetch API route
 const isBrowser = typeof window !== 'undefined';
@@ -348,14 +349,16 @@ export async function getClientDemands(batchId?: string, forceRefresh = false): 
 export async function createClientDemand(
   clientName: string,
   clientPhone: string,
-  items: { product_name: string; quantity: number }[],
+  items: { product_name: string; quantity: number; category?: string }[],
   avance_amount?: number,
   total_amount?: number,
-  ticket_id?: string
-): Promise<ClientDemand | any> {
+  ticket_id?: string,
+  linkedSchoolListId?: string
+): Promise<{ success: boolean; demandId?: string; clientId?: string } | any> {
   if (isBrowser) {
-    await fetchStoreApi('create_demand', { clientName, clientPhone, items, avance_amount, total_amount, ticket_id });
-    return;
+    const res = await fetchStoreApi('create_demand', { clientName, clientPhone, items, avance_amount, total_amount, ticket_id, linkedSchoolListId });
+    invalidateStoreCache();
+    return res;
   }
 
   if (isSupabaseConfigured) {
@@ -365,10 +368,16 @@ export async function createClientDemand(
     const cleanTicketId = (ticket_id || '').trim() || null;
     const validItems = items.filter(it => it.product_name?.trim());
 
-    // Bulk Safe Upsert master products
-    const productNames = Array.from(new Set(validItems.map(it => it.product_name.trim())));
-    if (productNames.length > 0) {
-      const prodRows = productNames.map(name => ({ name, category: 'كتاب مدرسي' }));
+    // Bulk Safe Upsert master products with actual categories
+    const prodMap = new Map<string, string>();
+    for (const it of validItems) {
+      const name = it.product_name.trim();
+      if (!name) continue;
+      const cat = (it as any).category ? getCategoryLabel((it as any).category) : 'كتب';
+      prodMap.set(name, cat);
+    }
+    if (prodMap.size > 0) {
+      const prodRows = Array.from(prodMap.entries()).map(([name, category]) => ({ name, category }));
       await supabase.from('master_products').upsert(prodRows, { onConflict: 'name' });
     }
 
@@ -409,6 +418,12 @@ export async function createClientDemand(
           await supabase.from('demand_items').insert(fallback);
         }
       }
+
+      if (linkedSchoolListId) {
+        await supabase.from('school_lists').update({ client_id: existingClient.id, status: 'pending' }).eq('id', linkedSchoolListId);
+      }
+      invalidateStoreCache();
+      return { success: true, demandId: demand?.id, clientId: existingClient.id };
     }
     invalidateStoreCache();
   }
@@ -632,6 +647,7 @@ export async function updateClientDemand(
     quantity: number;
     is_in_stock?: boolean;
     is_delivered?: boolean;
+    category?: string;
   }[],
   avance_amount?: number,
   total_amount?: number,
@@ -648,10 +664,16 @@ export async function updateClientDemand(
     const cleanTicketId = ticket_id !== undefined ? (ticket_id.trim() || null) : undefined;
     const validItems = items.filter(it => it.product_name?.trim());
 
-    // Bulk Safe Upsert master products
-    const productNames = Array.from(new Set(validItems.map(it => it.product_name.trim())));
-    if (productNames.length > 0) {
-      const prodRows = productNames.map(name => ({ name, category: 'كتاب مدرسي' }));
+    // Bulk Safe Upsert master products with actual categories
+    const prodMap = new Map<string, string>();
+    for (const it of validItems) {
+      const name = it.product_name.trim();
+      if (!name) continue;
+      const cat = (it as any).category ? getCategoryLabel((it as any).category) : 'كتب';
+      prodMap.set(name, cat);
+    }
+    if (prodMap.size > 0) {
+      const prodRows = Array.from(prodMap.entries()).map(([name, category]) => ({ name, category }));
       await supabase.from('master_products').upsert(prodRows, { onConflict: 'name' });
     }
 
@@ -699,16 +721,7 @@ export async function getSupplierAggregatedReport(
   statusFilter: 'normal' | 'rupture' = 'normal'
 ): Promise<SupplierAggregatedItem[]> {
   const demands = await getClientDemands(batchId);
-  const itemMap: Record<string, {
-    productName: string;
-    totalQuantity: number;
-    clients: {
-      clientName: string;
-      phone: string;
-      quantity: number;
-      demandId: string;
-    }[];
-  }> = {};
+  const itemMap: Record<string, SupplierAggregatedItem> = {};
 
   for (const dem of demands) {
     if (!dem.items || !dem.client) continue;
@@ -729,6 +742,7 @@ export async function getSupplierAggregatedReport(
       if (!itemMap[pName]) {
         itemMap[pName] = {
           productName: pName,
+          category: item.category || 'كتب',
           totalQuantity: 0,
           clients: [],
         };
