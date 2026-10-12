@@ -325,7 +325,7 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
 
   let rows: DatabaseRow[] = [];
   try {
-    // 1. Try full select with avance_amount and total_amount on client_demands AND clients
+    // 1. Try select with avance_amount and total_amount on clients table
     rows = unwrap(
       await supabaseAdmin
         .from('client_demands')
@@ -334,8 +334,6 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
           client_id,
           batch_id,
           status,
-          avance_amount,
-          total_amount,
           created_at,
           client:clients!inner (
             id,
@@ -354,7 +352,7 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
     ) as DatabaseRow[];
   } catch {
     try {
-      // 2. Fallback: amounts on client_demands only
+      // 2. Fallback: base select without amount columns on clients
       rows = unwrap(
         await supabaseAdmin
           .from('client_demands')
@@ -363,8 +361,6 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
             client_id,
             batch_id,
             status,
-            avance_amount,
-            total_amount,
             created_at,
             client:clients!inner (
               id,
@@ -377,60 +373,10 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
           `)
           .eq('batch_id', batchId)
           .order('created_at', { ascending: false }),
-        'Loading client demands with demand amounts',
+        'Loading client demands base fallback',
       ) as DatabaseRow[];
     } catch {
-      try {
-        // 3. Fallback: amounts on clients only
-        rows = unwrap(
-          await supabaseAdmin
-            .from('client_demands')
-            .select(`
-              id,
-              client_id,
-              batch_id,
-              status,
-              created_at,
-              client:clients!inner (
-                id,
-                name,
-                phone,
-                ticket_id,
-                total_amount,
-                avance_amount,
-                created_at
-              ),
-              items:demand_items (*)
-            `)
-            .eq('batch_id', batchId)
-            .order('created_at', { ascending: false }),
-          'Loading client demands with client amounts',
-        ) as DatabaseRow[];
-      } catch {
-        // 4. Base fallback without amount columns in select
-        rows = unwrap(
-          await supabaseAdmin
-            .from('client_demands')
-            .select(`
-              id,
-              client_id,
-              batch_id,
-              status,
-              created_at,
-              client:clients!inner (
-                id,
-                name,
-                phone,
-                ticket_id,
-                created_at
-              ),
-              items:demand_items (*)
-            `)
-            .eq('batch_id', batchId)
-            .order('created_at', { ascending: false }),
-          'Loading client demands base fallback',
-        ) as DatabaseRow[];
-      }
+      rows = [];
     }
   }
 
@@ -790,32 +736,14 @@ export async function POST(request: Request) {
       }
 
       // 2. Create client demand
-      let demand: DatabaseRow;
-      try {
-        demand = unwrap(
-          await supabaseAdmin
-            .from('client_demands')
-            .insert({ 
-              client_id: client.id, 
-              batch_id: activeBatch.id, 
-              status: 'pending',
-              avance_amount: numAvance,
-              total_amount: numTotal
-            })
-            .select()
-            .single(),
-          'Creating client demand',
-        ) as DatabaseRow;
-      } catch {
-        demand = unwrap(
-          await supabaseAdmin
-            .from('client_demands')
-            .insert({ client_id: client.id, batch_id: activeBatch.id, status: 'pending' })
-            .select()
-            .single(),
-          'Creating client demand fallback',
-        ) as DatabaseRow;
-      }
+      const demand = unwrap(
+        await supabaseAdmin
+          .from('client_demands')
+          .insert({ client_id: client.id, batch_id: activeBatch.id, status: 'pending' })
+          .select()
+          .single(),
+        'Creating client demand',
+      ) as DatabaseRow;
 
       // 2b. Always persist in metadata map for 100% sync reliability
       if (numAvance > 0 || numTotal > 0) {
@@ -949,18 +877,6 @@ export async function POST(request: Request) {
         }
       }
 
-      // 2. Update demand amounts on client_demands table
-      try {
-        const res = await supabaseAdmin
-          .from('client_demands')
-          .update({ avance_amount: numAvance, total_amount: numTotal })
-          .eq('id', demandId);
-        if (res.error) {
-          console.warn('Direct client_demands amounts update warning:', res.error);
-        }
-      } catch (err) {
-        console.warn('Direct client_demands update exception:', err);
-      }
 
       // 3. Always persist in avance & total metadata map for guaranteed durability
       try {
@@ -2068,26 +1984,13 @@ export async function POST(request: Request) {
                   client_id: targetClientId,
                   batch_id: activeBatch.id,
                   status: 'pending',
-                  avance_amount: listAvance,
-                  total_amount: listTotal,
                 })
                 .select()
                 .single(),
               'Creating initial client demand',
             ) as DatabaseRow;
           } catch {
-            newDemand = unwrap(
-              await supabaseAdmin
-                .from('client_demands')
-                .insert({
-                  client_id: targetClientId,
-                  batch_id: activeBatch.id,
-                  status: 'pending',
-                })
-                .select()
-                .single(),
-              'Creating initial client demand fallback',
-            ) as DatabaseRow;
+            newDemand = null;
           }
           demandId = newDemand?.id || '';
         }

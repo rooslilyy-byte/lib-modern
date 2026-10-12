@@ -134,8 +134,6 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             .select(`
               id,
               status,
-              avance_amount,
-              total_amount,
               created_at,
               client:clients!inner (
                 id,
@@ -155,7 +153,33 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
             `)
             .eq('batch_id', batch.id)
             .order('created_at', { ascending: false });
-          dData = res.data;
+          if (res.data) {
+            dData = res.data;
+          } else {
+            const fallbackRes = await supabase
+              .from('client_demands')
+              .select(`
+                id,
+                status,
+                created_at,
+                client:clients!inner (
+                  id,
+                  name,
+                  phone,
+                  ticket_id
+                ),
+                items:demand_items (
+                  id,
+                  product_name,
+                  quantity,
+                  is_in_stock,
+                  is_delivered
+                )
+              `)
+              .eq('batch_id', batch.id)
+              .order('created_at', { ascending: false });
+            dData = fallbackRes.data;
+          }
         } catch {
           const res = await supabase
             .from('client_demands')
@@ -184,8 +208,8 @@ export async function getFullStoreData(forceRefresh = false): Promise<FullStoreD
 
         if (dData) {
           demands = dData.map((d: any) => {
-            const dAvance = Number(d.avance_amount !== undefined && d.avance_amount !== null ? d.avance_amount : (d.client?.avance_amount || 0));
-            const dTotal = Number(d.total_amount !== undefined && d.total_amount !== null ? d.total_amount : (d.client?.total_amount || 0));
+            const dAvance = Number(d.avance_amount || d.client?.avance_amount || 0);
+            const dTotal = Number(d.total_amount || d.client?.total_amount || 0);
             return {
               id: d.id,
               client_id: d.client?.id || d.client_id,
@@ -458,8 +482,6 @@ export async function createClientDemand(
         client_id: existingClient.id,
         batch_id: activeBatch.id,
         status: 'pending',
-        avance_amount: Number(avance_amount) || 0,
-        total_amount: Number(total_amount) || 0,
       }).select().single();
 
       if (demand && validItems.length > 0) {
@@ -761,13 +783,7 @@ export async function updateClientDemand(
           await supabase.from('clients').update({ name: cleanName, phone: cleanPhone }).eq('id', currentDemand.client_id);
         }
       }
-      
-      try {
-        await supabase.from('client_demands').update({
-          avance_amount: Number(avance_amount) || 0,
-          total_amount: Number(total_amount) || 0,
-        }).eq('id', demandId);
-      } catch {}
+
 
       // 1. Delete all existing demand items
       await supabase.from('demand_items').delete().eq('demand_id', demandId);

@@ -64,8 +64,8 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
         const isComplete = totalItems > 0 && deliveredItems === totalItems;
         const isReady = !isComplete && totalItems > 0 && (inStockItems + deliveredItems) === totalItems;
 
-        const totalAmount = Number(dem.total_amount ?? dem.client.total_amount ?? 0);
-        const avanceAmount = Number(dem.avance_amount ?? dem.client.avance_amount ?? 0);
+        const totalAmount = Number(dem.total_amount || dem.client.total_amount || 0);
+        const avanceAmount = Number(dem.avance_amount || dem.client.avance_amount || 0);
 
         return {
           id: dem.id,
@@ -467,6 +467,29 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
                   {/* Inline Expanded Items Preview */}
                   {isExpanded && (
                     <div className="bg-neutral-50/80 border-t border-neutral-100 px-6 py-4 space-y-2 animate-in fade-in duration-150 text-right">
+                      {(cli.totalAmount > 0 || cli.avanceAmount > 0) && (
+                        <div className="flex flex-wrap items-center gap-3 pb-3 mb-2 border-b border-neutral-200/60 text-xs">
+                          {cli.totalAmount > 0 && (
+                            <span className="inline-flex items-center gap-1 font-bold text-neutral-800">
+                              <span className="text-neutral-500 font-medium">المبلغ الإجمالي:</span>
+                              <span className="font-mono text-neutral-900 bg-white px-2 py-0.5 rounded-md border border-neutral-200/80">{cli.totalAmount} د.م</span>
+                            </span>
+                          )}
+                          {cli.avanceAmount > 0 && (
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-800">
+                              <span className="text-neutral-500 font-medium">التسبيق:</span>
+                              <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">{cli.avanceAmount} د.م</span>
+                            </span>
+                          )}
+                          {cli.totalAmount > cli.avanceAmount && (
+                            <span className="inline-flex items-center gap-1 font-bold text-rose-800">
+                              <span className="text-neutral-500 font-medium">المتبقي:</span>
+                              <span className="font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">{cli.totalAmount - cli.avanceAmount} د.م</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {cli.missingCount === 0 ? (
                         <div className="text-xs font-bold text-emerald-700 py-1">
                           جميع كتب هذه الطلبية متوفرة بالمحل أو تم تسليمها بالكامل.
