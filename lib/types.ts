@@ -3,6 +3,8 @@ export interface Client {
   name: string;
   phone: string;
   ticket_id?: string | null;
+  avance_amount?: number;
+  total_amount?: number;
   created_at?: string;
 }
 

@@ -48,12 +48,19 @@ function EditDemandModal({
   const [clientName, setClientName] = useState(demand.client?.name || '');
   const [clientPhone, setClientPhone] = useState(demand.client?.phone || '');
   const [clientTicketId, setClientTicketId] = useState(demand.client?.ticket_id || '');
-  const [avanceAmount, setAvanceAmount] = useState<string>(
-    demand.avance_amount !== undefined && demand.avance_amount > 0 ? String(demand.avance_amount) : ''
-  );
-  const [totalAmount, setTotalAmount] = useState<string>(
-    demand.total_amount !== undefined && demand.total_amount > 0 ? String(demand.total_amount) : ''
-  );
+  const initialAvance = demand.avance_amount !== undefined && demand.avance_amount !== null && Number(demand.avance_amount) > 0
+    ? String(demand.avance_amount)
+    : (demand.client?.avance_amount !== undefined && demand.client?.avance_amount !== null && Number(demand.client.avance_amount) > 0
+        ? String(demand.client.avance_amount)
+        : '');
+  const initialTotal = demand.total_amount !== undefined && demand.total_amount !== null && Number(demand.total_amount) > 0
+    ? String(demand.total_amount)
+    : (demand.client?.total_amount !== undefined && demand.client?.total_amount !== null && Number(demand.client.total_amount) > 0
+        ? String(demand.client.total_amount)
+        : '');
+
+  const [avanceAmount, setAvanceAmount] = useState<string>(initialAvance);
+  const [totalAmount, setTotalAmount] = useState<string>(initialTotal);
   const [items, setItems] = useState<
     {
       id?: string;
@@ -92,11 +99,17 @@ function EditDemandModal({
       setClientPhone(demand.client.phone || '');
       setClientTicketId(demand.client.ticket_id || '');
     }
-    if (demand.avance_amount !== undefined && demand.avance_amount > 0) {
-      setAvanceAmount(String(demand.avance_amount));
+    const currentAvance = demand.avance_amount !== undefined && demand.avance_amount !== null
+      ? demand.avance_amount
+      : demand.client?.avance_amount;
+    if (currentAvance !== undefined && currentAvance !== null && Number(currentAvance) > 0) {
+      setAvanceAmount(String(currentAvance));
     }
-    if (demand.total_amount !== undefined && demand.total_amount > 0) {
-      setTotalAmount(String(demand.total_amount));
+    const currentTotal = demand.total_amount !== undefined && demand.total_amount !== null
+      ? demand.total_amount
+      : demand.client?.total_amount;
+    if (currentTotal !== undefined && currentTotal !== null && Number(currentTotal) > 0) {
+      setTotalAmount(String(currentTotal));
     }
   }, [demand, masterProducts]);
 
@@ -209,8 +222,8 @@ function EditDemandModal({
       return;
     }
 
-    const numAvance = avanceAmount !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : undefined;
-    const numTotal = totalAmount !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : undefined;
+    const numAvance = avanceAmount.trim() !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : 0;
+    const numTotal = totalAmount.trim() !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : 0;
     const cleanName = clientName.trim();
     const cleanPhone = clientPhone.trim();
     const cleanTicket = clientTicketId.trim() || undefined;

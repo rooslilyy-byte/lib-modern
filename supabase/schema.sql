@@ -128,6 +128,12 @@ ALTER TABLE public.demand_items ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pe
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS ticket_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_clients_ticket_id ON public.clients(ticket_id);
 
+-- Add financial columns to clients and client_demands if missing
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS avance_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS total_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.client_demands ADD COLUMN IF NOT EXISTS avance_amount NUMERIC DEFAULT 0;
+ALTER TABLE public.client_demands ADD COLUMN IF NOT EXISTS total_amount NUMERIC DEFAULT 0;
+
 -- 6. EMPLOYEES TABLE (الموظفين)
 CREATE TABLE IF NOT EXISTS public.employees (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

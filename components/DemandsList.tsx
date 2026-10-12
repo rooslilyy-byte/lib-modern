@@ -464,6 +464,12 @@ function DemandsList({
                         {completedItems} / {totalItems} مستلم
                       </span>
 
+                      {((demand.total_amount || demand.client?.total_amount || 0) > 0) && (
+                        <span className="text-[11px] sm:text-xs font-bold text-neutral-900 font-mono bg-neutral-100 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-neutral-200/80">
+                          {demand.total_amount || demand.client?.total_amount} د.م
+                        </span>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => setSelectedPrintDemand(demand)}

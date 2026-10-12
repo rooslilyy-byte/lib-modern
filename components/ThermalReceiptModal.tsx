@@ -126,28 +126,33 @@ function ThermalReceiptModal({ demand, onClose }: ThermalReceiptModalProps) {
       </table>
 
       {/* Financials & Totals Box */}
-      <div className="border-t-2 border-b-2 border-black py-1.5 px-1 my-1.5 text-[9.5px] space-y-1 text-black bg-neutral-50 font-bold">
-        <div className="flex justify-between items-center">
-          <span>المبلغ الإجمالي (Total):</span>
-          <span className="font-black font-mono">
-            {(demand.total_amount || 0) > 0 ? `${demand.total_amount} DH` : '—'}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span>التسبيق المؤدى (Avance):</span>
-          <span className="font-black font-mono">
-            {(demand.avance_amount || 0) > 0 ? `${demand.avance_amount} DH` : '0 DH'}
-          </span>
-        </div>
-        <div className="flex justify-between items-center border-t border-dashed border-black pt-1">
-          <span className="font-extrabold">المبلغ المتبقي (Le Reste):</span>
-          <span className="font-black font-mono text-[10.5px]">
-            {(demand.total_amount || 0) > 0 
-              ? `${Math.max(0, (demand.total_amount || 0) - (demand.avance_amount || 0))} DH`
-              : '—'}
-          </span>
-        </div>
-      </div>
+      {(() => {
+        const total = Number(demand.total_amount ?? demand.client?.total_amount ?? 0);
+        const avance = Number(demand.avance_amount ?? demand.client?.avance_amount ?? 0);
+        const reste = Math.max(0, total - avance);
+        return (
+          <div className="border-t-2 border-b-2 border-black py-1.5 px-1 my-1.5 text-[9.5px] space-y-1 text-black bg-neutral-50 font-bold">
+            <div className="flex justify-between items-center">
+              <span>المبلغ الإجمالي (Total):</span>
+              <span className="font-black font-mono">
+                {total > 0 ? `${total} DH` : '—'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>التسبيق المؤدى (Avance):</span>
+              <span className="font-black font-mono">
+                {avance > 0 ? `${avance} DH` : '0 DH'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-t border-dashed border-black pt-1">
+              <span className="font-extrabold">المبلغ المتبقي (Le Reste):</span>
+              <span className="font-black font-mono text-[10.5px]">
+                {total > 0 ? `${reste} DH` : '—'}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Signatures Side-by-Side */}
       <div className="pt-1.5 border-t border-dashed border-black text-[9.5px] flex justify-between items-end mt-1.5 text-black">

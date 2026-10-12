@@ -156,13 +156,15 @@ function AppShellContent({ children }: AppShellProps) {
       batch_id: activeBatch?.id || 'batch-001',
       status: 'pending',
       created_at: new Date().toISOString(),
-      avance_amount: avanceAmount || 0,
-      total_amount: totalAmount || 0,
+      avance_amount: Number(avanceAmount) || 0,
+      total_amount: Number(totalAmount) || 0,
       client: {
         id: tempClientId,
         name: cleanName,
         phone: cleanPhone,
         ticket_id: cleanTicketId,
+        avance_amount: Number(avanceAmount) || 0,
+        total_amount: Number(totalAmount) || 0,
         created_at: new Date().toISOString(),
       },
       items: validItems.map((it, idx) => ({
@@ -270,15 +272,20 @@ function AppShellContent({ children }: AppShellProps) {
           category: it.category ? getCategoryLabel(it.category) : 'كتب',
         }));
 
+        const newAvance = avanceAmount !== undefined ? (Number(avanceAmount) || 0) : (dem.avance_amount || 0);
+        const newTotal = totalAmount !== undefined ? (Number(totalAmount) || 0) : (dem.total_amount || 0);
+
         return {
           ...dem,
-          avance_amount: avanceAmount !== undefined ? avanceAmount : dem.avance_amount,
-          total_amount: totalAmount !== undefined ? totalAmount : dem.total_amount,
+          avance_amount: newAvance,
+          total_amount: newTotal,
           client: {
             id: dem.client?.id || dem.client_id || ('client-' + dem.id),
             name: cleanName,
             phone: cleanPhone,
             ticket_id: cleanTicketId !== undefined ? cleanTicketId : (dem.client?.ticket_id || null),
+            avance_amount: newAvance,
+            total_amount: newTotal,
             created_at: dem.client?.created_at || new Date().toISOString(),
           },
           items: updatedItems,

@@ -464,6 +464,7 @@ export default function EmployeesAndLists({
       name: list.client_name || '',
       phone: list.phone || '',
       avance_amount: list.avance_amount || 0,
+      total_amount: list.total_amount || 0,
       ticket_id: '', // KEEP ticket_id EMPTY / BLANK: user enters new ticket ID for pickup bill
       linkedSchoolListId: list.id,
     });

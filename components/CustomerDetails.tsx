@@ -149,6 +149,11 @@ function CustomerDetails({
     );
   }
 
+  const currentTotalAmount = Number(targetDemand.total_amount ?? targetDemand.client?.total_amount ?? 0);
+  const currentAvanceAmount = Number(targetDemand.avance_amount ?? targetDemand.client?.avance_amount ?? 0);
+  const remainingBalance = Math.max(0, currentTotalAmount - currentAvanceAmount);
+  const hasTotal = currentTotalAmount > 0;
+
   return (
     <div className="space-y-5">
       
@@ -287,7 +292,7 @@ function CustomerDetails({
           <div className="min-w-0">
             <p className="text-xs text-neutral-500 font-bold">المبلغ الإجمالي (Total):</p>
             <p className="text-base sm:text-lg font-black text-neutral-900 font-mono mt-0.5">
-              {(targetDemand.total_amount || 0) > 0 ? `${targetDemand.total_amount} د.م.` : 'غير محدد'}
+              {hasTotal ? `${currentTotalAmount} د.م.` : 'غير محدد'}
             </p>
           </div>
         </div>
@@ -300,7 +305,7 @@ function CustomerDetails({
           <div className="min-w-0">
             <p className="text-xs text-neutral-500 font-bold">التسبيق المؤدى (Avance):</p>
             <p className="text-base sm:text-lg font-black text-emerald-700 font-mono mt-0.5">
-              {(targetDemand.avance_amount || 0) > 0 ? `${targetDemand.avance_amount} د.م.` : '0 د.م.'}
+              {currentAvanceAmount > 0 ? `${currentAvanceAmount} د.م.` : '0 د.م.'}
             </p>
           </div>
         </div>
@@ -308,7 +313,7 @@ function CustomerDetails({
         {/* Remaining Balance */}
         <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 rounded-3xl p-4 flex items-center gap-3.5">
           <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${
-            Math.max(0, (targetDemand.total_amount || 0) - (targetDemand.avance_amount || 0)) > 0
+            remainingBalance > 0 && hasTotal
               ? 'bg-orange-50 border-orange-200/80 text-orange-700'
               : 'bg-neutral-100 border-neutral-200 text-neutral-500'
           }`}>
@@ -317,12 +322,12 @@ function CustomerDetails({
           <div className="min-w-0">
             <p className="text-xs text-neutral-500 font-bold">المبلغ المتبقي (Le Reste):</p>
             <p className={`text-base sm:text-lg font-black font-mono mt-0.5 ${
-              Math.max(0, (targetDemand.total_amount || 0) - (targetDemand.avance_amount || 0)) > 0
+              remainingBalance > 0 && hasTotal
                 ? 'text-orange-700'
                 : 'text-neutral-900'
             }`}>
-              {(targetDemand.total_amount || 0) > 0
-                ? `${Math.max(0, (targetDemand.total_amount || 0) - (targetDemand.avance_amount || 0))} د.م.`
+              {hasTotal
+                ? `${remainingBalance} د.م.`
                 : '—'}
             </p>
           </div>

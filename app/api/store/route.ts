@@ -323,28 +323,116 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
   const { map: progressiveMap } = await getProgressiveFulfillmentFromDb();
   const { map: avanceMap } = await getAvancePaymentsFromDb();
 
-  const rows = unwrap(
-    await supabaseAdmin
-      .from('client_demands')
-      .select(`
-        id,
-        client_id,
-        batch_id,
-        status,
-        created_at,
-        client:clients!inner (
+  let rows: DatabaseRow[] = [];
+  try {
+    // 1. Try full select with avance_amount and total_amount on client_demands AND clients
+    rows = unwrap(
+      await supabaseAdmin
+        .from('client_demands')
+        .select(`
           id,
-          name,
-          phone,
-          ticket_id,
-          created_at
-        ),
-        items:demand_items (*)
-      `)
-      .eq('batch_id', batchId)
-      .order('created_at', { ascending: false }),
-    'Loading client demands',
-  ) as DatabaseRow[];
+          client_id,
+          batch_id,
+          status,
+          avance_amount,
+          total_amount,
+          created_at,
+          client:clients!inner (
+            id,
+            name,
+            phone,
+            ticket_id,
+            total_amount,
+            avance_amount,
+            created_at
+          ),
+          items:demand_items (*)
+        `)
+        .eq('batch_id', batchId)
+        .order('created_at', { ascending: false }),
+      'Loading client demands with amounts',
+    ) as DatabaseRow[];
+  } catch {
+    try {
+      // 2. Fallback: amounts on client_demands only
+      rows = unwrap(
+        await supabaseAdmin
+          .from('client_demands')
+          .select(`
+            id,
+            client_id,
+            batch_id,
+            status,
+            avance_amount,
+            total_amount,
+            created_at,
+            client:clients!inner (
+              id,
+              name,
+              phone,
+              ticket_id,
+              created_at
+            ),
+            items:demand_items (*)
+          `)
+          .eq('batch_id', batchId)
+          .order('created_at', { ascending: false }),
+        'Loading client demands with demand amounts',
+      ) as DatabaseRow[];
+    } catch {
+      try {
+        // 3. Fallback: amounts on clients only
+        rows = unwrap(
+          await supabaseAdmin
+            .from('client_demands')
+            .select(`
+              id,
+              client_id,
+              batch_id,
+              status,
+              created_at,
+              client:clients!inner (
+                id,
+                name,
+                phone,
+                ticket_id,
+                total_amount,
+                avance_amount,
+                created_at
+              ),
+              items:demand_items (*)
+            `)
+            .eq('batch_id', batchId)
+            .order('created_at', { ascending: false }),
+          'Loading client demands with client amounts',
+        ) as DatabaseRow[];
+      } catch {
+        // 4. Base fallback without amount columns in select
+        rows = unwrap(
+          await supabaseAdmin
+            .from('client_demands')
+            .select(`
+              id,
+              client_id,
+              batch_id,
+              status,
+              created_at,
+              client:clients!inner (
+                id,
+                name,
+                phone,
+                ticket_id,
+                created_at
+              ),
+              items:demand_items (*)
+            `)
+            .eq('batch_id', batchId)
+            .order('created_at', { ascending: false }),
+          'Loading client demands base fallback',
+        ) as DatabaseRow[];
+      }
+    }
+  }
 
   const demands: ClientDemand[] = [];
 
@@ -375,13 +463,29 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
         };
       }) as ClientDemand['items'];
 
-    const storedAvance = row.avance_amount !== undefined && row.avance_amount !== null
+    const rawDemandAvance = (row.avance_amount !== undefined && row.avance_amount !== null && !isNaN(Number(row.avance_amount)))
       ? Number(row.avance_amount)
-      : (avanceMap[row.id]?.avance !== undefined ? Number(avanceMap[row.id].avance) : 0);
+      : undefined;
+    const rawClientAvance = (relatedClient.avance_amount !== undefined && relatedClient.avance_amount !== null && !isNaN(Number(relatedClient.avance_amount)))
+      ? Number(relatedClient.avance_amount)
+      : undefined;
+    const rawMapAvance = (avanceMap[row.id]?.avance !== undefined || avanceMap[relatedClient.id]?.avance !== undefined)
+      ? Number(avanceMap[row.id]?.avance ?? avanceMap[relatedClient.id]?.avance)
+      : undefined;
 
-    const storedTotal = row.total_amount !== undefined && row.total_amount !== null
+    const storedAvance = rawDemandAvance ?? rawClientAvance ?? rawMapAvance ?? 0;
+
+    const rawDemandTotal = (row.total_amount !== undefined && row.total_amount !== null && !isNaN(Number(row.total_amount)))
       ? Number(row.total_amount)
-      : (avanceMap[row.id]?.total !== undefined ? Number(avanceMap[row.id].total) : 0);
+      : undefined;
+    const rawClientTotal = (relatedClient.total_amount !== undefined && relatedClient.total_amount !== null && !isNaN(Number(relatedClient.total_amount)))
+      ? Number(relatedClient.total_amount)
+      : undefined;
+    const rawMapTotal = (avanceMap[row.id]?.total !== undefined || avanceMap[relatedClient.id]?.total !== undefined)
+      ? Number(avanceMap[row.id]?.total ?? avanceMap[relatedClient.id]?.total)
+      : undefined;
+
+    const storedTotal = rawDemandTotal ?? rawClientTotal ?? rawMapTotal ?? 0;
 
     demands.push({
       id: row.id,
@@ -396,6 +500,8 @@ async function getDemandsForBatch(batchId: string): Promise<ClientDemand[]> {
         name: relatedClient.name,
         phone: relatedClient.phone,
         ticket_id: relatedClient.ticket_id || null,
+        total_amount: storedTotal,
+        avance_amount: storedAvance,
         created_at: relatedClient.created_at,
       },
       items,
@@ -650,20 +756,37 @@ export async function POST(request: Request) {
         client = unwrap(
           await supabaseAdmin
             .from('clients')
-            .insert({ name: cleanName, phone: cleanPhone, ticket_id: cleanTicketId })
+            .insert({ 
+              name: cleanName, 
+              phone: cleanPhone, 
+              ticket_id: cleanTicketId,
+              avance_amount: numAvance,
+              total_amount: numTotal
+            })
             .select()
             .single(),
-          'Creating client with ticket_id',
+          'Creating client with ticket_id and amounts',
         ) as DatabaseRow;
       } catch {
-        client = unwrap(
-          await supabaseAdmin
-            .from('clients')
-            .insert({ name: cleanName, phone: cleanPhone })
-            .select()
-            .single(),
-          'Creating client fallback',
-        ) as DatabaseRow;
+        try {
+          client = unwrap(
+            await supabaseAdmin
+              .from('clients')
+              .insert({ name: cleanName, phone: cleanPhone, ticket_id: cleanTicketId })
+              .select()
+              .single(),
+            'Creating client with ticket_id fallback',
+          ) as DatabaseRow;
+        } catch {
+          client = unwrap(
+            await supabaseAdmin
+              .from('clients')
+              .insert({ name: cleanName, phone: cleanPhone })
+              .select()
+              .single(),
+            'Creating client base fallback',
+          ) as DatabaseRow;
+        }
       }
 
       // 2. Create client demand
@@ -692,11 +815,19 @@ export async function POST(request: Request) {
             .single(),
           'Creating client demand fallback',
         ) as DatabaseRow;
+      }
 
-        if (numAvance > 0 || numTotal > 0) {
+      // 2b. Always persist in metadata map for 100% sync reliability
+      if (numAvance > 0 || numTotal > 0) {
+        try {
           const { id: avId, map: avMap } = await getAvancePaymentsFromDb();
           avMap[demand.id] = { avance: numAvance, total: numTotal };
+          if (client.id) {
+            avMap[client.id] = { avance: numAvance, total: numTotal };
+          }
           await saveAvancePaymentsToDb(avMap, avId);
+        } catch (mErr) {
+          console.warn('Could not save metadata map on create_demand:', mErr);
         }
       }
 
@@ -776,40 +907,71 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, message: 'Demand not found' }, { status: 404 });
       }
 
-      // 1. Update client details
-      const clientUpdates: DatabaseRow = { name: cleanName, phone: cleanPhone };
-      if (cleanTicketId !== undefined) {
-        clientUpdates.ticket_id = cleanTicketId;
-      }
-
+      // 1. Update client details (including avance_amount and total_amount)
       try {
+        const clientUpdatesWithTotals: DatabaseRow = { 
+          name: cleanName, 
+          phone: cleanPhone,
+          avance_amount: numAvance,
+          total_amount: numTotal,
+        };
+        if (cleanTicketId !== undefined) {
+          clientUpdatesWithTotals.ticket_id = cleanTicketId;
+        }
         unwrap(
           await supabaseAdmin
             .from('clients')
-            .update(clientUpdates)
+            .update(clientUpdatesWithTotals)
             .eq('id', demand.client_id),
-          'Updating client with ticket_id',
+          'Updating client with amounts & ticket_id',
         );
       } catch {
-        unwrap(
-          await supabaseAdmin
-            .from('clients')
-            .update({ name: cleanName, phone: cleanPhone })
-            .eq('id', demand.client_id),
-          'Updating client fallback',
-        );
+        try {
+          const clientUpdates: DatabaseRow = { name: cleanName, phone: cleanPhone };
+          if (cleanTicketId !== undefined) {
+            clientUpdates.ticket_id = cleanTicketId;
+          }
+          unwrap(
+            await supabaseAdmin
+              .from('clients')
+              .update(clientUpdates)
+              .eq('id', demand.client_id),
+            'Updating client with ticket_id fallback',
+          );
+        } catch {
+          unwrap(
+            await supabaseAdmin
+              .from('clients')
+              .update({ name: cleanName, phone: cleanPhone })
+              .eq('id', demand.client_id),
+            'Updating client base fallback',
+          );
+        }
       }
 
-      // 2. Update demand amounts
+      // 2. Update demand amounts on client_demands table
       try {
-        await supabaseAdmin
+        const res = await supabaseAdmin
           .from('client_demands')
           .update({ avance_amount: numAvance, total_amount: numTotal })
           .eq('id', demandId);
-      } catch {
+        if (res.error) {
+          console.warn('Direct client_demands amounts update warning:', res.error);
+        }
+      } catch (err) {
+        console.warn('Direct client_demands update exception:', err);
+      }
+
+      // 3. Always persist in avance & total metadata map for guaranteed durability
+      try {
         const { id: avId, map: avMap } = await getAvancePaymentsFromDb();
         avMap[demandId] = { avance: numAvance, total: numTotal };
+        if (demand.client_id) {
+          avMap[demand.client_id] = { avance: numAvance, total: numTotal };
+        }
         await saveAvancePaymentsToDb(avMap, avId);
+      } catch (mErr) {
+        console.warn('Could not save metadata map on update_demand:', mErr);
       }
 
       // 3. Bulk Safe Upsert Master Products with Categories (onConflict: 'name')

@@ -68,6 +68,7 @@ const translations: Record<Language, Record<string, string>> = {
     'cust.col_client': 'الزبون واللائحة',
     'cust.col_phone': 'رقم الهاتف (الواتساب)',
     'cust.col_status': 'حالة الخصاص والاستلام',
+    'cust.col_total': 'المبلغ الإجمالي',
     'cust.col_details': 'التفاصيل',
 
     // Stock Allocation
@@ -166,6 +167,7 @@ const translations: Record<Language, Record<string, string>> = {
     'cust.col_client': 'Client & Liste',
     'cust.col_phone': 'Téléphone (WhatsApp)',
     'cust.col_status': 'État & Réception',
+    'cust.col_total': 'Montant Total',
     'cust.col_details': 'Détails',
 
     // Stock Allocation

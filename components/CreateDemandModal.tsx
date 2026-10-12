@@ -11,6 +11,7 @@ export interface DemandModalInitialData {
   name?: string;
   phone?: string;
   avance_amount?: number;
+  total_amount?: number;
   ticket_id?: string;
   linkedSchoolListId?: string;
 }
@@ -63,7 +64,12 @@ function CreateDemandModal({
             ? String(initialData.avance_amount)
             : (initialData.avance_amount === 0 ? '0' : '')
         );
-        setTotalAmount('');
+        const initTotal = initialData.total_amount;
+        setTotalAmount(
+          initTotal !== undefined && initTotal !== null && Number(initTotal) > 0
+            ? String(initTotal)
+            : ''
+        );
         setItems([{ product_name: '', quantity: 1, category: 'books' }]);
       } else {
         setClientName('');
@@ -160,8 +166,8 @@ function CreateDemandModal({
       return;
     }
 
-    const numAvance = avanceAmount !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : undefined;
-    const numTotal = totalAmount !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : undefined;
+    const numAvance = avanceAmount.trim() !== '' ? Math.max(0, parseFloat(avanceAmount) || 0) : 0;
+    const numTotal = totalAmount.trim() !== '' ? Math.max(0, parseFloat(totalAmount) || 0) : 0;
     const cleanName = clientName.trim();
     const cleanPhone = clientPhone.trim();
     const cleanTicket = clientTicketId.trim() || undefined;

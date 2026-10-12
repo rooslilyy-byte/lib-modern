@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Users, Search, Phone, Ticket, ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
+import { Users, Search, Phone, Ticket, ChevronDown, ChevronUp, Plus, Trash2, X, Receipt } from 'lucide-react';
 import { ClientDemand, MasterProduct } from '@/lib/types';
 import { useLanguage } from '@/lib/languageContext';
 import CreateDemandModal from './CreateDemandModal';
@@ -64,12 +64,17 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
         const isComplete = totalItems > 0 && deliveredItems === totalItems;
         const isReady = !isComplete && totalItems > 0 && (inStockItems + deliveredItems) === totalItems;
 
+        const totalAmount = Number(dem.total_amount ?? dem.client.total_amount ?? 0);
+        const avanceAmount = Number(dem.avance_amount ?? dem.client.avance_amount ?? 0);
+
         return {
           id: dem.id,
           clientId: dem.client.id,
           name: dem.client.name,
           phone: dem.client.phone,
           ticket_id: dem.client.ticket_id || null,
+          totalAmount,
+          avanceAmount,
           createdAt: dem.created_at || new Date().toISOString(),
           status: dem.status,
           totalItems,
@@ -303,6 +308,7 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
               </div>
               <div className="w-48 text-right">{t('cust.col_phone')}</div>
               <div className="flex-1 text-center">{t('cust.col_status')}</div>
+              <div className="w-28 text-center">{t('cust.col_total')}</div>
               <div className="w-20 text-left">{t('cust.col_details')}</div>
             </div>
 
@@ -385,6 +391,12 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
 
                       {/* Mobile Badges */}
                       <div className="md:hidden flex items-center gap-1.5 flex-wrap">
+                        {cli.totalAmount > 0 ? (
+                          <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-neutral-200/80 font-mono">
+                            <Receipt className="w-2.5 h-2.5 text-neutral-500 shrink-0" />
+                            <span>{cli.totalAmount} د.م</span>
+                          </span>
+                        ) : null}
                         <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-200/60">
                           {cli.totalItems} سلعة
                         </span>
@@ -421,6 +433,20 @@ const CustomersDirectoryContent = React.memo(function CustomersDirectoryContent(
                       ) : (
                         <span className="bg-neutral-100 text-neutral-700 text-xs font-bold px-3 py-1 rounded-full">
                           جميع طلباته مستلمة
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Section 3.5: Total Price Badge */}
+                    <div className="hidden md:flex w-28 items-center justify-center shrink-0">
+                      {cli.totalAmount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono bg-neutral-100 hover:bg-neutral-200/70 text-neutral-900 border border-neutral-200/80 shadow-2xs transition-colors">
+                          <Receipt className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                          <span>{cli.totalAmount} د.م</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium text-neutral-400 bg-neutral-50 border border-neutral-200/60" title="المبلغ الإجمالي غير محدد">
+                          —
                         </span>
                       )}
                     </div>
