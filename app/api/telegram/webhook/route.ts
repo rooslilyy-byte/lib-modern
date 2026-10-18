@@ -249,30 +249,35 @@ export async function POST(request: Request) {
       const text = (message.text || '').trim();
       const chatId = message.chat.id;
 
-      if (text === '📦 قائمة الخصاصات العادية' || text === '📦 كل الخصاص') {
-        await handleShortageQuery(chatId, 'regular', true);
-        return NextResponse.json({ ok: true });
+      try {
+        if (text === '📦 قائمة الخصاصات العادية' || text === '📦 كل الخصاص') {
+          await handleShortageQuery(chatId, 'regular', true);
+          return NextResponse.json({ ok: true });
+        }
+
+        if (text === '🚫 السلع المقطوعة') {
+          await handleShortageQuery(chatId, 'out_of_stock', true);
+          return NextResponse.json({ ok: true });
+        }
+
+        if (text === '📚 كتب فقط') {
+          await handleShortageQuery(chatId, 'books', true);
+          return NextResponse.json({ ok: true });
+        }
+
+        if (text === '✏️ أدوات فقط') {
+          await handleShortageQuery(chatId, 'supplies', true);
+          return NextResponse.json({ ok: true });
+        }
+
+        // Initial greeting on /start, /help, or any standard message
+        const welcomeText =
+          'مرحباً بك في نظام المكتبة العصرية 📚. اختر من القائمة أسفله لعرض الخصاص الحالي:';
+        await sendTelegramMessage(welcomeText, PERSISTENT_KEYBOARD, chatId);
+      } catch (msgError) {
+        console.error('Error handling Telegram message:', msgError);
       }
 
-      if (text === '🚫 السلع المقطوعة') {
-        await handleShortageQuery(chatId, 'out_of_stock', true);
-        return NextResponse.json({ ok: true });
-      }
-
-      if (text === '📚 كتب فقط') {
-        await handleShortageQuery(chatId, 'books', true);
-        return NextResponse.json({ ok: true });
-      }
-
-      if (text === '✏️ أدوات فقط') {
-        await handleShortageQuery(chatId, 'supplies', true);
-        return NextResponse.json({ ok: true });
-      }
-
-      // Initial greeting on /start, /help, or any standard message
-      const welcomeText =
-        'مرحباً بك في نظام المكتبة العصرية 📚. اختر من القائمة أسفله لعرض الخصاص الحالي:';
-      await sendTelegramMessage(welcomeText, PERSISTENT_KEYBOARD, chatId);
       return NextResponse.json({ ok: true });
     }
 
@@ -282,17 +287,24 @@ export async function POST(request: Request) {
       const data = callbackQuery.data;
       const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id;
 
-      // Immediately answer callback query to clear Telegram loading spinner
-      await answerCallbackQuery(callbackQuery.id);
+      // 1. Immediately call Telegram's answerCallbackQuery API as the very first operation
+      if (callbackQuery.id) {
+        await answerCallbackQuery(callbackQuery.id);
+      }
 
-      if (data === 'shortages_regular' || data === 'view_shortages' || data === 'shortage_all') {
-        await handleShortageQuery(chatId, 'regular', false);
-      } else if (data === 'shortages_out_of_stock') {
-        await handleShortageQuery(chatId, 'out_of_stock', false);
-      } else if (data === 'shortage_books') {
-        await handleShortageQuery(chatId, 'books', false);
-      } else if (data === 'shortage_supplies') {
-        await handleShortageQuery(chatId, 'supplies', false);
+      // 2. Wrap shortage calculation and message dispatch inside a try...catch block
+      try {
+        if (data === 'shortages_regular' || data === 'view_shortages' || data === 'shortage_all') {
+          await handleShortageQuery(chatId, 'regular', false);
+        } else if (data === 'shortages_out_of_stock') {
+          await handleShortageQuery(chatId, 'out_of_stock', false);
+        } else if (data === 'shortage_books') {
+          await handleShortageQuery(chatId, 'books', false);
+        } else if (data === 'shortage_supplies') {
+          await handleShortageQuery(chatId, 'supplies', false);
+        }
+      } catch (dispatchError) {
+        console.error('Error during Telegram shortage calculation and dispatch:', dispatchError);
       }
 
       return NextResponse.json({ ok: true });
@@ -301,6 +313,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Telegram webhook handler exception:', error);
-    return NextResponse.json({ ok: false, error: 'Internal server error' });
+    // Always return status 200 with { ok: true } to Telegram to prevent retry loops
+    return NextResponse.json({ ok: true });
   }
 }
