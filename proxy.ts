@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Immediately bypass Telegram webhooks and cron endpoints
@@ -54,7 +54,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const proxy = middleware;
+export const middleware = proxy;
 
 export const config = {
   matcher: [
@@ -70,4 +70,4 @@ export const config = {
   ],
 };
 
-export default middleware;
+export default proxy;
