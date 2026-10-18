@@ -1,12 +1,21 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // 1. Immediately bypass Telegram webhooks and cron endpoints
+  if (
+    pathname.startsWith('/api/telegram') ||
+    pathname.startsWith('/api/cron')
+  ) {
+    return NextResponse.next();
+  }
+
   const sessionCookie = request.cookies.get('session_auth')?.value;
   const isAuthenticated = sessionCookie === 'authenticated';
 
-  // Public assets and internal Next.js resources
+  // 2. Public assets and internal Next.js resources
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
@@ -29,7 +38,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Redirect authenticated user away from /login
+  // 3. Redirect authenticated user away from /login
   if (pathname === '/login') {
     if (isAuthenticated) {
       return NextResponse.redirect(new URL('/', request.url));
@@ -37,7 +46,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Protect internal dashboard routes
+  // 4. Protect internal dashboard routes
   if (!isAuthenticated) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
@@ -45,10 +54,20 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const middleware = proxy;
+export const proxy = middleware;
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - api/telegram (Telegram webhooks)
+     * - api/cron (Daily cron reports)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|api/telegram|api/cron).*)',
+  ],
 };
 
-export default proxy;
+export default middleware;
