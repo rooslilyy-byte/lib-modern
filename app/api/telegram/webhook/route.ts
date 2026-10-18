@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db';
 import {
+  TELEGRAM_BOT_TOKEN,
   sendTelegramMessage,
-  answerCallbackQuery,
   escapeHtml,
   sortArabicFirst,
   SHORTAGE_INLINE_BUTTONS,
@@ -20,10 +20,61 @@ const PERSISTENT_KEYBOARD = {
   is_persistent: true,
 };
 
+const RUPTURE_METADATA_PREFIX = '__METADATA_EN_RUPTURE__::';
+
 export async function GET(req: NextRequest) {
-  const type = req.nextUrl.searchParams.get('type');
+  const { searchParams } = req.nextUrl;
+  const action = searchParams.get('action');
+  const type = searchParams.get('type');
   const targetChatId = '6812050393';
 
+  // STEP 1: Dedicated self-healing endpoint to register webhook with allowed_updates
+  if (action === 'reset_webhook') {
+    try {
+      const webhookPayload = {
+        url: 'https://lib-modern.vercel.app/api/telegram/webhook',
+        allowed_updates: ['message', 'callback_query'],
+        drop_pending_updates: true,
+      };
+
+      const response = await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        }
+      );
+
+      const data = await response.json();
+      return NextResponse.json({
+        action: 'reset_webhook',
+        sentPayload: webhookPayload,
+        telegramResponse: data,
+      }, { status: 200 });
+    } catch (err: any) {
+      console.error('[TELEGRAM_WEBHOOK] Failed to reset webhook:', err);
+      return NextResponse.json({
+        ok: false,
+        error: err?.message || String(err),
+      }, { status: 500 });
+    }
+  }
+
+  // Inspect current Telegram webhook status & registered allowed_updates
+  if (action === 'get_webhook_info') {
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo`
+      );
+      const data = await response.json();
+      return NextResponse.json(data, { status: 200 });
+    } catch (err: any) {
+      return NextResponse.json({ ok: false, error: err?.message || String(err) }, { status: 500 });
+    }
+  }
+
+  // Browser testing triggers
   if (type === 'regular') {
     await handleShortageQuery(targetChatId, 'regular', false);
     return NextResponse.json({
@@ -41,11 +92,11 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    error: 'Invalid type. Use ?type=regular or ?type=out_of_stock',
+    status: 'active',
+    botTokenConfigured: Boolean(TELEGRAM_BOT_TOKEN),
+    info: 'Visit ?action=reset_webhook to register allowed_updates, ?action=get_webhook_info to inspect, or ?type=regular to test.',
   });
 }
-
-const RUPTURE_METADATA_PREFIX = '__METADATA_EN_RUPTURE__::';
 
 /**
  * Query Supabase for shortage items and dispatch aggregated response.
@@ -229,91 +280,109 @@ async function handleShortageQuery(
         : undefined;
       await sendTelegramMessage(chunks[i], markup, chatId);
     }
-  } catch (err) {
-    console.error('Error fetching shortage items:', err);
+  } catch (err: any) {
+    console.error('[TELEGRAM_WEBHOOK_PROCESSING_ERROR]:', err);
+    const errMsg = err?.message || String(err);
     await sendTelegramMessage(
-      '⚠️ حدث خطأ أثناء جلب قائمة الخصاص. يرجى المحاولة مرة أخرى.',
+      `⚠️ تعذر جلب قائمة الخصاص:\n<code>${escapeHtml(errMsg)}</code>`,
       withBottomKeyboard ? PERSISTENT_KEYBOARD : undefined,
       chatId
     );
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  // Read payload defensively
+  let body: any;
   try {
-    const update = await request.json();
+    body = await req.json();
+  } catch (parseErr) {
+    console.error('[TELEGRAM_WEBHOOK] JSON Parse Error:', parseErr);
+    return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 200 });
+  }
 
-    // 1. Handle incoming text messages
-    if (update.message) {
-      const message = update.message;
+  try {
+    // 1. Detect and handle callback_query from inline buttons
+    if (body?.callback_query) {
+      const callbackQuery = body.callback_query;
+      const callbackQueryId = callbackQuery.id;
+      const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id || '6812050393';
+      const callbackData = callbackQuery.data;
+
+      // IMMEDIATELY fire answerCallbackQuery to Telegram (without awaiting long calculations first) so the UI unfreezes immediately:
+      if (callbackQueryId && TELEGRAM_BOT_TOKEN) {
+        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callback_query_id: callbackQueryId }),
+        }).catch((err) => console.error('[TELEGRAM_WEBHOOK] answerCallbackQuery failed:', err));
+      }
+
+      // ROUTE DISPATCH WITH TRY-CATCH
+      try {
+        if (
+          callbackData === 'shortages_regular' ||
+          callbackData === 'view_shortages' ||
+          callbackData === 'shortage_all'
+        ) {
+          await handleShortageQuery(chatId, 'regular', false);
+        } else if (callbackData === 'shortages_out_of_stock') {
+          await handleShortageQuery(chatId, 'out_of_stock', false);
+        } else if (callbackData === 'shortage_books') {
+          await handleShortageQuery(chatId, 'books', false);
+        } else if (callbackData === 'shortage_supplies') {
+          await handleShortageQuery(chatId, 'supplies', false);
+        }
+      } catch (err: any) {
+        console.error('[TELEGRAM_WEBHOOK_PROCESSING_ERROR]:', err);
+        const errMsg = err?.message || String(err);
+        await sendTelegramMessage(
+          `⚠️ تعذر جلب قائمة الخصاص:\n<code>${escapeHtml(errMsg)}</code>`,
+          undefined,
+          chatId
+        );
+      }
+
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
+
+    // 2. Detect and handle standard text messages
+    if (body?.message) {
+      const message = body.message;
       const text = (message.text || '').trim();
-      const chatId = message.chat.id;
+      const chatId = message.chat?.id || '6812050393';
 
       try {
         if (text === '📦 قائمة الخصاصات العادية' || text === '📦 كل الخصاص') {
           await handleShortageQuery(chatId, 'regular', true);
-          return NextResponse.json({ ok: true });
-        }
-
-        if (text === '🚫 السلع المقطوعة') {
+        } else if (text === '🚫 السلع المقطوعة') {
           await handleShortageQuery(chatId, 'out_of_stock', true);
-          return NextResponse.json({ ok: true });
-        }
-
-        if (text === '📚 كتب فقط') {
+        } else if (text === '📚 كتب فقط') {
           await handleShortageQuery(chatId, 'books', true);
-          return NextResponse.json({ ok: true });
-        }
-
-        if (text === '✏️ أدوات فقط') {
+        } else if (text === '✏️ أدوات فقط') {
           await handleShortageQuery(chatId, 'supplies', true);
-          return NextResponse.json({ ok: true });
+        } else {
+          const welcomeText =
+            'مرحباً بك في نظام المكتبة العصرية 📚. اختر من القائمة أسفله لعرض الخصاص الحالي:';
+          await sendTelegramMessage(welcomeText, PERSISTENT_KEYBOARD, chatId);
         }
-
-        // Initial greeting on /start, /help, or any standard message
-        const welcomeText =
-          'مرحباً بك في نظام المكتبة العصرية 📚. اختر من القائمة أسفله لعرض الخصاص الحالي:';
-        await sendTelegramMessage(welcomeText, PERSISTENT_KEYBOARD, chatId);
-      } catch (msgError) {
-        console.error('Error handling Telegram message:', msgError);
+      } catch (err: any) {
+        console.error('[TELEGRAM_WEBHOOK_PROCESSING_ERROR]:', err);
+        const errMsg = err?.message || String(err);
+        await sendTelegramMessage(
+          `⚠️ تعذر جلب قائمة الخصاص:\n<code>${escapeHtml(errMsg)}</code>`,
+          undefined,
+          chatId
+        );
       }
 
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // 2. Handle callback queries from inline buttons
-    if (update.callback_query) {
-      const callbackQuery = update.callback_query;
-      const data = callbackQuery.data;
-      const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id;
-
-      // 1. Immediately call Telegram's answerCallbackQuery API as the very first operation
-      if (callbackQuery.id) {
-        await answerCallbackQuery(callbackQuery.id);
-      }
-
-      // 2. Wrap shortage calculation and message dispatch inside a try...catch block
-      try {
-        if (data === 'shortages_regular' || data === 'view_shortages' || data === 'shortage_all') {
-          await handleShortageQuery(chatId, 'regular', false);
-        } else if (data === 'shortages_out_of_stock') {
-          await handleShortageQuery(chatId, 'out_of_stock', false);
-        } else if (data === 'shortage_books') {
-          await handleShortageQuery(chatId, 'books', false);
-        } else if (data === 'shortage_supplies') {
-          await handleShortageQuery(chatId, 'supplies', false);
-        }
-      } catch (dispatchError) {
-        console.error('Error during Telegram shortage calculation and dispatch:', dispatchError);
-      }
-
-      return NextResponse.json({ ok: true });
-    }
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
-    console.error('Telegram webhook handler exception:', error);
+    console.error('[TELEGRAM_WEBHOOK_UNEXPECTED_EXCEPTION]:', error);
     // Always return status 200 with { ok: true } to Telegram to prevent retry loops
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 }
