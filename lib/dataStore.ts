@@ -11,6 +11,7 @@ import {
   SchoolListStatus
 } from './types';
 import { getCategoryLabel } from './categoryUtils';
+import { notifyNewShortage } from './telegram';
 
 // Helper to determine if we are running in browser context to fetch API route
 const isBrowser = typeof window !== 'undefined';
@@ -501,6 +502,22 @@ export async function createClientDemand(
           const fallback = demandItems.map(({ fulfilled_quantity, status, ...rest }) => rest);
           await supabase.from('demand_items').insert(fallback);
         }
+
+        // Asynchronously notify Telegram for newly created shortages (non-blocking)
+        for (const it of validItems) {
+          const isExplicitlyAvailable = (it as any).is_available === true || (it as any).is_in_stock === true;
+          const isShortage = !isExplicitlyAvailable || (it as any).status === 'خصاص معلق' || (it as any).status === 'pending';
+          if (isShortage) {
+            const catLabel = (it as any).category ? getCategoryLabel((it as any).category) : 'كتب';
+            const qty = Math.max(1, Math.floor(it.quantity || 1));
+            const pName = (it.product_name || '').trim();
+            if (pName) {
+              notifyNewShortage(pName, qty, catLabel).catch((err) => {
+                console.warn('Telegram shortage notification background error:', err);
+              });
+            }
+          }
+        }
       }
 
       if (linkedSchoolListId) {
@@ -785,6 +802,8 @@ export async function updateClientDemand(
       }
 
 
+      const existingItemIds = new Set((currentDemand.items || []).map((e: any) => e.id).filter(Boolean));
+
       // 1. Delete all existing demand items
       await supabase.from('demand_items').delete().eq('demand_id', demandId);
 
@@ -798,6 +817,24 @@ export async function updateClientDemand(
           is_delivered: Boolean(item.is_delivered),
         }));
         await supabase.from('demand_items').insert(demandItems);
+
+        // Check items in the edited demand: If newly added items or items marked as shortage ("خصاص معلق" / !is_available) were added, trigger notifyNewShortage
+        for (const it of validItems) {
+          const pName = (it.product_name || '').trim();
+          if (!pName) continue;
+
+          const isNewlyAdded = !it.id || !existingItemIds.has(it.id);
+          const isExplicitlyShortage = (it as any).status === 'خصاص معلق' || (it as any).is_available === false;
+          const isNotInStock = !it.is_in_stock && !it.is_delivered;
+
+          if ((isNewlyAdded && isNotInStock) || isExplicitlyShortage || (isNewlyAdded && (it as any).is_available === false)) {
+            const catLabel = (it as any).category ? getCategoryLabel((it as any).category) : 'كتب';
+            const qty = Math.max(1, Math.floor(it.quantity || 1));
+            notifyNewShortage(pName, qty, catLabel).catch((err) => {
+              console.warn('Telegram edit shortage notification background error:', err);
+            });
+          }
+        }
       }
     }
     invalidateStoreCache();

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db';
 import type { ClientDemand, MasterProduct, PurchaseBatch, Employee, SchoolList } from '@/lib/types';
 import { getCategoryLabel } from '@/lib/categoryUtils';
+import { notifyNewShortage } from '@/lib/telegram';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -796,6 +797,22 @@ export async function POST(request: Request) {
             'Bulk creating demand items fallback',
           );
         }
+
+        // Asynchronously notify Telegram for newly created shortages (non-blocking)
+        for (const item of validItems) {
+          const isExplicitlyAvailable = item.is_available === true || item.is_in_stock === true;
+          const isShortage = !isExplicitlyAvailable || item.status === 'خصاص معلق' || item.status === 'pending';
+          if (isShortage) {
+            const catLabel = item.category ? getCategoryLabel(item.category) : DEFAULT_PRODUCT_CATEGORY;
+            const qty = Math.max(1, Math.floor(Number(item.quantity) || 1));
+            const pName = (item.product_name || '').trim();
+            if (pName) {
+              notifyNewShortage(pName, qty, catLabel).catch((err) => {
+                console.warn('Telegram shortage notification background error:', err);
+              });
+            }
+          }
+        }
       }
 
       const targetSchoolListId = linkedSchoolListId || schoolListId;
@@ -896,7 +913,15 @@ export async function POST(request: Request) {
       );
       await ensureMasterProductsWithCategories(validItems);
 
-      // 4. Clean update: Delete all existing demand items for this demand/client
+      // 4. Fetch existing items to identify newly added items
+      const { data: existingItemsData } = await supabaseAdmin
+        .from('demand_items')
+        .select('id, product_name, is_in_stock, is_delivered, status')
+        .eq('demand_id', demandId);
+      const existingItems = existingItemsData || [];
+      const existingItemIds = new Set(existingItems.map((e: any) => e.id).filter(Boolean));
+
+      // 5. Clean update: Delete all existing demand items for this demand/client
       unwrap(
         await supabaseAdmin
           .from('demand_items')
@@ -905,7 +930,7 @@ export async function POST(request: Request) {
         'Deleting existing demand items',
       );
 
-      // 5. Bulk Insert newly submitted array of products into demand_items table
+      // 6. Bulk Insert newly submitted array of products into demand_items table
       if (validItems.length > 0) {
         const demandItemsToInsert = validItems.map((item: any) => ({
           demand_id: demandId,
@@ -934,6 +959,24 @@ export async function POST(request: Request) {
               .insert(fallbackItems),
             'Bulk inserting updated demand items fallback',
           );
+        }
+
+        // Check items in the edited demand: If newly added items or items marked as shortage ("خصاص معلق" / !is_available) were added, trigger notifyNewShortage
+        for (const it of validItems) {
+          const pName = (it.product_name || '').trim();
+          if (!pName) continue;
+
+          const isNewlyAdded = !it.id || !existingItemIds.has(it.id);
+          const isExplicitlyShortage = it.status === 'خصاص معلق' || it.is_available === false;
+          const isNotInStock = !it.is_in_stock && !it.is_delivered;
+
+          if ((isNewlyAdded && isNotInStock) || isExplicitlyShortage || (isNewlyAdded && it.is_available === false)) {
+            const catLabel = it.category ? getCategoryLabel(it.category) : DEFAULT_PRODUCT_CATEGORY;
+            const qty = Math.max(1, Math.floor(Number(it.quantity) || 1));
+            notifyNewShortage(pName, qty, catLabel).catch((err) => {
+              console.warn('Telegram edit shortage notification background error:', err);
+            });
+          }
         }
       }
 
