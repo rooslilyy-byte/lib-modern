@@ -151,10 +151,45 @@ export async function GET() {
       }
     }
 
-    for (let i = 0; i < chunks.length; i++) {
-      const isLast = i === chunks.length - 1;
-      await sendTelegramMessage(chunks[i], isLast ? SHORTAGE_INLINE_BUTTONS : undefined);
+    // 4. Query all active chat_ids from telegram_subscribers with fallback to 6812050393
+    let subscriberChatIds: string[] = [];
+    try {
+      const { data: subscribers, error: subError } = await supabaseAdmin
+        .from('telegram_subscribers')
+        .select('chat_id');
+
+      if (!subError && subscribers && subscribers.length > 0) {
+        subscriberChatIds = Array.from(
+          new Set(
+            subscribers
+              .map((s: any) => (s.chat_id != null ? String(s.chat_id).trim() : ''))
+              .filter(Boolean)
+          )
+        );
+      } else if (subError) {
+        console.warn('Error fetching telegram_subscribers for daily report:', subError);
+      }
+    } catch (subErr) {
+      console.warn('Exception querying telegram_subscribers for daily report:', subErr);
     }
+
+    if (subscriberChatIds.length === 0) {
+      subscriberChatIds = ['6812050393'];
+    }
+
+    // 5. Broadcast daily report chunks to all subscribers in parallel using Promise.allSettled
+    await Promise.allSettled(
+      subscriberChatIds.map(async (chatId) => {
+        for (let i = 0; i < chunks.length; i++) {
+          const isLast = i === chunks.length - 1;
+          await sendTelegramMessage(
+            chunks[i],
+            isLast ? SHORTAGE_INLINE_BUTTONS : undefined,
+            chatId
+          );
+        }
+      })
+    );
 
     return NextResponse.json({
       ok: true,
@@ -162,6 +197,7 @@ export async function GET() {
       demandsCount,
       totalShortageQty,
       shortagesCount: sortedList.length,
+      subscribersCount: subscriberChatIds.length,
     });
   } catch (error: any) {
     console.error('Error generating midnight daily report:', error);

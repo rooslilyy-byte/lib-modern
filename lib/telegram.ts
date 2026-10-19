@@ -141,7 +141,54 @@ export function sortArabicFirst<T extends { name: string }>(items: T[]): T[] {
 }
 
 /**
- * Notify the group/chat about a newly requested shortage item.
+ * Query all active chat_ids from telegram_subscribers.
+ * Falls back to default TELEGRAM_CHAT_ID ('6812050393') if empty or on error.
+ */
+export async function getTelegramSubscriberChatIds(): Promise<string[]> {
+  const defaultChatId = TELEGRAM_CHAT_ID || '6812050393';
+  try {
+    let client: any = null;
+    if (typeof window === 'undefined') {
+      try {
+        const { supabaseAdmin } = await import('@/lib/db');
+        client = supabaseAdmin;
+      } catch (e) {
+        // Fallback to public client if supabaseAdmin is unavailable
+      }
+    }
+    if (!client) {
+      const { supabase } = await import('./supabase');
+      client = supabase;
+    }
+
+    const { data, error } = await client
+      .from('telegram_subscribers')
+      .select('chat_id');
+
+    if (error) {
+      console.warn('[TELEGRAM] Error fetching subscribers from telegram_subscribers:', error);
+      return [defaultChatId];
+    }
+
+    if (!data || data.length === 0) {
+      return [defaultChatId];
+    }
+
+    const ids = data
+      .map((row: any) => (row.chat_id != null ? String(row.chat_id).trim() : ''))
+      .filter(Boolean);
+
+    const uniqueIds = Array.from(new Set(ids));
+    return uniqueIds.length > 0 ? uniqueIds : [defaultChatId];
+  } catch (err) {
+    console.warn('[TELEGRAM] Failed to fetch subscribers, falling back to default:', err);
+    return [defaultChatId];
+  }
+}
+
+/**
+ * Notify subscribers about a newly requested shortage item.
+ * Broadcasts to all active telegram_subscribers in parallel using Promise.allSettled.
  */
 export async function notifyNewShortage(
   productName: string,
@@ -157,5 +204,13 @@ export async function notifyNewShortage(
     `الكمية: ${safeQty} قطعة | الصنف: ${safeCat}`,
   ].join('\n');
 
-  return sendTelegramMessage(text, SHORTAGE_INLINE_BUTTONS);
+  const subscriberChatIds = await getTelegramSubscriberChatIds();
+  const results = await Promise.allSettled(
+    subscriberChatIds.map((chatId) =>
+      sendTelegramMessage(text, SHORTAGE_INLINE_BUTTONS, chatId)
+    )
+  );
+
+  return results;
 }
+

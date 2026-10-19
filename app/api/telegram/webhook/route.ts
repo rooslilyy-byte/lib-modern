@@ -6,6 +6,7 @@ import {
   escapeHtml,
   sortArabicFirst,
   SHORTAGE_INLINE_BUTTONS,
+  answerCallbackQuery,
 } from '@/lib/telegram';
 import { normalizeCategory } from '@/lib/categoryUtils';
 
@@ -310,12 +311,10 @@ export async function POST(req: Request) {
       const callbackData = callbackQuery.data;
 
       // IMMEDIATELY fire answerCallbackQuery to Telegram (without awaiting long calculations first) so the UI unfreezes immediately:
-      if (callbackQueryId && TELEGRAM_BOT_TOKEN) {
-        fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callback_query_id: callbackQueryId }),
-        }).catch((err) => console.error('[TELEGRAM_WEBHOOK] answerCallbackQuery failed:', err));
+      if (callbackQueryId) {
+        answerCallbackQuery(callbackQueryId).catch((err) =>
+          console.error('[TELEGRAM_WEBHOOK] answerCallbackQuery failed:', err)
+        );
       }
 
       // ROUTE DISPATCH WITH TRY-CATCH
@@ -353,7 +352,36 @@ export async function POST(req: Request) {
       const chatId = message.chat?.id || '6812050393';
 
       try {
-        if (text === '📦 قائمة الخصاصات العادية' || text === '📦 كل الخصاص') {
+        if (text === '/start' || text.startsWith('/start')) {
+          const userName =
+            message.from?.first_name ||
+            message.from?.username ||
+            'مرحباً بك';
+
+          try {
+            await supabaseAdmin.from('telegram_subscribers').upsert(
+              {
+                chat_id: String(chatId),
+                name: userName,
+                created_at: new Date().toISOString(),
+              },
+              { onConflict: 'chat_id' }
+            );
+          } catch (dbErr) {
+            console.error('[TELEGRAM_WEBHOOK] Failed to upsert telegram_subscribers:', dbErr);
+          }
+
+          const startWelcomeMessage =
+            'مرحباً بك في نظام تتبع المخزون والخصاص 📦✨\n\n' +
+            'تم تفعيل اشتراكك بنجاح في الإشعارات والتقارير اليومية.\n\n' +
+            'يمكنك في أي وقت:\n' +
+            '• الاطلاع الفوري على نواقص المحل الحالية.\n' +
+            '• متابعة السلع المقطوعة التي تحتاج إلى إعادة طلب.\n' +
+            '• استلام التقرير اليومي الشامل تلقائياً في منتصف الليل.\n\n' +
+            'اضغط على أحد الأزرار أسفله للاطلاع على القوائم فوراً 👇';
+
+          await sendTelegramMessage(startWelcomeMessage, SHORTAGE_INLINE_BUTTONS, chatId);
+        } else if (text === '📦 قائمة الخصاصات العادية' || text === '📦 كل الخصاص') {
           await handleShortageQuery(chatId, 'regular', true);
         } else if (text === '🚫 السلع المقطوعة') {
           await handleShortageQuery(chatId, 'out_of_stock', true);
