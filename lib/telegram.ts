@@ -174,11 +174,11 @@ export async function getTelegramSubscriberChatIds(): Promise<string[]> {
       return [defaultChatId];
     }
 
-    const ids = data
-      .map((row: any) => (row.chat_id != null ? String(row.chat_id).trim() : ''))
-      .filter(Boolean);
+    const ids: string[] = (data as { chat_id?: string | number | null }[])
+      .map((row) => (row.chat_id != null ? String(row.chat_id).trim() : ''))
+      .filter((id): id is string => Boolean(id));
 
-    const uniqueIds = Array.from(new Set(ids));
+    const uniqueIds: string[] = Array.from(new Set<string>(ids));
     return uniqueIds.length > 0 ? uniqueIds : [defaultChatId];
   } catch (err) {
     console.warn('[TELEGRAM] Failed to fetch subscribers, falling back to default:', err);
